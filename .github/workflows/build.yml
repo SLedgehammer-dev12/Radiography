@@ -25,9 +25,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libegl1 libgl1 libxkbcommon-x11-0
       - name: Install Python deps
-        run: pip install -r requirements.txt
+        run: pip install -r requirements.txt pytest
       - name: Run tests
-        run: python3 -m pytest tests/ -v
+        run: python -m pytest tests/ -v
 
   build-windows:
     name: Build Windows .exe
