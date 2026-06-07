@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.spec
+
+# macOS
+.DS_Store
+*.dmg
+*.app
+
+# Windows
+*.exe
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Reports (generated PDFs)
+RT_Inspection_Report_*.pdf
+
+# Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# OS metadata
+.DS_Store?
