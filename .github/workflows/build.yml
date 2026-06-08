@@ -107,19 +107,20 @@ jobs:
           VER="${{ github.ref_name }}"
           VER="${VER#v}"
           python3 -c "
-import re
-with open('CHANGELOG.md') as f:
-    content = f.read()
-pattern = r'##\s+\[?' + re.escape(VER) + r'\]?.*?\n(.*?)(?=\n##\s|$)'
-match = re.search(pattern, content, re.DOTALL)
-if match:
-    notes = match.group(1).strip()
-    with open('release_notes.txt', 'w') as out:
-        out.write(notes)
-else:
-    with open('release_notes.txt', 'w') as out:
-        out.write('See CHANGELOG.md for details.')
-"
+          import re, sys
+          with open('CHANGELOG.md') as f:
+              content = f.read()
+          ver = '${VER}'
+          pattern = r'##\s+\[?' + re.escape(ver) + r'\]?.*?\n(.*?)(?=\n##\s|$)'
+          match = re.search(pattern, content, re.DOTALL)
+          if match:
+              notes = match.group(1).strip()
+              with open('release_notes.txt', 'w') as out:
+                  out.write(notes)
+          else:
+              with open('release_notes.txt', 'w') as out:
+                  out.write('See CHANGELOG.md for details.')
+          "
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
