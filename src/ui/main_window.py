@@ -5,7 +5,8 @@ from datetime import datetime
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, 
                              QLabel, QComboBox, QLineEdit, QRadioButton, QButtonGroup, 
                              QCheckBox, QPushButton, QGroupBox, QScrollArea, QFileDialog, 
-                             QMessageBox, QFormLayout, QTabWidget, QDialog, QProgressDialog, QMenuBar)
+                             QMessageBox, QFormLayout, QTabWidget, QDialog, QProgressDialog,
+                             QMenuBar, QSplitter)
 from PyQt6.QtCore import Qt, QThread, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont, QPalette, QColor, QDoubleValidator, QAction
 
@@ -162,15 +163,10 @@ class MainWindow(QMainWindow):
         top_bar.addWidget(self.btn_export)
         main_layout.addLayout(top_bar)
 
-        # ---------------- MIDDLE CONTENT (Split: Left Inputs, Right Canvas & Outputs) ----------------
-        content_layout = QHBoxLayout()
-        content_layout.setSpacing(10)
-        main_layout.addLayout(content_layout)
-
         # --- LEFT PANEL: Inputs ---
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
-        scroll_area.setFixedWidth(420)
+        scroll_area.setMinimumWidth(280)
         scroll_widget = QWidget()
         scroll_layout = QVBoxLayout(scroll_widget)
         scroll_layout.setContentsMargins(5, 5, 5, 5)
@@ -474,12 +470,20 @@ class MainWindow(QMainWindow):
         scroll_layout.addWidget(self.grp_exposure)
 
         scroll_area.setWidget(scroll_widget)
-        content_layout.addWidget(scroll_area)
 
         # --- RIGHT PANEL: Visual Drawing & Output Logs ---
-        right_layout = QVBoxLayout()
+        right_container = QWidget()
+        right_layout = QVBoxLayout(right_container)
+        right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(10)
-        content_layout.addLayout(right_layout, stretch=2)
+
+        # Middle splitter: left inputs panel | right panel
+        middle_splitter = QSplitter(Qt.Orientation.Horizontal)
+        middle_splitter.addWidget(scroll_area)
+        middle_splitter.addWidget(right_container)
+        middle_splitter.setSizes([400, 800])
+        middle_splitter.setChildrenCollapsible(False)
+        main_layout.addWidget(middle_splitter)
 
         # Top Right: Weld Sketch Tabbed View inside Box
         self.sketch_box = QGroupBox(self.trans.get("sketch_title"))
@@ -514,12 +518,26 @@ class MainWindow(QMainWindow):
         self.tab_sketch.addTab(tab_std_widget, self.trans.get("tab_standard"))
 
         sketch_layout.addWidget(self.tab_sketch)
-        right_layout.addWidget(self.sketch_box, stretch=3)
 
-        # Bottom Split: Left Outputs Panel, Right Warning Log + API 1104
-        bottom_split = QHBoxLayout()
-        bottom_split.setSpacing(10)
-        right_layout.addLayout(bottom_split, stretch=4)
+        # Bottom Splitter: sketch (top) | bottom section (bottom)
+        right_splitter = QSplitter(Qt.Orientation.Vertical)
+        right_splitter.addWidget(self.sketch_box)
+
+        bottom_container = QWidget()
+        bottom_layout = QVBoxLayout(bottom_container)
+        bottom_layout.setContentsMargins(0, 0, 0, 0)
+        bottom_layout.setSpacing(10)
+
+        # Bottom Splitter: outputs (left) | warnings/defects (right)
+        bottom_splitter = QSplitter(Qt.Orientation.Horizontal)
+        bottom_splitter.setChildrenCollapsible(False)
+        bottom_layout.addWidget(bottom_splitter)
+
+        right_splitter.addWidget(bottom_container)
+        right_splitter.setSizes([300, 400])
+        right_splitter.setChildrenCollapsible(False)
+
+        right_layout.addWidget(right_splitter)
 
         # Bottom Left: Outputs
         grp_outputs = QGroupBox(self.trans.get("outputs"))
@@ -582,12 +600,15 @@ class MainWindow(QMainWindow):
             grp_outputs_layout.addWidget(val, r, c+1)
             self.out_labels[name] = (lbl, val)
 
-        bottom_split.addWidget(grp_outputs, stretch=4)
+        bottom_splitter.addWidget(grp_outputs)
 
         # Bottom Right: Warnings and API 1104 Defect Module
-        right_sub_layout = QVBoxLayout()
+        right_sub_container = QWidget()
+        right_sub_layout = QVBoxLayout(right_sub_container)
+        right_sub_layout.setContentsMargins(0, 0, 0, 0)
         right_sub_layout.setSpacing(10)
-        bottom_split.addLayout(right_sub_layout, stretch=4)
+        bottom_splitter.addWidget(right_sub_container)
+        bottom_splitter.setSizes([400, 400])
 
         # Warnings Panel
         self.grp_warnings = QGroupBox(self.trans.get("warnings"))

@@ -148,9 +148,9 @@ class TestRTCalculator(unittest.TestCase):
         txt, wire_no = self.calc.get_single_wire_iqi(5.0, 0.0, "class_b", "swsi", tech="analog")
         self.assertEqual(wire_no, 16)
 
-        # Class B, DWSI, t=5mm -> ref=t=5mm -> Table B.3 -> W16
+        # Class B, DWSI, t=5mm -> ref=2t=10mm -> Table B.3 -> W14 (<=12mm)
         txt, wire_no = self.calc.get_single_wire_iqi(5.0, 0.0, "class_b", "dwsi", tech="digital")
-        self.assertEqual(wire_no, 16)
+        self.assertEqual(wire_no, 14)
 
         # Class A, DWDI, t=5mm (penetrated=2t=10mm) -> ref=10 -> Table B.5 -> W13 (<=10mm)
         txt, wire_no = self.calc.get_single_wire_iqi(5.0, 0.0, "class_a", "dwdi_elliptic", tech="analog")
@@ -179,7 +179,7 @@ class TestRTCalculator(unittest.TestCase):
 
         txt_dwsi_tr, _ = self.calc.get_single_wire_iqi(5.0, 0.0, "class_a", "dwsi", tech="digital", lang="tr")
         self.assertIn("Tablo B.1", txt_dwsi_tr)
-        self.assertIn("t = 5.00 mm", txt_dwsi_tr)
+        self.assertIn("2 * t = 10.00 mm", txt_dwsi_tr)
 
     def test_detector_quality_film_class(self):
         # Steel, Class A -> C5

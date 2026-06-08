@@ -8,7 +8,7 @@ PROJECT_ROOT = os.getcwd()
 
 block_cipher = None
 
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 
 datas = [
     ("exposure_chart_dataset.json", "."),
@@ -105,8 +105,8 @@ if sys.platform == "darwin":
         info_plist={
             "NSHighResolutionCapable": True,
             "NSSupportsAutomaticGraphicsSwitching": True,
-            "CFBundleShortVersionString": "1.1.0",
-            "CFBundleVersion": "1.1.0",
+            "CFBundleShortVersionString": "1.2.0",
+            "CFBundleVersion": "1.2.0",
             "NSHumanReadableCopyright": "2026 Radiography",
         },
     )

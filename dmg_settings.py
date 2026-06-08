@@ -4,7 +4,7 @@
 import os
 
 APP_NAME = "Radiography"
-VOLUME_NAME = "Radiography 1.1.0"
+VOLUME_NAME = "Radiography 1.2.0"
 APP_PATH = os.path.abspath(os.path.join("dist", "Radiography.app"))
 
 icon = os.path.abspath("app.icns")

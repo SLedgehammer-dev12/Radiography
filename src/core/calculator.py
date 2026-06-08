@@ -300,13 +300,9 @@ class RTCalculator:
 
         # Reference thickness calculation (ref_thickness)
         if geometry == "dwsi":
-            # DWSI:
-            # Analog: ref = 2 * t (+ cap if ratio > 0.20)
-            # Digital: ref = t (+ cap if ratio > 0.20)
-            if tech == "analog":
-                ref_thickness = 2 * t + cap if include_cap else 2 * t
-            else:
-                ref_thickness = t + cap if include_cap else t
+            # DWSI: ref = 2 * t (+ cap if ratio > 0.20)
+            # Both analog and digital use double-wall thickness for single wire IQI
+            ref_thickness = 2 * t + cap if include_cap else 2 * t
         elif geometry in ["dwdi_elliptic", "dwdi_super"]:
             # DWDI: ref = 2 * t (+ cap if ratio > 0.20)
             ref_thickness = 2 * t + cap if include_cap else 2 * t
@@ -535,10 +531,7 @@ class RTCalculator:
 
         # Reference thickness text
         if geometry == "dwsi":
-            if tech == "analog":
-                t_label = "2 * t"
-            else:
-                t_label = "t"
+            t_label = "2 * t"
         elif geometry in ["dwdi_elliptic", "dwdi_super"]:
             t_label = "2 * t"
         else:
@@ -561,10 +554,9 @@ class RTCalculator:
 
         # Reference thickness calculation (ref_thickness)
         if geometry == "dwsi":
-            if tech == "analog":
-                ref_thickness = 2 * t + cap if include_cap else 2 * t
-            else:
-                ref_thickness = t + cap if include_cap else t
+            # DWSI: ref = 2 * t (+ cap if ratio > 0.20)
+            # Both analog and digital use double-wall thickness for single IQI
+            ref_thickness = 2 * t + cap if include_cap else 2 * t
         elif geometry in ["dwdi_elliptic", "dwdi_super"]:
             ref_thickness = 2 * t + cap if include_cap else 2 * t
         else:
@@ -729,10 +721,7 @@ class RTCalculator:
 
         # Reference thickness text
         if geometry == "dwsi":
-            if tech == "analog":
-                t_label = "2 * t"
-            else:
-                t_label = "t"
+            t_label = "2 * t"
         elif geometry in ["dwdi_elliptic", "dwdi_super"]:
             t_label = "2 * t"
         else:

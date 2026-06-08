@@ -17,21 +17,46 @@ class PDFReportGenerator:
             self._register_fonts()
             PDFReportGenerator._fonts_registered = True
 
+    _ARIAL_FALLBACK = "Helvetica"
+    _FONT_MAP = {
+        "Arial": "Helvetica",
+        "Arial-Bold": "Helvetica-Bold",
+        "Arial-Italic": "Helvetica-Oblique",
+        "Arial-BoldItalic": "Helvetica-BoldOblique",
+        "Arial-Oblique": "Helvetica-Oblique",
+    }
+
     @staticmethod
     def _register_fonts():
-        font_paths = [
-            ("Arial", "/System/Library/Fonts/Supplemental/Arial.ttf"),
-            ("Arial-Bold", "/System/Library/Fonts/Supplemental/Arial Bold.ttf"),
-            ("Arial-Italic", "/System/Library/Fonts/Supplemental/Arial Italic.ttf"),
-            ("Arial-BoldItalic", "/System/Library/Fonts/Supplemental/Arial Bold Italic.ttf"),
-            ("Arial-Oblique", "/System/Library/Fonts/Supplemental/Arial Italic.ttf"),
-        ]
-        for name, path in font_paths:
+        import platform
+        system = platform.system()
+        font_candidates = []
+        if system == "Darwin":
+            font_candidates = [
+                ("Arial", "/System/Library/Fonts/Supplemental/Arial.ttf"),
+                ("Arial-Bold", "/System/Library/Fonts/Supplemental/Arial Bold.ttf"),
+                ("Arial-Italic", "/System/Library/Fonts/Supplemental/Arial Italic.ttf"),
+                ("Arial-BoldItalic", "/System/Library/Fonts/Supplemental/Arial Bold Italic.ttf"),
+            ]
+        elif system == "Windows":
+            win_dir = os.environ.get("WINDIR", "C:\\Windows")
+            font_candidates = [
+                ("Arial", os.path.join(win_dir, "Fonts", "arial.ttf")),
+                ("Arial-Bold", os.path.join(win_dir, "Fonts", "arialbd.ttf")),
+                ("Arial-Italic", os.path.join(win_dir, "Fonts", "ariali.ttf")),
+                ("Arial-BoldItalic", os.path.join(win_dir, "Fonts", "arialbi.ttf")),
+            ]
+        for name, path in font_candidates:
             if os.path.exists(path):
                 try:
                     pdfmetrics.registerFont(TTFont(name, path))
+                    PDFReportGenerator._FONT_MAP[name] = name
                 except Exception:
                     pass
+
+    @staticmethod
+    def _resolve_font(name):
+        return PDFReportGenerator._FONT_MAP.get(name, PDFReportGenerator._ARIAL_FALLBACK)
 
     def generate_report(self, filepath, inputs, outputs, warnings_list, defect_eval, lvl3_active, sfd_comp_val, lang_obj):
         """
@@ -45,7 +70,7 @@ class PDFReportGenerator:
         # Custom Styles
         title_style = ParagraphStyle(
             name='TitleStyle',
-            fontName='Arial-Bold',
+            fontName=self._resolve_font('Arial-Bold'),
             fontSize=16,
             leading=20,
             textColor=colors.HexColor('#1b5e20'), # Dark Green / Teal accent
@@ -54,7 +79,7 @@ class PDFReportGenerator:
         
         section_style = ParagraphStyle(
             name='SectionStyle',
-            fontName='Arial-Bold',
+            fontName=self._resolve_font('Arial-Bold'),
             fontSize=12,
             leading=16,
             textColor=colors.HexColor('#0d47a1'), # Dark Blue
@@ -64,7 +89,7 @@ class PDFReportGenerator:
 
         label_style = ParagraphStyle(
             name='LabelStyle',
-            fontName='Arial-Bold',
+            fontName=self._resolve_font('Arial-Bold'),
             fontSize=9,
             leading=12,
             textColor=colors.HexColor('#212121'),
@@ -72,7 +97,7 @@ class PDFReportGenerator:
 
         value_style = ParagraphStyle(
             name='ValueStyle',
-            fontName='Arial',
+            fontName=self._resolve_font('Arial'),
             fontSize=9,
             leading=12,
             textColor=colors.HexColor('#424242'),
@@ -80,7 +105,7 @@ class PDFReportGenerator:
 
         warning_style = ParagraphStyle(
             name='WarningStyle',
-            fontName='Arial-Oblique',
+            fontName=self._resolve_font('Arial-Oblique'),
             fontSize=9,
             leading=12,
             textColor=colors.HexColor('#b71c1c'), # Red warning text
