@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
 
 import os
+import tempfile
 import unittest
 from src.core.exposure_charts import ExposureChartDatabase
 from src.core.calculator import RTCalculator
+
+TMP = tempfile.gettempdir()
 
 
 class TestExposureChartDatabase(unittest.TestCase):
@@ -109,12 +112,12 @@ class TestExposureChartCSVJSON(unittest.TestCase):
         self.db.generate_type_x_chart(self.calc)
 
     def tearDown(self):
-        for f in ["/tmp/test_chart.csv", "/tmp/test_chart.json"]:
+        for f in [TMP + "/test_chart.csv", TMP + "/test_chart.json"]:
             if os.path.exists(f):
                 os.remove(f)
 
     def test_save_and_load_csv(self):
-        csv_path = "/tmp/test_chart.csv"
+        csv_path = TMP + "/test_chart.csv"
         self.db.save_to_csv(csv_path)
         self.assertTrue(os.path.exists(csv_path))
 
@@ -129,7 +132,7 @@ class TestExposureChartCSVJSON(unittest.TestCase):
         self.assertAlmostEqual(db2.GAMMA["isotope_co60"], 1.30, places=2)
 
     def test_save_and_load_json(self):
-        json_path = "/tmp/test_chart.json"
+        json_path = TMP + "/test_chart.json"
         self.db.save_to_json(json_path)
         self.assertTrue(os.path.exists(json_path))
 
@@ -145,7 +148,7 @@ class TestExposureChartCSVJSON(unittest.TestCase):
         self.assertGreater(exp, 0)
 
     def test_csv_roundtrip_rfactor(self):
-        csv_path = "/tmp/test_chart.csv"
+        csv_path = TMP + "/test_chart.csv"
         self.db.save_to_csv(csv_path)
 
         db2 = ExposureChartDatabase()
@@ -159,7 +162,7 @@ class TestExposureChartCSVJSON(unittest.TestCase):
                 self.assertAlmostEqual(r1, r2, places=4)
 
     def test_json_roundtrip_type_x(self):
-        json_path = "/tmp/test_chart.json"
+        json_path = TMP + "/test_chart.json"
         self.db.save_to_json(json_path)
 
         db2 = ExposureChartDatabase()
@@ -174,12 +177,12 @@ class TestExposureChartCSVJSON(unittest.TestCase):
     def test_load_csv_missing_file(self):
         db2 = ExposureChartDatabase()
         with self.assertRaises(FileNotFoundError):
-            db2.load_from_csv("/tmp/nonexistent.csv")
+            db2.load_from_csv(TMP + "/nonexistent.csv")
 
     def test_load_json_missing_file(self):
         db2 = ExposureChartDatabase()
         with self.assertRaises(FileNotFoundError):
-            db2.load_from_json("/tmp/nonexistent.json")
+            db2.load_from_json(TMP + "/nonexistent.json")
 
 
 class TestExposureChartDatabaseTypeX(unittest.TestCase):
