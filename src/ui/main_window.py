@@ -5,9 +5,9 @@ from datetime import datetime
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, 
                              QLabel, QComboBox, QLineEdit, QRadioButton, QButtonGroup, 
                              QCheckBox, QPushButton, QGroupBox, QScrollArea, QFileDialog, 
-                             QMessageBox, QFormLayout, QTabWidget, QDialog)
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont, QPalette, QColor, QDoubleValidator
+                             QMessageBox, QFormLayout, QTabWidget, QDialog, QProgressDialog, QMenuBar)
+from PyQt6.QtCore import Qt, QThread, QTimer, pyqtSignal
+from PyQt6.QtGui import QFont, QPalette, QColor, QDoubleValidator, QAction
 
 from src.core.translation import Translation
 from src.core.calculator import RTCalculator
@@ -17,6 +17,7 @@ from src.ui.sketch import WeldSketchCanvas, StandardSchematicCanvas
 from src.ui.compensation import Level3Dialog
 from src.core.report import PDFReportGenerator
 from src.core.procedure_check import ProcedureComplianceChecker
+from src.core.updater import UpdateChecker, CURRENT_VERSION
 ASME_B36_10_PIPES = {
     # NPS: (OD_mm, [(wall_thickness_mm, "SCHEDULE_LABEL"), ...]) based on ASME B36.10
     "1/8\" (NPS 1/8)": (10.3, [(1.24, "SCH 10"), (1.45, "SCH 30"), (1.73, "SCH 40 / STD"), (2.41, "SCH 80 / XS")]),
@@ -104,6 +105,7 @@ class MainWindow(QMainWindow):
         
         # Init layout
         self.init_ui()
+        self._setup_menu_bar()
         self.apply_theme()
         
         # Initialize standard figure list
@@ -679,6 +681,9 @@ class MainWindow(QMainWindow):
             self.cmb_od.setCurrentIndex(idx_4in)
 
         self._setup_input_validation()
+
+        # Auto-check for updates on startup (silent)
+        QTimer.singleShot(2000, lambda: self.check_for_updates(silent=True))
 
     def on_detector_type_changed(self):
         is_curved = self.rad_detector_curved.isChecked()
@@ -1958,6 +1963,126 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, self.trans.get("success"), self.trans.get("report_saved", filepath))
         else:
             QMessageBox.critical(self, self.trans.get("error"), "Could not save PDF report.")
+
+    def _setup_menu_bar(self):
+        menu_bar = self.menuBar()
+
+        self.update_menu = menu_bar.addMenu("&Updates")
+        self.check_update_action = QAction("Check for Updates", self)
+        self.check_update_action.triggered.connect(lambda: self.check_for_updates(silent=False))
+        self.update_menu.addAction(self.check_update_action)
+
+        help_menu = menu_bar.addMenu("&Help")
+        about_action = QAction(f"About Radiography v{CURRENT_VERSION}", self)
+        about_action.triggered.connect(self._show_about)
+        help_menu.addAction(about_action)
+
+    def _show_about(self):
+        QMessageBox.about(self, "About Radiography",
+                          f"Radiographic Testing (RT) Exposure Calculator\n"
+                          f"Version: {CURRENT_VERSION}\n"
+                          f"ISO 17636 / API 1104 Compliant\n\n"
+                          f"© 2026 Radiography")
+
+    def check_for_updates(self, silent=True):
+        self.check_update_action.setEnabled(False)
+        self.check_update_action.setText("Checking...")
+
+        class CheckThread(QThread):
+            finished = pyqtSignal(object)
+
+            def run(self):
+                checker = UpdateChecker()
+                result = checker.check()
+                self.finished.emit(result)
+
+        self._update_thread = CheckThread()
+        self._update_thread.finished.connect(lambda res: self._on_update_check_result(res, silent))
+        self._update_thread.start()
+
+    def _on_update_check_result(self, result, silent):
+        self.check_update_action.setEnabled(True)
+        self.check_update_action.setText("Check for Updates")
+
+        if result.get("available"):
+            reply = QMessageBox.question(
+                self, "Update Available",
+                f"A new version ({result['version']}) is available.\n\n"
+                f"{result.get('release_notes', '')[:500]}\n\n"
+                f"Download and install now?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self._download_and_install(result)
+        elif result.get("error"):
+            if not silent:
+                QMessageBox.warning(self, "Update Check Failed",
+                                    f"Could not check for updates:\n{result['error']}")
+        else:
+            if not silent:
+                QMessageBox.information(self, "No Updates",
+                                        f"You are running the latest version ({CURRENT_VERSION}).")
+
+    def _download_and_install(self, release_data):
+        checker = UpdateChecker()
+        url = checker.get_download_url(release_data)
+        if not url:
+            QMessageBox.warning(self, "Download Error",
+                                "No compatible download found for your platform.")
+            return
+
+        self.progress = QProgressDialog("Downloading update...", "Cancel", 0, 100, self)
+        self.progress.setWindowTitle("Update")
+        self.progress.setWindowModality(Qt.WindowModality.WindowModal)
+        self.progress.setAutoClose(True)
+        self.progress.setMinimumDuration(0)
+        self.progress.show()
+
+        cancelled = [False]
+
+        def on_cancel():
+            cancelled[0] = True
+            checker.cancel()
+
+        self.progress.canceled.connect(on_cancel)
+
+        class DownloadThread(QThread):
+            finished = pyqtSignal(object)
+
+            def run(self):
+                try:
+                    filepath = checker.download_update(
+                        url,
+                        progress_callback=lambda pct: self.progress.setValue(int(pct * 100))
+                    )
+                    self.finished.emit(filepath)
+                except Exception as e:
+                    self.finished.emit(e)
+
+        self._download_thread = DownloadThread()
+        self._download_thread.finished.connect(lambda fp: self._on_download_finished(fp, checker))
+        self._download_thread.start()
+
+    def _on_download_finished(self, filepath, checker):
+        self.progress.close()
+        if filepath is None:
+            return
+        if isinstance(filepath, Exception):
+            QMessageBox.critical(self, "Download Failed", str(filepath))
+            return
+
+        reply = QMessageBox.question(
+            self, "Download Complete",
+            "Update downloaded. Install now?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                checker.launch_installer(filepath)
+                QMessageBox.information(self, "Installer Launched",
+                                        "The installer has been launched. Please close the application and follow the installation steps.")
+            except Exception as e:
+                QMessageBox.critical(self, "Launch Failed", str(e))
 
     def apply_theme(self):
         """

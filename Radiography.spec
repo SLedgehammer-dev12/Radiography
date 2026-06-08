@@ -8,6 +8,8 @@ PROJECT_ROOT = os.getcwd()
 
 block_cipher = None
 
+APP_VERSION = "1.1.0"
+
 datas = [
     ("exposure_chart_dataset.json", "."),
     ("exposure_chart_dataset.csv", "."),
@@ -20,6 +22,7 @@ hiddenimports = [
     "PyQt6.QtCore",
     "PyQt6.QtGui",
     "PyQt6.QtWidgets",
+    "PyQt6.QtNetwork",
     "PyQt6.sip",
     "reportlab",
     "reportlab.lib",
@@ -36,6 +39,12 @@ hiddenimports = [
     "PIL",
     "PIL._imaging",
     "numpy",
+    "importlib",
+    "importlib.metadata",
+    "urllib",
+    "urllib.request",
+    "json",
+    "threading",
 ]
 
 excludes = [
@@ -44,7 +53,6 @@ excludes = [
     "distutils",
     "setuptools",
     "pip",
-    "unittest",
     "PyQt5",
     "notebook",
     "IPython",
@@ -97,8 +105,8 @@ if sys.platform == "darwin":
         info_plist={
             "NSHighResolutionCapable": True,
             "NSSupportsAutomaticGraphicsSwitching": True,
-            "CFBundleShortVersionString": "1.0.0",
-            "CFBundleVersion": "1.0.0",
+            "CFBundleShortVersionString": "1.1.0",
+            "CFBundleVersion": "1.1.0",
             "NSHumanReadableCopyright": "2026 Radiography",
         },
     )
@@ -109,7 +117,7 @@ else:
         a.binaries,
         a.zipfiles,
         a.datas,
-        name="Radiography",
+        name=f"Radiography-{APP_VERSION}",
         debug=False,
         bootloader_ignore_signals=False,
         strip=False,

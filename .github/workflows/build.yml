@@ -46,7 +46,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Radiography-Windows-x64
-          path: dist/Radiography.exe
+          path: dist/Radiography-*.exe
           if-no-files-found: error
 
   build-macos:
@@ -97,8 +97,8 @@ jobs:
             Radiography RT Exposure Calculator
 
             ## Installation
-            - **Windows**: Download `Radiography.exe`, run it directly
-            - **macOS**: Download `Radiography-*.dmg`, open and drag to Applications
+            - **Windows**: Download `Radiography-${{ github.ref_name }}.exe`, run it directly
+            - **macOS**: Download `Radiography-${{ github.ref_name }}.dmg`, open and drag to Applications
           files: release-artifacts/*
           draft: false
           prerelease: false
