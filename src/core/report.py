@@ -336,14 +336,14 @@ class PDFReportGenerator:
         story.append(Paragraph("<b>" + lang_obj.get("pdf_ref_title", "Standards & Calculation References") + "</b>", section_style))
         ref_style = ParagraphStyle(
             name='RefStyle',
-            fontName='Arial',
+            fontName=self._resolve_font('Arial'),
             fontSize=7.5,
             leading=10,
             textColor=colors.HexColor('#616161'),
         )
         ref_header_style = ParagraphStyle(
             name='RefHeaderStyle',
-            fontName='Arial-Bold',
+            fontName=self._resolve_font('Arial-Bold'),
             fontSize=8,
             leading=11,
             textColor=colors.HexColor('#212121'),
@@ -390,7 +390,7 @@ class PDFReportGenerator:
         sig_table = Table(sig_data, colWidths=[250, 250])
         sig_table.setStyle(TableStyle([
             ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('FONTNAME', (0,2), (-1,2), 'Arial-Bold'),
+            ('FONTNAME', (0,2), (-1,2), PDFReportGenerator._resolve_font('Arial-Bold')),
             ('FONTSIZE', (0,2), (-1,2), 9),
             ('TOPPADDING', (0,1), (-1,1), 40), # Space for signatures
         ]))
