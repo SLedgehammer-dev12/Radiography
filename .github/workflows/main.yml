@@ -1,0 +1,132 @@
+name: Build & Release
+on:
+  push:
+    tags:
+      - v*
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test (Ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install system deps (Qt)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1 libxkbcommon-x11-0
+      - name: Install Python deps
+        run: pip install -r requirements.txt pytest
+      - name: Run tests
+        run: python -m pytest tests/ -v
+
+  build-windows:
+    name: Build Windows .exe
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Run tests on Windows
+        run: pip install -r requirements.txt pytest && python -m pytest tests/ -v
+      - name: Install build deps
+        run: pip install -r requirements.txt pyinstaller
+      - name: Build .exe
+        run: pyinstaller --clean Radiography.spec
+      - name: List dist contents
+        run: dir dist\
+        shell: cmd
+      - name: Rename .exe with version
+        shell: powershell
+        run: |
+          $ver = "${{ github.ref_name }}" -replace '^v', ''
+          Get-ChildItem dist\*.exe | Rename-Item -NewName { "Radiography-$ver-Windows-x64.exe" }
+      - name: Upload .exe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Radiography-Windows-x64
+          path: dist/Radiography-*.exe
+          if-no-files-found: error
+
+  build-macos:
+    name: Build macOS .dmg
+    needs: test
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Run tests on macOS
+        run: pip install -r requirements.txt pytest && python -m pytest tests/ -v
+      - name: Install build deps
+        run: pip install -r requirements.txt pyinstaller dmgbuild
+      - name: Build .app bundle (universal2)
+        run: pyinstaller --clean --target-arch universal2 Radiography.spec
+      - name: Build .dmg
+        run: |
+          VER="${{ github.ref_name }}"
+          VER="${VER#v}"
+          DMG_NAME="Radiography-${VER}-macOS.dmg"
+          DMG_VOLUME_NAME="Radiography ${VER}" dmgbuild -s dmg_settings.py "Radiography ${VER}" "dist/${DMG_NAME}"
+          echo "DMG_NAME=${DMG_NAME}" >> $GITHUB_ENV
+      - name: Upload .dmg artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Radiography-macOS-Universal
+          path: dist/Radiography-*-macOS.dmg
+          if-no-files-found: error
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Radiography-Windows-x64
+          path: release-artifacts
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Radiography-macOS-Universal
+          path: release-artifacts
+      - name: List release artifacts
+        run: ls -lh release-artifacts/
+      - name: Extract release notes from CHANGELOG
+        run: |
+          VER="${{ github.ref_name }}"
+          VER="${VER#v}"
+          python3 -c "
+import re
+with open('CHANGELOG.md') as f:
+    content = f.read()
+pattern = r'##\s+\[?' + re.escape(VER) + r'\]?.*?\n(.*?)(?=\n##\s|$)'
+match = re.search(pattern, content, re.DOTALL)
+if match:
+    notes = match.group(1).strip()
+    with open('release_notes.txt', 'w') as out:
+        out.write(notes)
+else:
+    with open('release_notes.txt', 'w') as out:
+        out.write('See CHANGELOG.md for details.')
+"
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Radiography ${{ github.ref_name }}
+          body_path: release_notes.txt
+          files: release-artifacts/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
