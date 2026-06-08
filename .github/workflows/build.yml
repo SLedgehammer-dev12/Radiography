@@ -21,6 +21,8 @@ jobs:
       - name: Install Python deps
         run: pip install -r requirements.txt pytest
       - name: Run tests
+        env:
+          QT_QPA_PLATFORM: offscreen
         run: python -m pytest tests/ -v
 
   build-windows:
@@ -34,6 +36,8 @@ jobs:
           python-version: '3.13'
       - name: Run tests on Windows
         run: pip install -r requirements.txt pytest && python -m pytest tests/ -v
+        env:
+          QT_QPA_PLATFORM: offscreen
       - name: Install build deps
         run: pip install -r requirements.txt pyinstaller
       - name: Build .exe
@@ -64,6 +68,8 @@ jobs:
           python-version: '3.13'
       - name: Run tests on macOS
         run: pip install -r requirements.txt pytest && python -m pytest tests/ -v
+        env:
+          QT_QPA_PLATFORM: offscreen
       - name: Install build deps
         run: pip install -r requirements.txt pyinstaller dmgbuild
       - name: Build .app bundle (universal2)
