@@ -1,4 +1,5 @@
 name: Build & Release
+# v2 - force re-register workflow
 
 on:
   push:
