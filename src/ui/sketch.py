@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QSizePolicy
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import matplotlib.patches as patches
@@ -13,6 +13,7 @@ class WeldSketchCanvas(FigureCanvas):
         self.axes = self.fig.add_subplot(111)
         super().__init__(self.fig)
         self.setParent(parent)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
         # Style the plot area
         self.axes.set_aspect('equal')
@@ -164,6 +165,7 @@ class StandardSchematicCanvas(FigureCanvas):
         self.axes = self.fig.add_subplot(111)
         super().__init__(self.fig)
         self.setParent(parent)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
         self.axes.set_aspect('equal')
         self.axes.axis('off')

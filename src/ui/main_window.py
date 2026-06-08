@@ -471,20 +471,6 @@ class MainWindow(QMainWindow):
 
         scroll_area.setWidget(scroll_widget)
 
-        # --- RIGHT PANEL: Visual Drawing & Output Logs ---
-        right_container = QWidget()
-        right_layout = QVBoxLayout(right_container)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(10)
-
-        # Middle splitter: left inputs panel | right panel
-        middle_splitter = QSplitter(Qt.Orientation.Horizontal)
-        middle_splitter.addWidget(scroll_area)
-        middle_splitter.addWidget(right_container)
-        middle_splitter.setSizes([400, 800])
-        middle_splitter.setChildrenCollapsible(False)
-        main_layout.addWidget(middle_splitter)
-
         # Top Right: Weld Sketch Tabbed View inside Box
         self.sketch_box = QGroupBox(self.trans.get("sketch_title"))
         self.sketch_box.setObjectName("SketchBox")
@@ -519,25 +505,25 @@ class MainWindow(QMainWindow):
 
         sketch_layout.addWidget(self.tab_sketch)
 
-        # Bottom Splitter: sketch (top) | bottom section (bottom)
+        # Vertical Splitter: sketch (top) | bottom section (bottom)
         right_splitter = QSplitter(Qt.Orientation.Vertical)
-        right_splitter.addWidget(self.sketch_box)
-
-        bottom_container = QWidget()
-        bottom_layout = QVBoxLayout(bottom_container)
-        bottom_layout.setContentsMargins(0, 0, 0, 0)
-        bottom_layout.setSpacing(10)
-
-        # Bottom Splitter: outputs (left) | warnings/defects (right)
-        bottom_splitter = QSplitter(Qt.Orientation.Horizontal)
-        bottom_splitter.setChildrenCollapsible(False)
-        bottom_layout.addWidget(bottom_splitter)
-
-        right_splitter.addWidget(bottom_container)
-        right_splitter.setSizes([300, 400])
         right_splitter.setChildrenCollapsible(False)
 
-        right_layout.addWidget(right_splitter)
+        # Horizontal Splitter: outputs (left) | warnings/defects (right)
+        bottom_splitter = QSplitter(Qt.Orientation.Horizontal)
+        bottom_splitter.setChildrenCollapsible(False)
+
+        right_splitter.addWidget(self.sketch_box)
+        right_splitter.addWidget(bottom_splitter)
+        right_splitter.setSizes([300, 400])
+
+        # Middle splitter: left inputs panel | right panel
+        middle_splitter = QSplitter(Qt.Orientation.Horizontal)
+        middle_splitter.addWidget(scroll_area)
+        middle_splitter.addWidget(right_splitter)
+        middle_splitter.setSizes([400, 800])
+        middle_splitter.setChildrenCollapsible(False)
+        main_layout.addWidget(middle_splitter)
 
         # Bottom Left: Outputs
         grp_outputs = QGroupBox(self.trans.get("outputs"))
