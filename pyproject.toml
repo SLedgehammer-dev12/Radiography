@@ -4,7 +4,7 @@ build-backend = "setuptools.backends._legacy:_Backend"
 
 [project]
 name = "Radiography"
-version = "1.2.0"
+version = "1.2.0"  # Keep in sync with src/core/version.py
 description = "Radiographic Testing (RT) exposure time calculator and inspection report generator"
 license = {text = "MIT"}
 requires-python = ">=3.10"

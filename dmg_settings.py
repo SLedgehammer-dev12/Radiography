@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
-"""dmgbuild settings for Radiography"""
+"""dmgbuild settings for Radiography.
+Volume name can be overridden via env DMG_VOLUME_NAME for CI builds.
+"""
 
 import os
 
 APP_NAME = "Radiography"
-VOLUME_NAME = "Radiography 1.2.0"
+VOLUME_NAME = os.environ.get("DMG_VOLUME_NAME", "Radiography 1.2.0")
 APP_PATH = os.path.abspath(os.path.join("dist", "Radiography.app"))
 
 icon = os.path.abspath("app.icns")

@@ -151,6 +151,10 @@ class Translation:
                 "lvl3_central_proj": "Merkezi Projeksiyonda %50 f_min Azaltma (Madde 7.6)",
                 "lvl3_dw_reduction": "Çift Duvar Tekniğinde %20 f_min Azaltma (Madde 7.6)",
                 "sfd_comp_label": "Mesafe Telafisi ile Güncellenen SNR_N Hedefi:",
+                "level3_approval_note": "Seviye 3 Onay Adı / Not:",
+                "level3_approval_placeholder": "Örn. ASNT Lvl III John Doe tarafından onaylandı",
+                "dialog_ok": "Tamam",
+                "dialog_cancel": "İptal",
 
                 # Matplotlib Sketch
                 "sketch_title": "Çekim Düzeneği Geometrisi (Weld & Beam Sketch)",
@@ -356,6 +360,10 @@ class Translation:
                 "lvl3_central_proj": "50% f_min Reduction for Central Projection (Clause 7.6)",
                 "lvl3_dw_reduction": "20% f_min Reduction for Double-Wall Technique (Clause 7.6)",
                 "sfd_comp_label": "SNR_N Target Updated by Distance Compensation:",
+                "level3_approval_note": "Level 3 Approval Name / Note:",
+                "level3_approval_placeholder": "e.g. Approved by ASNT Lvl III John Doe",
+                "dialog_ok": "OK",
+                "dialog_cancel": "Cancel",
 
                 # Matplotlib Sketch
                 "sketch_title": "Weld & Beam Sketch Geometry",
@@ -377,9 +385,9 @@ class Translation:
                 "applied_film_class": "Applied Film Class:",
                 "applied_srb": "Applied Panel SRb (µm):",
                 "check_compliance": "Check Compliance",
-                "compliance_result": "Procedure Uyum Report:",
-                "compliant": "COMPLIANT (UYGUN)",
-                "non_compliant": "NON-COMPLIANT (UYGUN DEĞİL)",
+                "compliance_result": "Procedure Compliance Report:",
+                "compliant": "COMPLIANT",
+                "non_compliant": "NON-COMPLIANT",
                 "film_class_pass": "Film Class Compliant: {} (Required minimum: {})",
                 "film_class_fail": "FILM CLASS INSUFFICIENT! Applied: {} < Required minimum: {}",
                 "srb_pass": "SRb Resolution Compliant: {} µm <= Maximum {} µm limit.",

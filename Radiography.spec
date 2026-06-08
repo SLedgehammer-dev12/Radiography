@@ -5,10 +5,12 @@ import os
 import sys
 
 PROJECT_ROOT = os.getcwd()
+sys.path.insert(0, PROJECT_ROOT)
 
 block_cipher = None
 
-APP_VERSION = "1.2.0"
+# Dynamic version from single source of truth
+from src.core.version import __version__ as APP_VERSION
 
 datas = [
     ("exposure_chart_dataset.json", "."),

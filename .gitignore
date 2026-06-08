@@ -4,6 +4,7 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+*.spec
 
 # macOS
 .DS_Store
@@ -27,5 +28,5 @@ RT_Inspection_Report_*.pdf
 htmlcov/
 .pytest_cache/
 
-# OS metadata
-.DS_Store?
+# Build artifacts
+release-artifacts/

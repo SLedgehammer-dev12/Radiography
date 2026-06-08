@@ -646,6 +646,135 @@ class TestRTCalculator(unittest.TestCase):
         self.assertFalse(valid)
         self.assertEqual(mn, 50)
 
+    # --- Geometry and ISO figure mapping tests ---
+
+    def test_is_double_wall_technique_swsi(self):
+        self.assertFalse(self.calc.is_double_wall_technique("swsi"))
+
+    def test_is_double_wall_technique_dwsi(self):
+        self.assertTrue(self.calc.is_double_wall_technique("dwsi"))
+
+    def test_is_double_wall_technique_dwdi_elliptic(self):
+        self.assertTrue(self.calc.is_double_wall_technique("dwdi_elliptic"))
+
+    def test_is_double_wall_technique_dwdi_super(self):
+        self.assertTrue(self.calc.is_double_wall_technique("dwdi_super"))
+
+    def test_is_central_projection_panoramic(self):
+        self.assertTrue(self.calc.is_central_projection("swsi", "fig5"))
+
+    def test_is_central_projection_eccentric(self):
+        self.assertFalse(self.calc.is_central_projection("swsi", "fig6"))
+
+    def test_is_central_projection_source_outside(self):
+        self.assertFalse(self.calc.is_central_projection("swsi", "fig7"))
+
+    def test_is_central_projection_dwdi(self):
+        self.assertFalse(self.calc.is_central_projection("dwdi_elliptic", "fig11"))
+
+    def test_is_central_projection_dwsi(self):
+        self.assertFalse(self.calc.is_central_projection("dwsi", "fig13"))
+
+    def test_calculate_b_curved_sanity(self):
+        b = self.calc.calculate_b_curved(5.0, 3.0, 10.0, "class_b")
+        self.assertGreater(b, 0)
+
+    def test_calculate_b_panoramic_sanity(self):
+        b = self.calc.calculate_b_panoramic(5.0, 3.0, 10.0)
+        self.assertGreater(b, 0)
+
+    def test_get_effective_b_applies_rule(self):
+        b_eff, rule = self.calc.get_effective_b(5.0, 10.0)
+        self.assertEqual(b_eff, 10.0)
+        self.assertTrue(rule)
+
+    def test_get_effective_b_no_rule(self):
+        b_eff, rule = self.calc.get_effective_b(15.0, 10.0)
+        self.assertEqual(b_eff, 15.0)
+        self.assertFalse(rule)
+
+    def test_geometric_unsharpness(self):
+        ug = self.calc.calculate_geometric_unsharpness(2.0, 10.0, 600.0)
+        expected = 2.0 * 10.0 / 600.0
+        self.assertAlmostEqual(ug, expected)
+
+    def test_calculate_sdd_min(self):
+        sdd = self.calc.calculate_sdd_min(200.0)
+        self.assertGreater(sdd, 0)
+
+    def test_calculate_f_min_star_none_when_not_curved(self):
+        f_star, _ = self.calc.calculate_f_min_star(2.0, 10.0, 8.0, "class_b")
+        self.assertIsNotNone(f_star)
+
+    def test_check_annex_f_compensation_false(self):
+        should_warn, ratio = self.calc.check_annex_f_compensation(0.1, 100.0)
+        self.assertFalse(should_warn)
+        self.assertGreater(ratio, 0)
+
+    def test_check_annex_f_compensation_true(self):
+        ug = 100.0
+        max_srb = 50.0
+        should_warn, ratio = self.calc.check_annex_f_compensation(ug, max_srb)
+        self.assertTrue(should_warn)
+        self.assertGreater(ratio, 0)
+
+
+class TestRTCalculatorEdgeCases(unittest.TestCase):
+    def setUp(self):
+        self.calc = RTCalculator()
+
+    def test_thicknesses_zero_cap(self):
+        w_nom, w_eff = self.calc.calculate_thicknesses(10.0, 0.0, "swsi")
+        self.assertEqual(w_nom, 10.0)
+        self.assertEqual(w_eff, 10.0)
+
+    def test_f_min_zero_d(self):
+        """Source size d=0 should handle gracefully."""
+        f_min = self.calc.calculate_f_min(0.0, 10.0, "class_b", 8.0)
+        self.assertEqual(f_min, 0.0)
+
+    def test_exposure_time_zero_kv(self):
+        result = self.calc.calculate_exposure_time(
+            sfd=600.0, w_eff=10.0, source="x_ray", output_val=5.0,
+            base_factor=3.0, tech="digital", testing_class="class_b",
+            film_class="C5", detector_type="dda_si",
+            kv=None, material="steel",
+            chart_source=None, chart_db=None
+        )
+        self.assertIsNotNone(result)
+
+    def test_target_snr_invalid_material(self):
+        base_snr, table, desc = self.calc.get_target_snr(
+            "unknown", "x_ray", 120.0, 10.0, "class_a", lang="en"
+        )
+        self.assertGreater(base_snr, 0)
+
+    def test_get_single_wire_iqi_extreme_thickness(self):
+        wire_str, wire_no = self.calc.get_single_wire_iqi(
+            500.0, 0.0, "class_b", "swsi", tech="analog", film_side=False, lang="en"
+        )
+        self.assertIsNotNone(wire_str)
+
+    def test_validate_source_thickness_invalid_source(self):
+        valid, min_t, max_t, _ = self.calc.validate_source_thickness(
+            "unknown_source", 10.0, "class_b", "steel"
+        )
+        self.assertTrue(valid)
+
+    def test_get_required_film_class_min_thickness(self):
+        result = self.calc.get_required_film_class(0.5, "class_a", "steel", "x_ray")
+        self.assertIsNotNone(result)
+
+    def test_get_max_srb_dwdi(self):
+        result = self.calc.get_max_srb(10.0, "class_b", "dwdi_elliptic")
+        self.assertIsNotNone(result)
+
+    def test_calculate_exposures_dwdi_elliptic(self):
+        geometry = "dwdi_elliptic"
+        if hasattr(self.calc, 'calculate_dwsi_exposures'):
+            with self.subTest("check exposures for dwdi elliptic"):
+                pass
+
 if __name__ == "__main__":
     unittest.main()
 

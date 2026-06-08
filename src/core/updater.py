@@ -7,9 +7,10 @@ import threading
 import urllib.request
 import urllib.error
 
+from src.core.version import __version__ as _version
 
-GITHUB_REPO = "SLedgehammer-dev12/Radiogrphy"
-CURRENT_VERSION = "1.2.0"
+GITHUB_REPO = "SLedgehammer-dev12/Radiography"
+CURRENT_VERSION = _version
 
 
 class UpdateChecker:

@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
@@ -58,7 +58,7 @@ class PDFReportGenerator:
     def _resolve_font(name):
         return PDFReportGenerator._FONT_MAP.get(name, PDFReportGenerator._ARIAL_FALLBACK)
 
-    def generate_report(self, filepath, inputs, outputs, warnings_list, defect_eval, lvl3_active, sfd_comp_val, lang_obj):
+    def generate_report(self, filepath, inputs, outputs, warnings_list, defect_eval, lvl3_active, sfd_comp_val, lang_obj, dynamic_img_path=None, standard_img_path=None):
         """
         Generates a professional PDF report of the RT calculation and defect evaluation.
         """
@@ -285,7 +285,54 @@ class PDFReportGenerator:
             story.append(warn_table)
             story.append(Spacer(1, 30))
 
-        # Section 5.5: Standards & References Appendix (Option 4)
+        # Section 6: Shooting Geometry Sketches (if images provided)
+        if dynamic_img_path or standard_img_path:
+            story.append(Paragraph("Shooting Geometry Sketches", section_style))
+            img_data = []
+            col_widths = []
+            if dynamic_img_path:
+                try:
+                    dyn_img = Image(dynamic_img_path, width=220, height=160)
+                    img_data.append(dyn_img)
+                    col_widths.append(250)
+                except Exception:
+                    img_data.append(Paragraph("Dynamic sketch unavailable", value_style))
+                    col_widths.append(250)
+            else:
+                img_data.append(Paragraph("", value_style))
+                col_widths.append(250)
+            if standard_img_path:
+                try:
+                    std_img = Image(standard_img_path, width=220, height=160)
+                    img_data.append(std_img)
+                    col_widths.append(250)
+                except Exception:
+                    img_data.append(Paragraph("Standard sketch unavailable", value_style))
+                    col_widths.append(250)
+            else:
+                img_data.append(Paragraph("", value_style))
+                col_widths.append(250)
+
+            caption_data = []
+            if dynamic_img_path:
+                caption_data.append(Paragraph("<b>Dynamic Shot Setup</b>", label_style))
+            else:
+                caption_data.append(Paragraph("", label_style))
+            if standard_img_path:
+                caption_data.append(Paragraph("<b>ISO 17636 Figure Schematic</b>", label_style))
+            else:
+                caption_data.append(Paragraph("", label_style))
+
+            img_table = Table([img_data, caption_data], colWidths=col_widths)
+            img_table.setStyle(TableStyle([
+                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                ('TOPPADDING', (0,0), (-1,-1), 4),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+            ]))
+            story.append(img_table)
+            story.append(Spacer(1, 15))
+
+        # Section 7: Standards & References Appendix
         story.append(Paragraph("<b>" + lang_obj.get("pdf_ref_title", "Standards & Calculation References") + "</b>", section_style))
         ref_style = ParagraphStyle(
             name='RefStyle',

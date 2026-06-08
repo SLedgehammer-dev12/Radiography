@@ -159,6 +159,9 @@ class WeldSketchCanvas(FigureCanvas):
         self.axes.set_facecolor(bg_color)
         self.draw()
 
+    def save_figure(self, filepath, dpi=150):
+        self.fig.savefig(filepath, dpi=dpi, bbox_inches='tight', pad_inches=0.2)
+
 class StandardSchematicCanvas(FigureCanvas):
     def __init__(self, parent=None, width=5, height=4, dpi=100):
         self.fig = Figure(figsize=(width, height), dpi=dpi)
@@ -177,6 +180,9 @@ class StandardSchematicCanvas(FigureCanvas):
         self.fig.patch.set_facecolor(bg_color)
         self.axes.set_facecolor(bg_color)
         self.draw()
+
+    def save_figure(self, filepath, dpi=150):
+        self.fig.savefig(filepath, dpi=dpi, bbox_inches='tight', pad_inches=0.2)
 
     def draw_figure(self, fig_name, lang_obj, is_dark=True):
         self.axes.clear()
