@@ -255,11 +255,14 @@ class TestRTCalculator(unittest.TestCase):
 
     def test_exposure_time_film_speed_ratio(self):
         # C5 film (factor 16.0) should take half the time of C4 film (factor 8.0)
+        # Use Class A to exclude density correction (od_factor is 1.0 for both)
         _, _, t_c5 = self.calc.calculate_exposure_time(
-            600.0, 10.0, "x_ray", 5.0, 3.0, "analog", film_class="C5"
+            600.0, 10.0, "x_ray", 5.0, 3.0, "analog",
+            testing_class="class_a", film_class="C5"
         )
         _, _, t_c4 = self.calc.calculate_exposure_time(
-            600.0, 10.0, "x_ray", 5.0, 3.0, "analog", film_class="C4"
+            600.0, 10.0, "x_ray", 5.0, 3.0, "analog",
+            testing_class="class_a", film_class="C4"
         )
         self.assertAlmostEqual(t_c4 / t_c5, 2.0, places=3)
 
@@ -354,6 +357,58 @@ class TestRTCalculator(unittest.TestCase):
         # Class B, OD=114.3, t=8.56, SFD=600.0 (Class B is stricter, should require >= Class A exposures)
         n_b = self.calc.calculate_dwsi_exposures(114.3, 8.56, 600.0, "class_b")
         self.assertGreaterEqual(n_b, n_a)
+
+    def test_dwsi_table_lookup(self):
+        # D/t = 114.3 / 8.56 ≈ 13.35 → Class A: 4, Class B: 5
+        n_a = self.calc._lookup_dwsi_exposures(114.3, 8.56, "class_a")
+        self.assertEqual(n_a, 4)
+        n_b = self.calc._lookup_dwsi_exposures(114.3, 8.56, "class_b")
+        self.assertEqual(n_b, 5)
+
+        # D/t >= 20 → both classes return 3
+        n_a = self.calc._lookup_dwsi_exposures(200.0, 8.0, "class_a")
+        self.assertEqual(n_a, 3)
+        n_b = self.calc._lookup_dwsi_exposures(200.0, 8.0, "class_b")
+        self.assertEqual(n_b, 3)
+
+        # D/t < 5 → both classes return 8
+        n = self.calc._lookup_dwsi_exposures(40.0, 10.0, "class_a")
+        self.assertEqual(n, 8)
+
+    def test_density_correction_factor(self):
+        # Class A always returns 1.0 regardless of film class
+        self.assertAlmostEqual(self.calc._density_correction_factor("class_a"), 1.0)
+        self.assertAlmostEqual(self.calc._density_correction_factor("class_a", "C1"), 1.0)
+        self.assertAlmostEqual(self.calc._density_correction_factor("class_a", "C6"), 1.0)
+
+        # Class B with C5 film (G=2.8): 10^((2.3-2.0)/2.8) = 10^0.10714 ≈ 1.2797
+        f_c5 = self.calc._density_correction_factor("class_b", "C5")
+        self.assertAlmostEqual(f_c5, 1.2797, places=3)
+
+        # Class B with C1 film (G=4.0): 10^((2.3-2.0)/4.0) = 10^0.075 = 1.1885
+        f_c1 = self.calc._density_correction_factor("class_b", "C1")
+        self.assertAlmostEqual(f_c1, 1.1885, places=3)
+
+        # Class B without film class falls back to G=3.0: 10^((2.3-2.0)/3.0) = 10^0.1 = 1.2589
+        f_default = self.calc._density_correction_factor("class_b")
+        self.assertAlmostEqual(f_default, 1.2589, places=3)
+
+    def test_beam_hardening(self):
+        # X-ray, thin wall (<=10mm) → no correction
+        mu = self.calc.get_mu_from_kv(120.0, "steel")
+        self.assertAlmostEqual(self.calc._apply_beam_hardening(mu, 5.0, "x_ray"), mu)
+
+        # X-ray, thick wall (40mm) → ~15% reduction
+        mu_corrected = self.calc._apply_beam_hardening(mu, 40.0, "x_ray")
+        self.assertAlmostEqual(mu_corrected, mu * 0.85, places=6)
+
+        # X-ray, very thick wall (80mm) → capped at 15% reduction
+        mu_corrected = self.calc._apply_beam_hardening(mu, 80.0, "x_ray")
+        self.assertAlmostEqual(mu_corrected, mu * 0.85, places=6)
+
+        # Isotope → no correction regardless of thickness
+        mu_ir = 0.035
+        self.assertAlmostEqual(self.calc._apply_beam_hardening(mu_ir, 50.0, "isotope_ir192"), mu_ir)
 
     def test_get_mu_from_kv_clamping_and_fallback(self):
         # Low clamp (below 80 kV) -> returns 80 kV value

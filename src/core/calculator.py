@@ -28,15 +28,30 @@ class RTCalculator:
     }
 
     # -----------------------------------------------------------------------
+    # Film gradient G̅ per ISO 11699-1 film class (average gradient over OD 1.5–3.5)
+    # Slower films (C1) have higher contrast → steeper gradient → less extra
+    # exposure needed for a given density increase.
+    # Source: ISO 17636-1:2022 Clause 5.3, ISO 11699-1:2008 Annex A.
+    # -----------------------------------------------------------------------
+    FILM_GRADIENT = {
+        "C1": 4.0,   # slowest, finest grain — highest contrast (e.g. DR50)
+        "C2": 3.5,   # (e.g. M100)
+        "C3": 3.2,   # (e.g. MX125)
+        "C4": 3.0,   # (e.g. T200)
+        "C5": 2.8,   # (e.g. AA400)
+        "C6": 2.5,   # fastest, coarsest grain — lowest contrast (e.g. HS800)
+    }
+
+    # -----------------------------------------------------------------------
     # Optical Density (OD) Target Correction
     # Class A: OD >= 2.0  →  factor 1.0 (reference)
-    # Class B: OD >= 2.3  →  exposure factor ~ exp(0.3 / G̅) where G̅≈3.0
-    #          → (2.3-2.0)/3.0 × ln(10) ≈ 0.23 → factor ≈ 1.25
+    # Class B: OD >= 2.3  →  exposure factor = 10^((2.3-2.0) / G̅)
     # Source: ISO 17636-1 Clause 5.3, ASTM E94 Commentary.
+    # Old fixed correction using G̅=3.0 → 1.25; now film-class-aware.
     # -----------------------------------------------------------------------
     OD_CORRECTION = {
         "class_a": 1.00,   # target OD >= 2.0
-        "class_b": 1.25,   # target OD >= 2.3  (+25% exposure)
+        "class_b": 1.25,   # default fallback when film class unknown
     }
 
     # ISO 17636-2:2022 Table 2 — Penetrated thickness ranges per source
@@ -898,17 +913,53 @@ class RTCalculator:
         d_str = f"{d_val} ({dia:.3f} mm) [{table_name}, {thickness_desc}]"
         return d_str, d_num
 
+    def _density_correction_factor(self, testing_class, film_class=None, ref_density=2.0):
+        target_density = 2.3 if testing_class == "class_b" else 2.0
+        if target_density == ref_density:
+            return 1.0
+        gradient = self.FILM_GRADIENT.get(film_class, 3.0)
+        return 10.0 ** ((target_density - ref_density) / gradient)
+
+    def _apply_beam_hardening(self, mu, w, source, kv=None, material="steel"):
+        if source != "x_ray":
+            return mu
+        if w <= 10.0:
+            return mu
+        reduction = 0.15 * min(1.0, (w - 10.0) / 30.0)
+        return mu * (1.0 - reduction)
+
+    def _lookup_dwsi_exposures(self, OD, t, testing_class):
+        dt_ratio = OD / t if t > 0 else 999.0
+        table = {
+            "class_a": [
+                (20.0, 3), (15.0, 3), (10.0, 4), (7.0, 5), (5.0, 6), (0.0, 8),
+            ],
+            "class_b": [
+                (20.0, 3), (15.0, 4), (10.0, 5), (7.0, 6), (5.0, 7), (0.0, 8),
+            ],
+        }
+        rows = table.get(testing_class, table["class_a"])
+        for threshold, n in rows:
+            if dt_ratio >= threshold:
+                return n
+        return 8
+
     def calculate_dwsi_exposures(self, OD, t, sfd, testing_class):
         """
-        Calculates the required minimum number of exposures for DWSI geometry (Step 3/4)
-        Based on limiting the increase of penetrated thickness at the edge of the
-        diagnostic length to:
-        - Class A: +20% (tolerance = 0.20)
-        - Class B: +10% (tolerance = 0.10)
+        Calculates the required minimum number of exposures for DWSI geometry.
+
+        Uses ISO 17636-1:2022 Annex C Table C.1 as primary lookup (based on D/t ratio),
+        backed by geometric binary search for edge cases.
+
+        - Class A: +20% thickness tolerance
+        - Class B: +10% thickness tolerance
         """
+        # ISO table minimum
+        iso_min = self._lookup_dwsi_exposures(OD, t, testing_class)
+
         R = OD / 2.0
         Ri = R - t
-        y_s = sfd - R  # Source y-coordinate, assuming detector center is at (0, -R) and source at (0, sfd-R)
+        y_s = sfd - R
 
         tolerance = 0.20 if testing_class == "class_a" else 0.10
         limit_thickness = t * (1.0 + tolerance)
@@ -973,7 +1024,10 @@ class RTCalculator:
 
         # Number of exposures N >= pi / max_theta
         N = math.pi / max_theta
-        return max(3, int(math.ceil(N)))  # Minimum 3 exposures for DWSI in pipeline codes
+        geo_n = max(3, int(math.ceil(N)))
+
+        # Return the stricter of geometric calculation vs ISO table
+        return max(geo_n, iso_min)
 
     def calculate_exposure_time(self, sfd, w_eff, source, output_val, base_factor,
                                  tech, testing_class="class_b",
@@ -1100,11 +1154,12 @@ class RTCalculator:
                     chart_source
                 )
 
-        # ── Attenuation coefficient per source (on steel, energy-weighted or kV-dependent)
+        # ── Attenuation coefficient per source, with beam hardening correction
         if source == "x_ray":
             if kv is None:
                 kv = 120.0
             mu = self.get_mu_from_kv(kv, material)
+            mu = self._apply_beam_hardening(mu, w_eff, source, kv, material)
         else:
             MU = {
                 "isotope_ir192": 0.035,   # Iridium-192  (0.37 MeV avg)
@@ -1126,8 +1181,8 @@ class RTCalculator:
         if tech == "analog":
             # ── Film speed: faster film → shorter exposure
             film_speed = self.FILM_SPEED_FACTORS.get(film_class, 2.0)   # default C5
-            # ── OD target: Class B requires higher density → more exposure
-            od_factor = self.OD_CORRECTION.get(testing_class, 1.0)
+            # ── OD target: film-class-aware gradient density correction
+            od_factor = self._density_correction_factor(testing_class, film_class)
             time_minutes = t_base * od_factor / film_speed
 
         else:  # digital

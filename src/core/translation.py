@@ -140,6 +140,9 @@ class Translation:
                 "defect_porosity": "Porozite / Gözenek",
                 "defect_crack": "Çatlak (Crack)",
                 "defect_ic": "Yetersiz İç Kep (IC)",
+                "defect_slag": "Cüruf Kalıntısı (Slag)",
+                "defect_undercut": "Yanma Oluğu (Undercut)",
+                "defect_burn_through": "Kök Yanması (Burn-Through)",
 
                 # Level 3 Authority Panel
                 "level3_section": "4. Seviye 3 Yetki ve Dijital Telafi Ekranı",
@@ -349,6 +352,9 @@ class Translation:
                 "defect_porosity": "Porosity",
                 "defect_crack": "Crack",
                 "defect_ic": "Incomplete Penetration of Weld Root (IC)",
+                "defect_slag": "Slag Inclusion (Slag)",
+                "defect_undercut": "Undercut",
+                "defect_burn_through": "Burn-Through",
 
                 # Level 3 Authority Panel
                 "level3_section": "4. Level 3 Authority and Digital Compensation Panel",

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import logging
 import os
 from datetime import datetime
 from reportlab.lib.pagesizes import letter
@@ -8,6 +9,9 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
+
+logger = logging.getLogger(__name__)
+
 
 class PDFReportGenerator:
     _fonts_registered = False
@@ -401,5 +405,5 @@ class PDFReportGenerator:
             doc.build(story)
             return True
         except Exception as e:
-            print(f"Error building PDF: {e}")
+            logger.error("Error building PDF: %s", e)
             return False

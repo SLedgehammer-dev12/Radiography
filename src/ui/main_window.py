@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGr
                              QCheckBox, QPushButton, QGroupBox, QScrollArea, QFileDialog, 
                              QMessageBox, QFormLayout, QTabWidget, QDialog, QProgressDialog,
                              QMenuBar, QSplitter)
-from PyQt6.QtCore import Qt, QThread, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QThread, QTimer, QSettings, pyqtSignal
 from PyQt6.QtGui import QFont, QPalette, QColor, QDoubleValidator, QAction
 
 from src.core.translation import Translation
@@ -21,58 +21,16 @@ from src.core.report import PDFReportGenerator
 from src.core.procedure_check import ProcedureComplianceChecker
 from src.core.updater import UpdateChecker
 from src.core.version import __version__ as CURRENT_VERSION
-ASME_B36_10_PIPES = {
-    # NPS: (OD_mm, [(wall_thickness_mm, "SCHEDULE_LABEL"), ...]) based on ASME B36.10
-    "1/8\" (NPS 1/8)": (10.3, [(1.24, "SCH 10"), (1.45, "SCH 30"), (1.73, "SCH 40 / STD"), (2.41, "SCH 80 / XS")]),
-    "1/4\" (NPS 1/4)": (13.7, [(1.65, "SCH 10"), (1.85, "SCH 30"), (2.24, "SCH 40 / STD"), (3.02, "SCH 80 / XS")]),
-    "3/8\" (NPS 3/8)": (17.1, [(1.65, "SCH 10"), (1.85, "SCH 30"), (2.31, "SCH 40 / STD"), (3.20, "SCH 80 / XS")]),
-    "1/2\" (NPS 1/2)": (21.3, [(1.65, "SCH 5S"), (2.11, "SCH 10"), (2.41, "SCH 30"), (2.77, "SCH 40 / STD"), (3.73, "SCH 80 / XS"), (4.78, "SCH 160"), (7.47, "XXS")]),
-    "3/4\" (NPS 3/4)": (26.7, [(1.65, "SCH 5S"), (2.11, "SCH 10"), (2.41, "SCH 30"), (2.87, "SCH 40 / STD"), (3.91, "SCH 80 / XS"), (5.56, "SCH 160"), (7.82, "XXS")]),
-    "1\" (NPS 1)": (33.4, [(1.65, "SCH 5S"), (2.77, "SCH 10"), (2.90, "SCH 30"), (3.38, "SCH 40 / STD"), (4.55, "SCH 80 / XS"), (6.35, "SCH 160"), (9.09, "XXS")]),
-    "1 1/4\" (NPS 1 1/4)": (42.2, [(1.65, "SCH 5S"), (2.77, "SCH 10"), (2.97, "SCH 30"), (3.56, "SCH 40 / STD"), (4.85, "SCH 80 / XS"), (6.35, "SCH 160"), (9.70, "XXS")]),
-    "1 1/2\" (NPS 1 1/2)": (48.3, [(1.65, "SCH 5S"), (2.77, "SCH 10"), (3.18, "SCH 30"), (3.68, "SCH 40 / STD"), (5.08, "SCH 80 / XS"), (7.14, "SCH 160"), (10.15, "XXS")]),
-    "2\" (NPS 2)": (60.3, [(1.65, "SCH 5S"), (2.77, "SCH 10"), (3.18, "SCH 30"), (3.91, "SCH 40 / STD"), (5.54, "SCH 80 / XS"), (8.74, "SCH 160"), (11.07, "XXS")]),
-    "2 1/2\" (NPS 2 1/2)": (73.0, [(2.11, "SCH 5S"), (3.05, "SCH 10"), (4.78, "SCH 30"), (5.16, "SCH 40 / STD"), (7.01, "SCH 80 / XS"), (9.53, "SCH 160"), (14.02, "XXS")]),
-    "3\" (NPS 3)": (88.9, [(2.11, "SCH 5S"), (3.05, "SCH 10"), (4.78, "SCH 30"), (5.49, "SCH 40 / STD"), (7.62, "SCH 80 / XS"), (11.13, "SCH 160"), (15.24, "XXS")]),
-    "3 1/2\" (NPS 3 1/2)": (101.6, [(2.11, "SCH 5S"), (3.05, "SCH 10"), (4.78, "SCH 30"), (5.74, "SCH 40 / STD"), (8.08, "SCH 80 / XS")]),
-    "4\" (NPS 4)": (114.3, [(2.11, "SCH 5S"), (3.05, "SCH 10"), (4.78, "SCH 30"), (6.02, "SCH 40 / STD"), (8.56, "SCH 80 / XS"), (11.13, "SCH 120"), (13.49, "SCH 160"), (17.12, "XXS")]),
-    "5\" (NPS 5)": (141.3, [(2.77, "SCH 5S"), (3.40, "SCH 10"), (6.55, "SCH 40 / STD"), (9.53, "SCH 80 / XS"), (12.70, "SCH 120"), (15.88, "SCH 160"), (19.05, "XXS")]),
-    "6\" (NPS 6)": (168.3, [(2.77, "SCH 5S"), (3.40, "SCH 10"), (7.11, "SCH 40 / STD"), (10.97, "SCH 80 / XS"), (14.27, "SCH 120"), (18.26, "SCH 160"), (21.95, "XXS")]),
-    "8\" (NPS 8)": (219.1, [(2.77, "SCH 5S"), (3.76, "SCH 10"), (6.35, "SCH 20"), (7.04, "SCH 30"), (8.18, "SCH 40 / STD"), (10.31, "SCH 60"), (12.70, "SCH 80 / XS"), (15.09, "SCH 100"), (18.26, "SCH 120"), (20.62, "SCH 140"), (22.23, "XXS"), (23.01, "SCH 160")]),
-    "10\" (NPS 10)": (273.0, [(3.40, "SCH 5S"), (4.19, "SCH 10"), (6.35, "SCH 20"), (7.80, "SCH 30"), (9.27, "SCH 40 / STD"), (12.70, "SCH 60 / XS"), (15.09, "SCH 80"), (18.26, "SCH 100"), (21.44, "SCH 120"), (25.40, "SCH 140 / XXS"), (28.58, "SCH 160")]),
-    "12\" (NPS 12)": (323.9, [(3.96, "SCH 5S"), (4.57, "SCH 10"), (6.35, "SCH 20"), (8.38, "SCH 30"), (9.53, "STD"), (10.31, "SCH 40"), (12.70, "XS"), (14.27, "SCH 60"), (17.48, "SCH 80"), (21.44, "SCH 100"), (25.40, "SCH 120 / XXS"), (28.58, "SCH 140"), (33.32, "SCH 160")]),
-    "14\" (NPS 14)": (355.6, [(6.35, "SCH 10"), (7.92, "SCH 20"), (9.53, "SCH 30 / STD"), (11.13, "SCH 40"), (12.70, "XS"), (15.09, "SCH 60"), (19.05, "SCH 80"), (23.83, "SCH 100"), (27.79, "SCH 120"), (31.75, "SCH 140"), (35.71, "SCH 160")]),
-    "16\" (NPS 16)": (406.4, [(6.35, "SCH 10"), (7.92, "SCH 20"), (9.53, "SCH 30 / STD"), (12.70, "SCH 40 / XS"), (16.66, "SCH 60"), (21.44, "SCH 80"), (26.19, "SCH 100"), (30.96, "SCH 120"), (36.53, "SCH 140"), (40.49, "SCH 160")]),
-    "18\" (NPS 18)": (457.0, [(6.35, "SCH 10"), (7.92, "SCH 20"), (9.53, "STD"), (11.13, "SCH 30"), (12.70, "XS"), (14.27, "SCH 40"), (19.05, "SCH 60"), (23.83, "SCH 80"), (29.36, "SCH 100"), (34.93, "SCH 120"), (39.67, "SCH 140"), (45.24, "SCH 160")]),
-    "20\" (NPS 20)": (508.0, [(6.35, "SCH 10"), (9.53, "SCH 20 / STD"), (12.70, "SCH 30 / XS"), (15.09, "SCH 40"), (20.62, "SCH 60"), (26.19, "SCH 80"), (32.54, "SCH 100"), (38.10, "SCH 120"), (44.45, "SCH 140"), (50.01, "SCH 160")]),
-    "22\" (NPS 22)": (559.0, [(6.35, "SCH 10"), (9.53, "SCH 20 / STD"), (12.70, "SCH 30 / XS"), (22.23, "SCH 60"), (28.56, "SCH 80"), (34.93, "SCH 100"), (41.28, "SCH 120"), (47.63, "SCH 140"), (53.98, "SCH 160")]),
-    "24\" (NPS 24)": (610.0, [(6.35, "SCH 10"), (9.53, "SCH 20 / STD"), (12.70, "XS"), (14.27, "SCH 30"), (17.48, "SCH 40"), (24.61, "SCH 60"), (30.96, "SCH 80"), (38.89, "SCH 100"), (46.02, "SCH 120"), (52.37, "SCH 140"), (59.54, "SCH 160")]),
-    "26\" (NPS 26)": (660.0, [(7.92, "SCH 10"), (9.53, "STD"), (12.70, "XS / SCH 20")]),
-    "28\" (NPS 28)": (711.0, [(7.92, "SCH 10"), (9.53, "STD"), (12.70, "XS / SCH 20"), (15.88, "SCH 30")]),
-    "30\" (NPS 30)": (762.0, [(7.92, "SCH 10"), (9.53, "STD"), (12.70, "XS / SCH 20"), (15.88, "SCH 30")]),
-    "32\" (NPS 32)": (813.0, [(7.92, "SCH 10"), (9.53, "STD"), (12.70, "XS / SCH 20"), (15.88, "SCH 30"), (17.48, "SCH 40")]),
-    "34\" (NPS 34)": (864.0, [(7.92, "SCH 10"), (9.53, "STD"), (12.70, "XS / SCH 20"), (15.88, "SCH 30"), (17.48, "SCH 40")]),
-    "36\" (NPS 36)": (914.0, [(7.92, "SCH 10"), (9.53, "STD"), (12.70, "XS / SCH 20"), (15.88, "SCH 30"), (19.05, "SCH 40")]),
-    "38\" (NPS 38)": (965.0, [(9.53, "STD"), (12.70, "XS")]),
-    "40\" (NPS 40)": (1016.0, [(9.53, "STD"), (12.70, "XS")]),
-    "42\" (NPS 42)": (1067.0, [(9.53, "STD"), (12.70, "XS")]),
-    "44\" (NPS 44)": (1118.0, [(9.53, "STD"), (12.70, "XS")]),
-    "46\" (NPS 46)": (1168.0, [(9.53, "STD"), (12.70, "XS")]),
-    "48\" (NPS 48)": (1219.0, [(9.53, "STD"), (12.70, "XS")]),
-    "52\" (NPS 52)": (1321.0, [(9.53, "STD"), (12.70, "XS")]),
-    "56\" (NPS 56)": (1422.0, [(9.53, "STD"), (12.70, "XS")]),
-    "60\" (NPS 60)": (1524.0, [(9.53, "STD"), (12.70, "XS")])
-}
+from src.ui.panels.input_panel import InputPanelMixin, ASME_B36_10_PIPES, QFormLayout_custom
+from src.ui.panels.defect_panel import DefectPanelMixin
+from src.ui.panels.warnings_compliance_panel import WarningsPanelMixin, CompliancePanelMixin
 
-class QFormLayout_custom(QFormLayout):
-    def __init__(self):
-        super().__init__()
-        self.setContentsMargins(10, 5, 10, 10)
-        self.setSpacing(8)
-        self.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
-        self.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
 
-class MainWindow(QMainWindow):
+class MainWindow(QMainWindow,
+                  InputPanelMixin,
+                  DefectPanelMixin,
+                  WarningsPanelMixin,
+                  CompliancePanelMixin):
     def __init__(self):
         super().__init__()
         
@@ -102,6 +60,9 @@ class MainWindow(QMainWindow):
             "approval_note": ""
         }
 
+        # QSettings persistence
+        self._settings = QSettings("Radiography", "Radiography")
+
         # Set Window Title and size
         self.setWindowTitle(self.trans.get("app_title"))
         self.setMinimumSize(1200, 800)
@@ -109,6 +70,10 @@ class MainWindow(QMainWindow):
         # Init layout
         self.init_ui()
         self._setup_menu_bar()
+
+        # Restore persistent settings
+        self._restore_settings()
+
         self.apply_theme()
         
         # Initialize standard figure list
@@ -119,7 +84,130 @@ class MainWindow(QMainWindow):
         self.txt_bgap.setVisible(False)
 
         # Trigger initial calculations
-        self.update_calculations()
+        if not self._restored_settings:
+            self.update_calculations()
+
+    def closeEvent(self, event):
+        self._save_settings()
+        super().closeEvent(event)
+
+    def _save_settings(self):
+        s = self._settings
+        s.setValue("window/geometry", self.saveGeometry())
+        s.setValue("window/state", self.saveState())
+        s.setValue("window/is_dark_theme", self.is_dark_theme)
+
+        # Splitter sizes
+        for name in ("left_splitter",):
+            w = getattr(self, name, None)
+            if w:
+                s.setValue(f"splitter/{name}", w.sizes())
+
+        # Middle and right splitters
+        for child in self.findChildren(QSplitter):
+            obj_name = child.objectName() or ""
+            if obj_name:
+                s.setValue(f"splitter/{obj_name}", child.sizes())
+
+        # Language
+        s.setValue("ui/language", self.trans.language)
+
+        # Form combo indices
+        combo_map = {
+            "cmb_material": None,
+            "cmb_source": None,
+            "cmb_class": None,
+            "cmb_od": None,
+            "cmb_t": None,
+            "cmb_geometry": None,
+            "cmb_film_class_used": None,
+            "cmb_detector_type": None,
+            "cmb_chart_source": None,
+        }
+        for combo_name in combo_map:
+            w = getattr(self, combo_name, None)
+            if w:
+                s.setValue(f"form/{combo_name}", w.currentIndex())
+
+        # Form line edits
+        line_edits = {
+            "txt_custom_od": "",
+            "txt_custom_t": "",
+            "txt_cap": "3.0",
+            "txt_d": "2.0",
+            "txt_app_sfd": "600.0",
+            "txt_output": "5.0",
+            "txt_app_activity": "40.0",
+            "txt_base_e": "3.0",
+        }
+        for le_name, default_val in line_edits.items():
+            w = getattr(self, le_name, None)
+            if w:
+                val = w.text()
+                if val != default_val or s.contains(f"form/{le_name}"):
+                    s.setValue(f"form/{le_name}", val)
+
+    def _restore_settings(self):
+        self._restored_settings = False
+        s = self._settings
+
+        # Window geometry & state
+        geom = s.value("window/geometry")
+        if geom is not None:
+            self.restoreGeometry(geom)
+            self._restored_settings = True
+        state = s.value("window/state")
+        if state is not None:
+            self.restoreState(state)
+
+        # Theme
+        theme_val = s.value("window/is_dark_theme", type=bool)
+        if theme_val is not None:
+            self.is_dark_theme = theme_val
+
+        # Splitter sizes
+        for child in self.findChildren(QSplitter):
+            obj_name = child.objectName() or ""
+            if obj_name:
+                val = s.value(f"splitter/{obj_name}")
+                if val is not None:
+                    child.setSizes([int(v) for v in val])
+        left_sizes = s.value("splitter/left_splitter")
+        if left_sizes is not None:
+            self.left_splitter.setSizes([int(v) for v in left_sizes])
+
+        # Language
+        lang = s.value("ui/language")
+        if lang is not None and lang in ("tr", "en"):
+            self.trans.set_language(lang)
+            self.retranslate_ui()
+
+        # Form combo indices
+        combo_map = [
+            "cmb_material", "cmb_source", "cmb_class", "cmb_od",
+            "cmb_t", "cmb_geometry", "cmb_film_class_used",
+            "cmb_detector_type", "cmb_chart_source",
+        ]
+        for combo_name in combo_map:
+            idx = s.value(f"form/{combo_name}", type=int)
+            if idx is not None:
+                w = getattr(self, combo_name, None)
+                if w and 0 <= idx < w.count():
+                    w.blockSignals(True)
+                    w.setCurrentIndex(idx)
+                    w.blockSignals(False)
+
+        # Form line edits
+        line_edits = [
+            "txt_custom_od", "txt_custom_t", "txt_cap", "txt_d",
+            "txt_app_sfd", "txt_output", "txt_app_activity", "txt_base_e",
+        ]
+        for le_name in line_edits:
+            val = s.value(f"form/{le_name}")
+            if val is not None:
+                w = getattr(self, le_name, None)
+                if w:
+                    w.setText(val)
 
     def init_ui(self):
         # Central widget
@@ -165,14 +253,21 @@ class MainWindow(QMainWindow):
         top_bar.addWidget(self.btn_export)
         main_layout.addLayout(top_bar)
 
-        # --- LEFT PANEL: Inputs (split into resizable sections) ---
-        self.left_splitter = QSplitter(Qt.Orientation.Vertical)
-        self.left_splitter.setChildrenCollapsible(False)
+        # ── MAIN 3-COLUMN SPLITTER ──────────────────────────────────────────
+        main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        main_splitter.setObjectName("main_splitter")
+        main_splitter.setChildrenCollapsible(False)
+        main_splitter.setHandleWidth(8)
 
-        # Group 1: Shooting Parameters and Inputs (wrapped in scroll area)
+        # ══════════════ COLUMN 1: Input Parameters (25%) ═══════════════════
+        self.left_splitter = QSplitter(Qt.Orientation.Vertical)
+        self.left_splitter.setObjectName("left_splitter")
+        self.left_splitter.setChildrenCollapsible(False)
+        self.left_splitter.setHandleWidth(8)
+
         self.left_scroll_1 = QScrollArea()
         self.left_scroll_1.setWidgetResizable(True)
-        self.left_scroll_1.setMinimumHeight(150)
+        self.left_scroll_1.setMinimumHeight(100)
         scroll_widget_1 = QWidget()
         scroll_layout_1 = QVBoxLayout(scroll_widget_1)
         scroll_layout_1.setContentsMargins(5, 5, 5, 5)
@@ -182,128 +277,7 @@ class MainWindow(QMainWindow):
         grp_inputs_layout = QFormLayout_custom()
         grp_inputs.setLayout(grp_inputs_layout)
 
-        self.cmb_material = QComboBox()
-        self.cmb_material.addItems([
-            self.trans.get("steel"),
-            self.trans.get("aluminum"),
-            self.trans.get("titanium"),
-            self.trans.get("copper_nickel")
-        ])
-        self.cmb_material.currentIndexChanged.connect(self.update_calculations)
-        grp_inputs_layout.addRow(self.trans.get("material_type"), self.cmb_material)
-
-        self.lbl_std_od = QLabel(self.trans.get("std_pipe_od"))
-        self.cmb_od = QComboBox()
-        self.cmb_od.blockSignals(True)
-        for key in ASME_B36_10_PIPES.keys():
-            self.cmb_od.addItem(key, key)
-        self.cmb_od.currentIndexChanged.connect(self.on_od_changed)
-        grp_inputs_layout.addRow(self.lbl_std_od, self.cmb_od)
-
-        self.lbl_custom_od = QLabel(self.trans.get("custom_pipe_od"))
-        self.txt_custom_od = QLineEdit()
-        self.txt_custom_od.setValidator(QDoubleValidator(1.0, 5000.0, 2))
-        self.txt_custom_od.setPlaceholderText(self.trans.get("custom_od_placeholder"))
-        self.txt_custom_od.textChanged.connect(self.update_calculations)
-        grp_inputs_layout.addRow(self.lbl_custom_od, self.txt_custom_od)
-
-        self.lbl_std_t = QLabel(self.trans.get("std_nominal_t"))
-        self.cmb_t = QComboBox()
-        self.cmb_t.blockSignals(True)
-        self.cmb_t.currentIndexChanged.connect(self.update_calculations)
-        grp_inputs_layout.addRow(self.lbl_std_t, self.cmb_t)
-
-        self.lbl_custom_t = QLabel(self.trans.get("custom_nominal_t"))
-        self.txt_custom_t = QLineEdit()
-        self.txt_custom_t.setValidator(QDoubleValidator(0.1, 500.0, 2))
-        self.txt_custom_t.setPlaceholderText(self.trans.get("custom_t_placeholder"))
-        self.txt_custom_t.textChanged.connect(self.update_calculations)
-        grp_inputs_layout.addRow(self.lbl_custom_t, self.txt_custom_t)
-
-        self.txt_cap = QLineEdit("3.0")
-        self.txt_cap.setValidator(QDoubleValidator(0.0, 50.0, 2))
-        self.txt_cap.textChanged.connect(self.update_calculations)
-        grp_inputs_layout.addRow(self.trans.get("cap_height"), self.txt_cap)
-
-        self.bg_tech = QButtonGroup(self)
-        self.rad_analog = QRadioButton(self.trans.get("analog_film"))
-        self.rad_digital = QRadioButton(self.trans.get("digital_cr_dda"))
-        self.rad_digital.setChecked(True)
-        self.bg_tech.addButton(self.rad_analog, 0)
-        self.bg_tech.addButton(self.rad_digital, 1)
-        self.rad_analog.toggled.connect(self.on_tech_changed)
-        self.rad_digital.toggled.connect(self.on_tech_changed)
-        
-        tech_widget = QWidget()
-        tech_layout = QVBoxLayout(tech_widget)
-        tech_layout.setContentsMargins(0,0,0,0)
-        tech_layout.addWidget(self.rad_analog)
-        tech_layout.addWidget(self.rad_digital)
-        grp_inputs_layout.addRow(self.trans.get("rt_tech"), tech_widget)
-
-        self.cmb_source = QComboBox()
-        self.cmb_source.addItems([
-            self.trans.get("x_ray"),
-            self.trans.get("isotope_ir192"),
-            self.trans.get("isotope_se75"),
-            self.trans.get("isotope_co60")
-        ])
-        self.cmb_source.currentIndexChanged.connect(self.on_source_changed)
-        grp_inputs_layout.addRow(self.trans.get("rad_source"), self.cmb_source)
-
-        self.txt_d = QLineEdit("2.0")
-        self.txt_d.setValidator(QDoubleValidator(0.01, 20.0, 2))
-        self.txt_d.textChanged.connect(self.update_calculations)
-        grp_inputs_layout.addRow(self.trans.get("focal_size"), self.txt_d)
-
-        self.txt_dd = QLineEdit("200.0")
-        self.txt_dd.setValidator(QDoubleValidator(1.0, 1000.0, 1))
-        self.txt_dd.textChanged.connect(self.update_calculations)
-        grp_inputs_layout.addRow(self.trans.get("detector_size"), self.txt_dd)
-
-        self.cmb_class = QComboBox()
-        self.cmb_class.addItems([
-            self.trans.get("class_b"),
-            self.trans.get("class_a")
-        ])
-        self.cmb_class.currentIndexChanged.connect(self.update_calculations)
-        grp_inputs_layout.addRow(self.trans.get("testing_class"), self.cmb_class)
-
-        self.cmb_geometry = QComboBox()
-        self.cmb_geometry.addItems([
-            self.trans.get("dwsi"),
-            self.trans.get("swsi"),
-            self.trans.get("dwdi_elliptic"),
-            self.trans.get("dwdi_super")
-        ])
-        self.cmb_geometry.currentIndexChanged.connect(self.on_geometry_changed)
-        grp_inputs_layout.addRow(self.trans.get("geometry"), self.cmb_geometry)
-
-        self.cmb_std_figure = QComboBox()
-        self.cmb_std_figure.currentIndexChanged.connect(self.on_std_figure_changed)
-        grp_inputs_layout.addRow(self.trans.get("standard_fig"), self.cmb_std_figure)
-
-        self.rad_detector_flat = QRadioButton(self.trans.get("detector_flat"))
-        self.rad_detector_curved = QRadioButton(self.trans.get("detector_curved"))
-        self.rad_detector_flat.setChecked(True)
-        det_type_widget = QWidget()
-        det_type_layout = QHBoxLayout(det_type_widget)
-        det_type_layout.setContentsMargins(0, 0, 0, 0)
-        det_type_layout.addWidget(self.rad_detector_flat)
-        det_type_layout.addWidget(self.rad_detector_curved)
-        self.rad_detector_flat.toggled.connect(self.on_detector_type_changed)
-        self.rad_detector_curved.toggled.connect(self.on_detector_type_changed)
-        grp_inputs_layout.addRow(self.trans.get("detector_type"), det_type_widget)
-
-        self.txt_bed = QLineEdit("0.0")
-        self.txt_bed.setValidator(QDoubleValidator(0.0, 500.0, 1))
-        self.txt_bed.textChanged.connect(self.update_calculations)
-        self.lbl_bed = grp_inputs_layout.addRow(self.trans.get("bed"), self.txt_bed)
-
-        self.txt_bgap = QLineEdit("5.0")
-        self.txt_bgap.setValidator(QDoubleValidator(0.0, 100.0, 1))
-        self.txt_bgap.textChanged.connect(self.update_calculations)
-        self.lbl_bgap = grp_inputs_layout.addRow(self.trans.get("bgap"), self.txt_bgap)
+        self._init_input_panel(grp_inputs_layout)
 
         self.chk_source_side_iqi = QCheckBox(self.trans.get("source_side_iqi"))
         self.chk_source_side_iqi.setChecked(True)
@@ -320,10 +294,10 @@ class MainWindow(QMainWindow):
         scroll_layout_1.addWidget(grp_inputs)
         self.left_scroll_1.setWidget(scroll_widget_1)
 
-        # Group 2: Applied Exposure and Geometry Settings (wrapped in scroll area)
+        # Scroll area 2: Exposure Settings
         self.left_scroll_2 = QScrollArea()
         self.left_scroll_2.setWidgetResizable(True)
-        self.left_scroll_2.setMinimumHeight(150)
+        self.left_scroll_2.setMinimumHeight(100)
         scroll_widget_2 = QWidget()
         scroll_layout_2 = QVBoxLayout(scroll_widget_2)
         scroll_layout_2.setContentsMargins(5, 5, 5, 5)
@@ -333,41 +307,41 @@ class MainWindow(QMainWindow):
         grp_exposure_layout = QFormLayout_custom()
         self.grp_exposure.setLayout(grp_exposure_layout)
 
-        # 1. Applied SFD
+        # Applied SFD
         self.lbl_app_sfd = QLabel(self.trans.get("applied_sfd"))
         self.txt_app_sfd = QLineEdit("600.0")
         self.txt_app_sfd.setValidator(QDoubleValidator(10.0, 5000.0, 1))
         self.txt_app_sfd.textChanged.connect(self.update_calculations)
         grp_exposure_layout.addRow(self.lbl_app_sfd, self.txt_app_sfd)
 
-        # 2. Tube Amperage (mA) - visible for X-ray
+        # Tube Amperage (mA) - visible for X-ray
         self.lbl_output = QLabel(self.trans.get("amperage"))
         self.txt_output = QLineEdit("5.0")
         self.txt_output.setValidator(QDoubleValidator(0.01, 1000.0, 2))
         self.txt_output.textChanged.connect(self.update_calculations)
         grp_exposure_layout.addRow(self.lbl_output, self.txt_output)
 
-        # 3. Applied Tube Voltage (kV) - visible for X-ray
+        # Applied Tube Voltage (kV) - visible for X-ray
         self.lbl_app_kv = QLabel(self.trans.get("applied_kv"))
         self.txt_app_kv = QLineEdit("120.0")
         self.txt_app_kv.setValidator(QDoubleValidator(1.0, 1000.0, 1))
         self.txt_app_kv.textChanged.connect(self.update_calculations)
         grp_exposure_layout.addRow(self.lbl_app_kv, self.txt_app_kv)
 
-        # 4. Applied Activity (Ci) - visible for Isotopes
+        # Applied Activity (Ci) - visible for Isotopes
         self.lbl_app_activity = QLabel(self.trans.get("applied_activity"))
         self.txt_app_activity = QLineEdit("40.0")
         self.txt_app_activity.setValidator(QDoubleValidator(0.01, 1000.0, 2))
         self.txt_app_activity.textChanged.connect(self.update_calculations)
         grp_exposure_layout.addRow(self.lbl_app_activity, self.txt_app_activity)
 
-        # 5. Base factor E
+        # Base factor E
         self.txt_base_e = QLineEdit("3.0")
         self.txt_base_e.setValidator(QDoubleValidator(0.0001, 100.0, 4))
         self.txt_base_e.textChanged.connect(self.update_calculations)
         grp_exposure_layout.addRow(self.trans.get("base_factor"), self.txt_base_e)
 
-        # 6. Chart Source (exposure chart database routing)
+        # Chart Source
         self.cmb_chart_source = QComboBox()
         self.cmb_chart_source.addItem(self.trans.get("chart_model"), "model")
         self.cmb_chart_source.addItem("AA400 (C5)", "AA400")
@@ -379,23 +353,30 @@ class MainWindow(QMainWindow):
         self.cmb_chart_source.currentIndexChanged.connect(self.on_chart_source_changed)
         grp_exposure_layout.addRow(self.trans.get("chart_source"), self.cmb_chart_source)
 
-        # 7. Film class in use (analog only) — ISO 11699-1
+        # Film class in use
         self.lbl_film_class_used = QLabel(self.trans.get("film_class_used"))
         self.cmb_film_class_used = QComboBox()
         self.cmb_film_class_used.addItems(["C1", "C2", "C3", "C4", "C5", "C6"])
-        self.cmb_film_class_used.setCurrentIndex(4)   # default C5
+        self.cmb_film_class_used.setCurrentIndex(4)
         self.cmb_film_class_used.setMinimumWidth(100)
         self.cmb_film_class_used.currentIndexChanged.connect(self.update_calculations)
         grp_exposure_layout.addRow(self.lbl_film_class_used, self.cmb_film_class_used)
 
-        # 7. Applied Film Overlap (mm) - visible for analog
+        # Applied Film Overlap
         self.lbl_app_overlap = QLabel(self.trans.get("applied_overlap"))
         self.txt_app_overlap = QLineEdit("10.0")
         self.txt_app_overlap.setValidator(QDoubleValidator(0.0, 500.0, 1))
         self.txt_app_overlap.textChanged.connect(self.update_calculations)
         grp_exposure_layout.addRow(self.lbl_app_overlap, self.txt_app_overlap)
 
-        # 8. Detector type (digital only) — ISO 17636-2 / DQE
+        # Applied Exposure Time
+        self.lbl_app_time = QLabel(self.trans.get("applied_time"))
+        self.txt_app_time = QLineEdit("120.0")
+        self.txt_app_time.setValidator(QDoubleValidator(0.1, 100000.0, 1))
+        self.txt_app_time.textChanged.connect(self.update_calculations)
+        grp_exposure_layout.addRow(self.lbl_app_time, self.txt_app_time)
+
+        # Detector type
         self.lbl_detector_type = QLabel(self.trans.get("detector_type"))
         self.cmb_detector_type = QComboBox()
         self._det_keys = ["cr_standard", "cr_highres", "dda_si", "dda_se", "dda_gdos"]
@@ -406,14 +387,14 @@ class MainWindow(QMainWindow):
         self.cmb_detector_type.currentIndexChanged.connect(self.update_calculations)
         grp_exposure_layout.addRow(self.lbl_detector_type, self.cmb_detector_type)
 
-        # 9. Applied Panel SRb (µm) - visible for digital
+        # Applied Panel SRb
         self.lbl_app_srb = QLabel(self.trans.get("applied_srb"))
         self.txt_app_srb = QLineEdit("80.0")
         self.txt_app_srb.setValidator(QDoubleValidator(1.0, 1000.0, 1))
         self.txt_app_srb.textChanged.connect(self.update_calculations)
         grp_exposure_layout.addRow(self.lbl_app_srb, self.txt_app_srb)
 
-        # SNR Measurement Location (visible for digital)
+        # SNR Measurement Location
         self.lbl_snr_location = QLabel(self.trans.get("snr_location"))
         self.cmb_snr_location = QComboBox()
         self.cmb_snr_location.addItem(self.trans.get("snr_location_weld"), "weld")
@@ -421,139 +402,78 @@ class MainWindow(QMainWindow):
         self.cmb_snr_location.currentIndexChanged.connect(self.update_calculations)
         grp_exposure_layout.addRow(self.lbl_snr_location, self.cmb_snr_location)
 
-        # 10. Applied Wire (W-No)
-        self.lbl_app_wire = QLabel(self.trans.get("applied_wire"))
-        self.cmb_app_wire = QComboBox()
-        wire_dias = {
-            1: 3.20, 2: 2.50, 3: 2.00, 4: 1.60, 5: 1.25,
-            6: 1.00, 7: 0.80, 8: 0.63, 9: 0.50, 10: 0.40,
-            11: 0.32, 12: 0.25, 13: 0.20, 14: 0.16, 15: 0.125,
-            16: 0.10, 17: 0.08, 18: 0.063, 19: 0.05
-        }
-        for w_no in sorted(wire_dias.keys()):
-            self.cmb_app_wire.addItem(f"W {w_no} ({wire_dias[w_no]:.3f} mm)", w_no)
-        self.cmb_app_wire.setCurrentIndex(9) # default W10
-        self.cmb_app_wire.currentIndexChanged.connect(self.update_calculations)
-        grp_exposure_layout.addRow(self.lbl_app_wire, self.cmb_app_wire)
-
-        # 11. Applied Duplex (D-No) - visible for digital
+        # Applied Duplex IQI
         self.lbl_app_duplex = QLabel(self.trans.get("applied_duplex"))
         self.cmb_app_duplex = QComboBox()
-        duplex_dias = {
-            5: 0.320, 6: 0.250, 7: 0.200, 8: 0.160, 9: 0.125,
-            10: 0.100, 11: 0.080, 12: 0.063, 13: 0.050
-        }
-        for d_no in sorted(duplex_dias.keys()):
-            self.cmb_app_duplex.addItem(f"D {d_no} ({duplex_dias[d_no]:.3f} mm)", d_no)
-        self.cmb_app_duplex.setCurrentIndex(5) # default D10
+        for d in range(1, 14):
+            self.cmb_app_duplex.addItem(str(d), d)
+        self.cmb_app_duplex.setCurrentIndex(5)
         self.cmb_app_duplex.currentIndexChanged.connect(self.update_calculations)
         grp_exposure_layout.addRow(self.lbl_app_duplex, self.cmb_app_duplex)
 
-        # 12. Applied Quality Target (OD / SNR_N)
+        # Applied IQI (Wire / Step Hole)
+        self.lbl_app_wire = QLabel(self.trans.get("applied_wire"))
+        self.cmb_app_wire = QComboBox()
+        self.cmb_app_wire.setMinimumWidth(160)
+        # Populated dynamically in on_iqi_type_changed
+        self.cmb_app_wire.currentIndexChanged.connect(self.update_calculations)
+        # Initial population (block signals to avoid premature update_calculations)
+        self.cmb_app_wire.blockSignals(True)
+        for w_no in sorted(self.calc.wire_diameters.keys()):
+            self.cmb_app_wire.addItem(f"W {w_no} ({self.calc.wire_diameters[w_no]:.3f} mm)", w_no)
+        self.cmb_app_wire.setCurrentIndex(9)
+        self.cmb_app_wire.blockSignals(False)
+        grp_exposure_layout.addRow(self.lbl_app_wire, self.cmb_app_wire)
+
+        # Applied Quality (SNR_N for digital / Optical Density for analog)
         self.lbl_app_quality = QLabel(self.trans.get("applied_quality"))
-        self.txt_app_quality = QLineEdit("2.5")
-        self.txt_app_quality.setValidator(QDoubleValidator(0.01, 10000.0, 2))
+        self.txt_app_quality = QLineEdit("140")
+        self.txt_app_quality.setValidator(QDoubleValidator(0.1, 1000.0, 1))
         self.txt_app_quality.textChanged.connect(self.update_calculations)
         grp_exposure_layout.addRow(self.lbl_app_quality, self.txt_app_quality)
 
-        # 13. Applied Exposure Time (sec)
-        self.lbl_app_time = QLabel(self.trans.get("applied_time"))
-        self.txt_app_time = QLineEdit("180.0")
-        self.txt_app_time.setValidator(QDoubleValidator(0.1, 100000.0, 1))
-        self.txt_app_time.textChanged.connect(self.update_calculations)
-        grp_exposure_layout.addRow(self.lbl_app_time, self.txt_app_time)
+        # Applied Overlap Length for analog
+        # (note: this is a duplicate concept from txt_app_overlap above — kept for clarity)
 
         scroll_layout_2.addWidget(self.grp_exposure)
         self.left_scroll_2.setWidget(scroll_widget_2)
 
-        # Assemble left panel vertical splitter
         self.left_splitter.addWidget(self.left_scroll_1)
         self.left_splitter.addWidget(self.left_scroll_2)
-        self.left_splitter.setSizes([400, 400])
+        self.left_splitter.setSizes([300, 300])
 
-        # Top Right: Weld Sketch Tabbed View inside Box
-        self.sketch_box = QGroupBox(self.trans.get("sketch_title"))
-        self.sketch_box.setObjectName("SketchBox")
-        sketch_layout = QVBoxLayout(self.sketch_box)
-        sketch_layout.setContentsMargins(5,5,5,5)
+        main_splitter.addWidget(self.left_splitter)
 
-        self.tab_sketch = QTabWidget()
-        self.tab_sketch.setObjectName("SketchTabs")
-        
-        # Tab 1: Dynamic Sketch Canvas
-        tab_dynamic_widget = QWidget()
-        tab_dynamic_layout = QVBoxLayout(tab_dynamic_widget)
-        tab_dynamic_layout.setContentsMargins(2,2,2,2)
-        self.canvas = WeldSketchCanvas(tab_dynamic_widget, width=5, height=3, dpi=100)
-        tab_dynamic_layout.addWidget(self.canvas)
-        
-        # Under the dynamic canvas, show which standard figure corresponds to the setup
-        self.lbl_dynamic_standard_ref = QLabel("")
-        self.lbl_dynamic_standard_ref.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_dynamic_standard_ref.setStyleSheet("color: #89b4fa; font-size: 11px; font-weight: bold; padding: 4px;")
-        tab_dynamic_layout.addWidget(self.lbl_dynamic_standard_ref)
-        
-        self.tab_sketch.addTab(tab_dynamic_widget, self.trans.get("tab_dynamic"))
+        # ══════════════ COLUMN 2: Calculation Results (25%) ════════════════
+        self.outputs_panel = QWidget()
+        self.outputs_panel.setObjectName("OutputsPanel")
+        outputs_layout = QVBoxLayout(self.outputs_panel)
+        outputs_layout.setContentsMargins(5, 5, 5, 5)
+        outputs_layout.setSpacing(4)
 
-        # Tab 2: Standard Schematic
-        tab_std_widget = QWidget()
-        tab_std_layout = QVBoxLayout(tab_std_widget)
-        tab_std_layout.setContentsMargins(2,2,2,2)
-        self.std_canvas = StandardSchematicCanvas(tab_std_widget, width=5, height=3, dpi=100)
-        tab_std_layout.addWidget(self.std_canvas)
-        self.tab_sketch.addTab(tab_std_widget, self.trans.get("tab_standard"))
-
-        sketch_layout.addWidget(self.tab_sketch)
-
-        # Vertical Splitter: sketch (top) | bottom section (bottom)
-        right_splitter = QSplitter(Qt.Orientation.Vertical)
-        right_splitter.setChildrenCollapsible(False)
-
-        # Horizontal Splitter: outputs (left) | warnings/defects (right)
-        bottom_splitter = QSplitter(Qt.Orientation.Horizontal)
-        bottom_splitter.setChildrenCollapsible(False)
-
-        right_splitter.addWidget(self.sketch_box)
-        right_splitter.addWidget(bottom_splitter)
-        right_splitter.setSizes([300, 400])
-
-        # Middle splitter: left inputs panel | right panel
-        middle_splitter = QSplitter(Qt.Orientation.Horizontal)
-        middle_splitter.addWidget(self.left_splitter)
-        middle_splitter.addWidget(right_splitter)
-        middle_splitter.setSizes([400, 800])
-        middle_splitter.setChildrenCollapsible(False)
-        main_layout.addWidget(middle_splitter)
-
-        # Bottom Left: Outputs
         grp_outputs = QGroupBox(self.trans.get("outputs"))
         grp_outputs.setObjectName("OutputsBox")
-        grp_outputs_layout = QGridLayout(grp_outputs)
+        grp_outputs_layout = QVBoxLayout(grp_outputs)
+        grp_outputs_layout.setSpacing(6)
         grp_outputs.setLayout(grp_outputs_layout)
 
-        # Labels & values for calculations
         self.out_labels = {}
         self.info_buttons = {}
         out_fields = [
-            ("w_nom", 0, 0), ("w_eff", 1, 0), ("u_max", 2, 0), ("f_min", 3, 0), ("sfd_min", 4, 0),
-            ("ug", 5, 0),
-            ("req_exposures", 0, 2), ("single_wire_iqi", 1, 2), ("duplex_iqi", 2, 2),
-            ("quality_target", 3, 2), ("calc_time", 4, 2), ("detector_quality", 5, 2),
-            ("filter_recommendation", 6, 0)
+            "w_nom", "w_eff", "u_max", "f_min", "sfd_min",
+            "ug", "req_exposures", "single_wire_iqi", "duplex_iqi",
+            "quality_target", "calc_time", "detector_quality",
+            "filter_recommendation"
         ]
 
-        # For quality_target, it dynamically holds Optical Density (analog) or SNR_N (digital)
-        # For calc_time, it holds the exposure time.
-
-        for name, r, c in out_fields:
-            # Create a widget to group label and info button
-            lbl_widget = QWidget()
-            lbl_layout = QHBoxLayout(lbl_widget)
-            lbl_layout.setContentsMargins(0, 0, 0, 0)
-            lbl_layout.setSpacing(4)
+        for name in out_fields:
+            row_widget = QWidget()
+            row_layout = QHBoxLayout(row_widget)
+            row_layout.setContentsMargins(4, 2, 4, 2)
+            row_layout.setSpacing(6)
 
             lbl = QLabel(self.trans.get(name))
-            lbl_layout.addWidget(lbl)
+            lbl.setMinimumWidth(100)
 
             info_btn = QPushButton("?")
             info_btn.setFixedSize(14, 14)
@@ -574,44 +494,103 @@ class MainWindow(QMainWindow):
                 }
             """)
             info_btn.setToolTip(self.trans.get("tt_" + name))
-            lbl_layout.addWidget(info_btn)
             self.info_buttons[name] = info_btn
 
             val = QLabel("-")
             val.setObjectName("OutputValue")
             val.setFont(QFont("Helvetica", 10, QFont.Weight.Bold))
-            val.setStyleSheet("color: #a6e3a1;") # light green
-            
-            grp_outputs_layout.addWidget(lbl_widget, r, c)
-            grp_outputs_layout.addWidget(val, r, c+1)
+            val.setStyleSheet("color: #a6e3a1;")
+            val.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+
+            row_layout.addWidget(lbl)
+            row_layout.addWidget(info_btn)
+            row_layout.addStretch()
+            row_layout.addWidget(val)
+
+            grp_outputs_layout.addWidget(row_widget)
+
             self.out_labels[name] = (lbl, val)
 
-        bottom_splitter.addWidget(grp_outputs)
+        grp_outputs_layout.addStretch()
+        outputs_layout.addWidget(grp_outputs)
 
-        # Bottom Right: Warnings and API 1104 Defect Module
-        right_sub_container = QWidget()
-        right_sub_layout = QVBoxLayout(right_sub_container)
-        right_sub_layout.setContentsMargins(0, 0, 0, 0)
-        right_sub_layout.setSpacing(10)
-        bottom_splitter.addWidget(right_sub_container)
-        bottom_splitter.setSizes([400, 400])
+        main_splitter.addWidget(self.outputs_panel)
 
-        # Warnings Panel
-        self.grp_warnings = QGroupBox(self.trans.get("warnings"))
-        self.grp_warnings.setObjectName("WarningsBox")
-        warnings_layout = QVBoxLayout(self.grp_warnings)
-        self.txt_warnings = QLabel("")
-        self.txt_warnings.setWordWrap(True)
-        self.txt_warnings.setStyleSheet("color: #f38ba8; font-size: 10px; font-weight: bold;")
-        warnings_layout.addWidget(self.txt_warnings)
-        # Right sub-panel: vertical splitter for warnings, compliance, defects
+        # ══════════════ COLUMN 3: Sketch + Procedure/Defects (50%) ═════════
+        right_panel = QSplitter(Qt.Orientation.Vertical)
+        right_panel.setObjectName("right_panel")
+        right_panel.setChildrenCollapsible(False)
+        right_panel.setHandleWidth(8)
+
+        # ── Top: Sketch (square, 50% of right panel) ──
+        self.sketch_box = QGroupBox(self.trans.get("sketch_title"))
+        self.sketch_box.setObjectName("SketchBox")
+        sketch_layout = QVBoxLayout(self.sketch_box)
+        sketch_layout.setContentsMargins(5, 5, 5, 5)
+
+        self.tab_sketch = QTabWidget()
+        self.tab_sketch.setObjectName("SketchTabs")
+
+        tab_dynamic_widget = QWidget()
+        tab_dynamic_layout = QVBoxLayout(tab_dynamic_widget)
+        tab_dynamic_layout.setContentsMargins(2, 2, 2, 2)
+        self.canvas = WeldSketchCanvas(tab_dynamic_widget, width=5, height=3, dpi=100)
+        tab_dynamic_layout.addWidget(self.canvas)
+
+        self.lbl_dynamic_standard_ref = QLabel("")
+        self.lbl_dynamic_standard_ref.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_dynamic_standard_ref.setStyleSheet("color: #89b4fa; font-size: 11px; font-weight: bold; padding: 4px;")
+        tab_dynamic_layout.addWidget(self.lbl_dynamic_standard_ref)
+
+        self.tab_sketch.addTab(tab_dynamic_widget, self.trans.get("tab_dynamic"))
+
+        tab_std_widget = QWidget()
+        tab_std_layout = QVBoxLayout(tab_std_widget)
+        tab_std_layout.setContentsMargins(2, 2, 2, 2)
+        self.std_canvas = StandardSchematicCanvas(tab_std_widget, width=5, height=3, dpi=100)
+        tab_std_layout.addWidget(self.std_canvas)
+        self.cmb_std_figure = QComboBox()
+        self.cmb_std_figure.currentIndexChanged.connect(self.on_std_figure_changed)
+        tab_std_layout.addWidget(self.cmb_std_figure)
+        self.tab_sketch.addTab(tab_std_widget, self.trans.get("tab_standard"))
+
+        sketch_layout.addWidget(self.tab_sketch)
+
+        right_panel.addWidget(self.sketch_box)
+
+        # ── Bottom: Procedure Control + API 1104 Defects (side by side) ──
+        bottom_horizontal = QSplitter(Qt.Orientation.Horizontal)
+        bottom_horizontal.setObjectName("bottom_horizontal")
+        bottom_horizontal.setChildrenCollapsible(False)
+        bottom_horizontal.setHandleWidth(8)
+
+        # Procedure Compliance (left half of bottom)
+        self._init_compliance_panel()
+
+        # Right half of bottom: Warnings + API 1104 Defects
         right_sub_splitter = QSplitter(Qt.Orientation.Vertical)
+        right_sub_splitter.setObjectName("right_sub_splitter")
         right_sub_splitter.setChildrenCollapsible(False)
+        right_sub_splitter.setHandleWidth(8)
+
+        self._init_warnings_panel()
+        self._init_defect_panel()
+
         right_sub_splitter.addWidget(self.grp_warnings)
-        right_sub_splitter.addWidget(self.grp_compliance)
         right_sub_splitter.addWidget(self.tab_extra)
-        right_sub_splitter.setSizes([150, 200, 200])
-        right_sub_layout.addWidget(right_sub_splitter)
+        right_sub_splitter.setSizes([150, 250])
+
+        bottom_horizontal.addWidget(self.grp_compliance)
+        bottom_horizontal.addWidget(right_sub_splitter)
+        bottom_horizontal.setSizes([300, 300])
+
+        right_panel.addWidget(bottom_horizontal)
+        right_panel.setSizes([400, 400])
+
+        main_splitter.addWidget(right_panel)
+        main_splitter.setSizes([250, 250, 500])
+
+        main_layout.addWidget(main_splitter)
 
         # Setup initial state for fields
         self.on_tech_changed()
@@ -893,7 +872,8 @@ class MainWindow(QMainWindow):
         # Refresh detector type combobox labels
         for i, tkey in enumerate(self._det_trans_keys):
             self.cmb_detector_type.setItemText(i, self.trans.get(tkey))
-        self.grp_warnings.setTitle(self.trans.get("warnings"))
+        self._retranslate_warnings_panel()
+        self._retranslate_compliance_panel()
         self.sketch_box.setTitle(self.trans.get("sketch_title"))
         self.chk_source_side_iqi.setText(self.trans.get("source_side_iqi"))
 
@@ -936,23 +916,11 @@ class MainWindow(QMainWindow):
                 self.info_buttons[name].setToolTip(self.trans.get("tt_" + name))
 
         # Re-translate defect evaluation UI
-        defect_idx = self.cmb_defect_type.currentIndex()
-        self.cmb_defect_type.clear()
-        self.cmb_defect_type.addItems([
-            self.trans.get("defect_ip"),
-            self.trans.get("defect_if"),
-            self.trans.get("defect_ic"),
-            self.trans.get("defect_porosity"),
-            self.trans.get("defect_crack")
-        ])
-        self.cmb_defect_type.setCurrentIndex(defect_idx)
-        self.btn_eval_defect.setText(self.trans.get("evaluate_defect"))
+        self._retranslate_defect_panel()
 
         # Update tab titles
         self.tab_sketch.setTabText(0, self.trans.get("tab_dynamic"))
         self.tab_sketch.setTabText(1, self.trans.get("tab_standard"))
-
-        self.tab_extra.setTabText(0, self.trans.get("defect_section"))
 
         # Update QGroupBox titles for exposure section
         self.grp_exposure.setTitle(self.trans.get("applied_exposure_section"))
@@ -1586,7 +1554,7 @@ class MainWindow(QMainWindow):
         # Read inputs
         t = self.get_form_values()[1] # get wall thickness
         
-        defect_types = ["defect_ip", "defect_if", "defect_ic", "defect_porosity", "defect_crack"]
+        defect_types = ["defect_ip", "defect_if", "defect_ic", "defect_porosity", "defect_crack", "defect_slag", "defect_undercut", "defect_burn_through"]
         defect_type = defect_types[self.cmb_defect_type.currentIndex()]
 
         try:
@@ -1858,7 +1826,7 @@ class MainWindow(QMainWindow):
         defect_eval = None
         defect_text = self.lbl_defect_result.text()
         if defect_text:
-            defect_types = ["defect_ip", "defect_if", "defect_ic", "defect_porosity", "defect_crack"]
+            defect_types = ["defect_ip", "defect_if", "defect_ic", "defect_porosity", "defect_crack", "defect_slag", "defect_undercut", "defect_burn_through"]
             defect_type = defect_types[self.cmb_defect_type.currentIndex()]
             
             try:
@@ -2116,6 +2084,7 @@ class MainWindow(QMainWindow):
                     color: #fab387;
                     font-weight: bold;
                     font-size: 12px;
+                    background-color: #181825;
                 }
                 QGroupBox::title {
                     subcontrol-origin: margin;
@@ -2130,7 +2099,7 @@ class MainWindow(QMainWindow):
                 QLineEdit {
                     background-color: #313244;
                     border: 1px solid #45475a;
-                    border-radius: 4px;
+                    border-radius: 6px;
                     color: #cdd6f4;
                     padding: 5px;
                 }
@@ -2140,7 +2109,7 @@ class MainWindow(QMainWindow):
                 QComboBox {
                     background-color: #313244;
                     border: 1px solid #45475a;
-                    border-radius: 4px;
+                    border-radius: 6px;
                     color: #cdd6f4;
                     padding: 5px;
                 }
@@ -2214,6 +2183,12 @@ class MainWindow(QMainWindow):
                 QTabBar::tab:hover:!selected {
                     background-color: #45475a;
                 }
+                QSplitter::handle {
+                    background-color: #313244;
+                }
+                QSplitter::handle:hover {
+                    background-color: #fab387;
+                }
             """)
         else:
             # Light Theme Colors: Professional slate light
@@ -2267,6 +2242,7 @@ class MainWindow(QMainWindow):
                     color: #0d47a1;
                     font-weight: bold;
                     font-size: 12px;
+                    background-color: #fafafa;
                 }
                 QGroupBox::title {
                     subcontrol-origin: margin;
@@ -2281,7 +2257,7 @@ class MainWindow(QMainWindow):
                 QLineEdit {
                     background-color: #ffffff;
                     border: 1px solid #b0bec5;
-                    border-radius: 4px;
+                    border-radius: 6px;
                     color: #212121;
                     padding: 5px;
                 }
@@ -2291,7 +2267,7 @@ class MainWindow(QMainWindow):
                 QComboBox {
                     background-color: #ffffff;
                     border: 1px solid #b0bec5;
-                    border-radius: 4px;
+                    border-radius: 6px;
                     color: #212121;
                     padding: 5px;
                 }
@@ -2361,6 +2337,12 @@ class MainWindow(QMainWindow):
                 }
                 QTabBar::tab:hover:!selected {
                     background-color: #b0bec5;
+                }
+                QSplitter::handle {
+                    background-color: #cfd8dc;
+                }
+                QSplitter::handle:hover {
+                    background-color: #0d47a1;
                 }
             """)
         self._update_theme_styles()
