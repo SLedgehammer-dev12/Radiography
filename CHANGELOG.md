@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.3.0] - 2026-06-13
+
+### Added
+- API 1104 defect types: slag, undercut, burn-through, cross-accumulation check
+- Gradient-based density correction (ISO 17636-1 Annex C film gradient table)
+- DWSI technique lookup from ISO 17636-1 Annex C
+- Beam hardening approximation for X-ray
+- QSettings persistence (window geometry, splitter sizes, theme, language, form state)
+- Modular panel mixins (InputPanel, DefectPanel, WarningsCompliancePanel)
+
+### Changed
+- UI redesigned: 3-column horizontal splitter layout (inputs 25% | outputs+compliance 25% | sketch+warnings+defects 50%)
+- Output values arranged vertically (QVBoxLayout) instead of grid
+- Sketch displayed square in right panel top 50%
+- Procedure compliance panel moved below calculation results
+- Splitter handles thickened to 8px with hover color effects
+- QGroupBox card-style background for visual depth
+- Input field border-radius increased to 6px for softer look
+
+### Fixed
+- Restored missing `txt_app_time`, `lbl_app_time`, `cmb_app_wire`, `lbl_app_wire` widgets
+- Fixed `cmb_app_duplex` userData assignment (currentData returned None)
+- Replaced stray `print()` call with `logger.error()` in report module
+
 ## [1.2.0] - 2026-06-08
 
 ### Added

@@ -514,6 +514,10 @@ class MainWindow(QMainWindow,
         grp_outputs_layout.addStretch()
         outputs_layout.addWidget(grp_outputs)
 
+        # Procedure Compliance (below outputs)
+        self._init_compliance_panel()
+        outputs_layout.addWidget(self.grp_compliance)
+
         main_splitter.addWidget(self.outputs_panel)
 
         # ══════════════ COLUMN 3: Sketch + Procedure/Defects (50%) ═════════
@@ -558,16 +562,7 @@ class MainWindow(QMainWindow,
 
         right_panel.addWidget(self.sketch_box)
 
-        # ── Bottom: Procedure Control + API 1104 Defects (side by side) ──
-        bottom_horizontal = QSplitter(Qt.Orientation.Horizontal)
-        bottom_horizontal.setObjectName("bottom_horizontal")
-        bottom_horizontal.setChildrenCollapsible(False)
-        bottom_horizontal.setHandleWidth(8)
-
-        # Procedure Compliance (left half of bottom)
-        self._init_compliance_panel()
-
-        # Right half of bottom: Warnings + API 1104 Defects
+        # ── Bottom: Warnings + API 1104 Defects ──
         right_sub_splitter = QSplitter(Qt.Orientation.Vertical)
         right_sub_splitter.setObjectName("right_sub_splitter")
         right_sub_splitter.setChildrenCollapsible(False)
@@ -580,11 +575,7 @@ class MainWindow(QMainWindow,
         right_sub_splitter.addWidget(self.tab_extra)
         right_sub_splitter.setSizes([150, 250])
 
-        bottom_horizontal.addWidget(self.grp_compliance)
-        bottom_horizontal.addWidget(right_sub_splitter)
-        bottom_horizontal.setSizes([300, 300])
-
-        right_panel.addWidget(bottom_horizontal)
+        right_panel.addWidget(right_sub_splitter)
         right_panel.setSizes([400, 400])
 
         main_splitter.addWidget(right_panel)
