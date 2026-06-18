@@ -1,0 +1,175 @@
+<StepResults>:
+    name: "results"
+    BoxLayout:
+        orientation: "vertical"
+        padding: dp(16)
+        spacing: dp(8)
+
+        MDTopAppBar:
+            title: "Sonuçlar"
+            elevation: 0
+
+        ScrollView:
+            BoxLayout:
+                orientation: "vertical"
+                size_hint_y: None
+                height: self.minimum_height
+                spacing: dp(8)
+                padding: dp(4)
+
+                # Compliance Badge
+                MDFlatButton:
+                    id: compliance_badge
+                    text: ""
+                    size_hint_x: 1
+                    size_hint_y: None
+                    height: dp(56)
+                    md_bg_color: (0.2, 0.7, 0.3, 1)
+                    text_color: 1, 1, 1, 1
+                    font_size: dp(18)
+
+                # Output Values
+                MDCard:
+                    orientation: "vertical"
+                    size_hint_y: None
+                    height: dp(200)
+                    padding: dp(12)
+                    spacing: dp(4)
+                    MDLabel:
+                        text: "Hesaplanan Değerler"
+                        font_style: "H5"
+                        size_hint_y: None
+                        height: dp(24)
+                    GridLayout:
+                        cols: 2
+                        spacing: dp(4)
+                        size_hint_y: None
+                        height: dp(200)
+                        MDLabel:
+                            text: "W_nom"
+                        MDLabel:
+                            id: w_nom_val
+                            text: "-"
+                        MDLabel:
+                            text: "W_eff"
+                        MDLabel:
+                            id: w_eff_val
+                            text: "-"
+                        MDLabel:
+                            text: "U_max"
+                        MDLabel:
+                            id: u_max_val
+                            text: "-"
+                        MDLabel:
+                            text: "SFD_min"
+                        MDLabel:
+                            id: sfd_min_val
+                            text: "-"
+                        MDLabel:
+                            text: "IQI"
+                        MDLabel:
+                            id: iqi_val
+                            text: "-"
+                        MDLabel:
+                            text: "Süre"
+                        MDLabel:
+                            id: time_val
+                            text: "-"
+
+                # Compliance
+                MDCard:
+                    orientation: "vertical"
+                    size_hint_y: None
+                    height: self.minimum_height
+                    padding: dp(12)
+                    spacing: dp(4)
+                    MDLabel:
+                        text: "Prosedür Kontrol"
+                        font_style: "H5"
+                        size_hint_y: None
+                        height: dp(24)
+                    BoxLayout:
+                        id: compliance_container
+                        orientation: "vertical"
+                        size_hint_y: None
+                        height: self.minimum_height
+
+                # Defect Evaluation
+                MDCard:
+                    orientation: "vertical"
+                    size_hint_y: None
+                    height: self.minimum_height
+                    padding: dp(12)
+                    spacing: dp(8)
+                    MDLabel:
+                        text: "API 1104 Kusur Değerlendirme"
+                        font_style: "H5"
+                        size_hint_y: None
+                        height: dp(24)
+
+                    MDRaisedButton:
+                        id: defect_type_btn
+                        text: "Kusur Seçin"
+                        size_hint_x: 1
+                        size_hint_y: None
+                        height: dp(48)
+                        on_release: root.open_defect_menu()
+
+                    MDTextField:
+                        hint_text: "Uzunluk (mm)"
+                        input_filter: "float"
+                        on_text: root.on_defect_length(self.text)
+                        size_hint_x: 1
+                        size_hint_y: None
+                        height: dp(48)
+
+                    MDTextField:
+                        hint_text: "Genişlik (mm)"
+                        input_filter: "float"
+                        on_text: root.on_defect_width(self.text)
+                        size_hint_x: 1
+                        size_hint_y: None
+                        height: dp(48)
+
+                    MDTextField:
+                        hint_text: "Birikim (mm)"
+                        input_filter: "float"
+                        on_text: root.on_defect_accum(self.text)
+                        size_hint_x: 1
+                        size_hint_y: None
+                        height: dp(48)
+
+                    MDRaisedButton:
+                        text: "DEĞERLENDİR"
+                        size_hint_x: 1
+                        size_hint_y: None
+                        height: dp(48)
+                        md_bg_color: app.theme_cls.accent_color
+                        on_release: root.evaluate_defect()
+
+                    MDLabel:
+                        id: defect_result_label
+                        text: ""
+                        size_hint_y: None
+                        height: dp(32)
+                        bold: True
+
+                # Action Buttons
+                MDRaisedButton:
+                    text: "📄 PDF Rapor Oluştur"
+                    size_hint_x: 1
+                    size_hint_y: None
+                    height: dp(48)
+                    on_release: root.generate_report()
+
+        BoxLayout:
+            size_hint_y: None
+            height: dp(52)
+            spacing: dp(12)
+            MDTextButton:
+                text: "← BACK"
+                on_release: root.on_back()
+            MDRaisedButton:
+                text: "ÇİZİM →"
+                md_bg_color: app.theme_cls.primary_color
+                on_release: root.on_next()

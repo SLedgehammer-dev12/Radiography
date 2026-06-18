@@ -1,0 +1,25 @@
+<StepSketch>:
+    name: "sketch"
+    BoxLayout:
+        orientation: "vertical"
+        padding: dp(4)
+        spacing: dp(4)
+
+        MDTopAppBar:
+            title: "Weld Sketch"
+            elevation: 0
+            left_action_items: [["arrow-left", lambda x: root.on_back()]]
+
+        MDTabs:
+            id: tabs
+            on_tab_switch: root.toggle_sketch(*args)
+
+        WeldCanvas:
+            id: canvas
+
+        MDRaisedButton:
+            text: "← RAPORA DÖN"
+            size_hint_x: 1
+            size_hint_y: None
+            height: dp(48)
+            on_release: root.on_back()

@@ -4,7 +4,7 @@ __pycache__/
 *.egg-info/
 dist/
 build/
-*.spec
+Radiography.spec
 
 # macOS
 .DS_Store

@@ -1,0 +1,91 @@
+<StepTechnique>:
+    name: "technique"
+    BoxLayout:
+        orientation: "vertical"
+        padding: dp(16)
+        spacing: dp(8)
+
+        MDTopAppBar:
+            title: "Radiography"
+            right_action_items: [["weather-night", lambda x: app.toggle_theme()]]
+            elevation: 0
+
+        MDLabel:
+            text: "Adım 1/5 - Teknik Seçim"
+            font_style: "H5"
+            size_hint_y: None
+            height: dp(36)
+
+        Widget:
+            size_hint_y: None
+            height: dp(8)
+
+        MDBoxLayout:
+            id: tech_segment
+            size_hint_x: 1
+            size_hint_y: None
+            height: dp(48)
+            spacing: dp(8)
+            MDRaisedButton:
+                id: tech_analog
+                text: app.state.get_text("analog_film")
+                size_hint_x: 0.5
+                md_bg_color: app.theme_cls.primary_color
+                on_release: root.set_tech("analog")
+            MDRaisedButton:
+                id: tech_digital
+                text: app.state.get_text("digital_cr_dda")
+                size_hint_x: 0.5
+                md_bg_color: app.theme_cls.bg_dark if app.theme_cls.theme_style == "Dark" else (0.85, 0.85, 0.85, 1)
+                on_release: root.set_tech("digital")
+
+        MDRaisedButton:
+            id: technique_btn
+            text: app.state.technique.upper()
+            size_hint_x: 1
+            size_hint_y: None
+            height: dp(48)
+            on_release: root.open_technique_menu()
+
+        MDRaisedButton:
+            id: material_btn
+            text: app.state.get_text(app.state.material)
+            size_hint_x: 1
+            size_hint_y: None
+            height: dp(48)
+            on_release: root.open_material_menu()
+
+        MDRaisedButton:
+            id: class_btn
+            text: app.state.get_text(app.state.testing_class)
+            size_hint_x: 1
+            size_hint_y: None
+            height: dp(48)
+            on_release: root.open_class_menu()
+
+        MDRaisedButton:
+            id: source_btn
+            text: app.state.get_text(app.state.source)
+            size_hint_x: 1
+            size_hint_y: None
+            height: dp(48)
+            on_release: root.open_source_menu()
+
+        MDRaisedButton:
+            id: geometry_btn
+            text: app.state.get_text(app.state.geometry)
+            size_hint_x: 1
+            size_hint_y: None
+            height: dp(48)
+            on_release: root.open_geometry_menu()
+
+        Widget:
+            size_hint_y: 1
+
+        MDRaisedButton:
+            text: "NEXT →"
+            size_hint_x: 1
+            size_hint_y: None
+            height: dp(52)
+            md_bg_color: app.theme_cls.primary_color
+            on_release: root.on_next()

@@ -1,0 +1,69 @@
+<StepDimensions>:
+    name: "dimensions"
+    BoxLayout:
+        orientation: "vertical"
+        padding: dp(16)
+        spacing: dp(8)
+
+        MDTopAppBar:
+            title: app.state.get_text("app_title")[:30] + "..."
+            elevation: 0
+
+        MDLabel:
+            text: "Adım 2/5 - Boru Boyutları"
+            font_style: "H5"
+            size_hint_y: None
+            height: dp(36)
+
+        MDRaisedButton:
+            id: od_btn
+            text: "4\" (NPS 4)"
+            size_hint_x: 1
+            size_hint_y: None
+            height: dp(48)
+            on_release: root.open_pipe_menu()
+
+        MDTextField:
+            id: custom_od
+            hint_text: "Özel Dış Çap (mm)"
+            text: str(app.state.pipe_od)
+            input_filter: "float"
+            on_text: root.on_custom_od(self.text)
+            size_hint_x: 1
+            size_hint_y: None
+            height: dp(48)
+
+        MDTextField:
+            id: custom_wall
+            hint_text: "Et Kalınlığı (mm)"
+            text: str(app.state.pipe_wall)
+            input_filter: "float"
+            on_text: root.on_custom_wall(self.text)
+            size_hint_x: 1
+            size_hint_y: None
+            height: dp(48)
+
+        MDTextField:
+            id: cap
+            hint_text: "Kaynak Kep Yüksekliği (mm)"
+            text: str(app.state.cap)
+            input_filter: "float"
+            on_text: root.on_cap(self.text)
+            size_hint_x: 1
+            size_hint_y: None
+            height: dp(48)
+
+        Widget:
+            size_hint_y: 1
+
+        BoxLayout:
+            size_hint_y: None
+            height: dp(52)
+            spacing: dp(12)
+            MDTextButton:
+                text: "← BACK"
+                on_release: root.on_back()
+            MDRaisedButton:
+                text: "NEXT →"
+                md_bg_color: app.theme_cls.primary_color
+                on_release: root.on_next()
