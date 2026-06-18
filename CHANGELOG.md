@@ -1,14 +1,6 @@
 # Changelog
 
-## [1.3.0] - 2026-06-18
-
-### Added (Desktop)
-- API 1104 defect types: slag, undercut, burn-through, cross-accumulation check
-- Gradient-based density correction (ISO 17636-1 Annex C film gradient table)
-- DWSI technique lookup from ISO 17636-1 Annex C
-- Beam hardening approximation for X-ray
-- QSettings persistence (window geometry, splitter sizes, theme, language, form state)
-- Modular panel mixins (InputPanel, DefectPanel, WarningsCompliancePanel)
+## [1.3.1] - 2026-06-18
 
 ### Added (Mobile - KivyMD Android)
 - Complete Material Design 3 responsive UI in KivyMD
@@ -21,7 +13,23 @@
 - Android Share Sheet integration (Pyjnius Intent ACTION_SEND)
 - Singleton AppState manager with core calculator integration (~2200 lines)
 
-### Changed (Desktop)
+### Infrastructure
+- Buildozer spec for Android APK/AAB packaging
+- GitHub Actions CI: Android APK build via kivy/buildozer-action
+- Unified release pipeline: Windows .exe + macOS .dmg + Android APK under same version tag
+- NotoSans static TTF fonts bundled for PDF generation
+
+## [1.3.0] - 2026-06-13
+
+### Added
+- API 1104 defect types: slag, undercut, burn-through, cross-accumulation check
+- Gradient-based density correction (ISO 17636-1 Annex C film gradient table)
+- DWSI technique lookup from ISO 17636-1 Annex C
+- Beam hardening approximation for X-ray
+- QSettings persistence (window geometry, splitter sizes, theme, language, form state)
+- Modular panel mixins (InputPanel, DefectPanel, WarningsCompliancePanel)
+
+### Changed
 - UI redesigned: 3-column horizontal splitter layout (inputs 25% | outputs+compliance 25% | sketch+warnings+defects 50%)
 - Output values arranged vertically (QVBoxLayout) instead of grid
 - Sketch displayed square in right panel top 50%
@@ -30,16 +38,10 @@
 - QGroupBox card-style background for visual depth
 - Input field border-radius increased to 6px for softer look
 
-### Fixed (Desktop)
+### Fixed
 - Restored missing `txt_app_time`, `lbl_app_time`, `cmb_app_wire`, `lbl_app_wire` widgets
 - Fixed `cmb_app_duplex` userData assignment (currentData returned None)
 - Replaced stray `print()` call with `logger.error()` in report module
-
-### Infrastructure
-- Buildozer spec for Android APK/AAB packaging
-- GitHub Actions CI: Android APK build via kivy/buildozer-action
-- Unified release pipeline: Windows .exe + macOS .dmg + Android APK under same version tag
-- NotoSans static TTF fonts bundled for PDF generation
 
 ## [1.2.0] - 2026-06-08
 

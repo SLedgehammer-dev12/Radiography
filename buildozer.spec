@@ -37,7 +37,7 @@ source.exclude_dirs = tests, bin, venv, __pycache__, .git, src/ui
 #source.exclude_patterns = license,images/*/*.jpg
 
 # (str) Application versioning (method 1)
-version = 1.3.0
+version = 1.3.1
 
 # (str) Application versioning (method 2)
 version.regex = __version__ = ['"](.*)['"]
