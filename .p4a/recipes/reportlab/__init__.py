@@ -18,10 +18,11 @@ class ReportlabRecipe(CompiledComponentsPythonRecipe):
             super().prebuild_arch(arch)
             recipe_dir = self.get_build_dir(arch.arch)
 
-            accel_dir = os.path.join(recipe_dir, "src", "rl_addons", "rl_accel")
-            if os.path.exists(accel_dir):
-                shutil.rmtree(accel_dir)
-                info("reportlab recipe: REMOVED _rl_accel C extension for Python 3.14 compat")
+            for subdir in ("rl_accel", "renderPM"):
+                target = os.path.join(recipe_dir, "src", "rl_addons", subdir)
+                if os.path.exists(target):
+                    shutil.rmtree(target)
+                    info("reportlab recipe: REMOVED {} C extension for Python 3.14 compat".format(subdir))
 
             font_dir = os.path.join(recipe_dir, "src", "reportlab", "fonts")
             if os.path.exists(font_dir):
