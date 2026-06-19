@@ -21,7 +21,8 @@ from src.core.report import PDFReportGenerator
 from src.core.procedure_check import ProcedureComplianceChecker
 from src.core.updater import UpdateChecker
 from src.core.version import __version__ as CURRENT_VERSION
-from src.ui.panels.input_panel import InputPanelMixin, ASME_B36_10_PIPES, QFormLayout_custom
+from src.core.asme_b36 import ASME_B36_10_PIPES
+from src.ui.panels.input_panel import InputPanelMixin, QFormLayout_custom
 from src.ui.panels.defect_panel import DefectPanelMixin
 from src.ui.panels.warnings_compliance_panel import WarningsPanelMixin, CompliancePanelMixin
 

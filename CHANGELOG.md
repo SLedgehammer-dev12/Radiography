@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.3.2] - 2026-06-19
+
+### Changed
+- Extracted ASME B36.10 pipe data from inline dict in `input_panel.py` to shared `src/core/asme_b36.py`
+- Created `ASME_B36_19_PIPES` dict for stainless steel pipe schedules (5S/10S/40S/80S)
+- Generated `docs/asme_b36_10_19_pipe_data.json` — full pipe data export for external use
+- Corrected outer diameter values per ASME B36.10-2022: 10"(273.1), 18"(457.2), 22"(558.8), 24"(609.6), 26"(660.4), 28"(711.2), 32"(812.8), 34"(863.6), 36"(914.4)
+- Added missing schedules: SCH 160 + XXS for NPS 1/8–3/8
+- Mobile Step 2 (Dimensions): replaced static 15-pipe list with full ASME B36.10 database + schedule sub-menu
+- `buildozer.spec` source.include_patterns updated to include `src/core/asme_b36.py`
+
+### Added
+- Helper functions: `get_pipe_od()`, `get_pipe_schedules()`, `find_nps_by_od()`, `get_default_schedule()`
+- 17 validation tests for `core.asme_b36`
+- `pipe_schedule` attribute to `AppState` for mobile
+
 ## [1.3.1] - 2026-06-18
 
 ### Added (Mobile - KivyMD Android)

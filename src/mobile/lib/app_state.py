@@ -34,6 +34,7 @@ class AppState:
         self.pipe_od_std = '4" (NPS 4)'
         self.pipe_od = 114.3
         self.pipe_wall = 6.02
+        self.pipe_schedule = "SCH 40 / STD"
         self.custom_od = None
         self.custom_wall = None
         self.use_standard = True

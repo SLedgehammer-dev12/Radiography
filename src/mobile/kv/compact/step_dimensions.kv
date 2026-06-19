@@ -17,11 +17,19 @@
 
         MDRaisedButton:
             id: od_btn
-            text: "4\" (NPS 4)"
+            text: '4" (NPS 4)'
             size_hint_x: 1
             size_hint_y: None
             height: dp(48)
             on_release: root.open_pipe_menu()
+
+        MDRaisedButton:
+            id: schedule_btn
+            text: "SCH 40 / STD"
+            size_hint_x: 1
+            size_hint_y: None
+            height: dp(48)
+            on_release: root.open_schedule_menu()
 
         MDTextField:
             id: custom_od
