@@ -94,19 +94,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build APK with Buildozer
-        uses: ArtemSBulgakov/buildozer-action@v1
-        id: buildozer
-        with:
-          workdir: .
-          command: buildozer android debug
-          buildozer_version: stable
+      - name: Build APK with Buildozer (Docker)
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/app \
+            -w /app \
+            ghcr.io/kivy/buildozer:latest \
+            buildozer android debug
       - name: Upload APK artifact
-        if: steps.buildozer.outputs.filename != ''
+        if: hashFiles('bin/*.apk') != ''
         uses: actions/upload-artifact@v4
         with:
           name: Radiography-Android-APK
-          path: ${{ steps.buildozer.outputs.filename }}
+          path: bin/*.apk
           if-no-files-found: warn
       - name: Upload AAB artifact
         if: hashFiles('bin/*.aab') != ''
