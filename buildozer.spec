@@ -41,7 +41,7 @@ version = 1.3.2
 
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy
-requirements = python3,kivy==2.3.1,kivymd==1.2.0,reportlab,pyjnius
+requirements = python3,kivy==2.3.1,kivymd==1.2.0,reportlab
 
 # (str) Custom source folders for requirements
 # Sets custom source for any requirements with recipes
@@ -346,7 +346,7 @@ p4a.branch = develop
 #p4a.local_recipes =
 
 # (str) Filename to the hook for p4a
-#p4a.hook =
+p4a.hook = p4a_hook.sh
 
 # (str) Bootstrap to use for android builds
 # Run "buildozer android p4a -- bootstraps" for a list of valid values.
