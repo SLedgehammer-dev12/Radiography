@@ -95,8 +95,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build APK with Buildozer (Docker)
+        env:
+          NO_RL_ACCEL: "1"
         run: |
           docker run --rm \
+            -e NO_RL_ACCEL=1 \
             -v ${{ github.workspace }}:/app \
             -w /app \
             --entrypoint /bin/bash \
