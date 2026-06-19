@@ -39,10 +39,6 @@ source.exclude_dirs = tests, bin, venv, __pycache__, .git, src/ui
 # (str) Application versioning (method 1)
 version = 1.3.1
 
-# (str) Application versioning (method 2)
-version.regex = __version__ = ['"](.*)['"]
-version.filename = %(source.dir)s/../../core/version.py
-
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy
 requirements = python3,kivy==2.3.1,kivymd==1.2.0,reportlab,pyjnius
