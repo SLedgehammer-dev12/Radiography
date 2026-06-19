@@ -95,16 +95,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build APK with Buildozer
-        uses: ArtemSBulgakov/buildozer-action@v2.0
+        uses: ArtemSBulgakov/buildozer-action@v1
+        id: buildozer
         with:
           workdir: .
-          specfile: buildozer.spec
+          command: buildozer android debug
+          buildozer_version: stable
       - name: Upload APK artifact
-        if: hashFiles('bin/*.apk') != ''
+        if: steps.buildozer.outputs.filename != ''
         uses: actions/upload-artifact@v4
         with:
           name: Radiography-Android-APK
-          path: bin/*.apk
+          path: ${{ steps.buildozer.outputs.filename }}
           if-no-files-found: warn
       - name: Upload AAB artifact
         if: hashFiles('bin/*.aab') != ''
