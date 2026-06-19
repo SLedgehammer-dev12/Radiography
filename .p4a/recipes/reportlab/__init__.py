@@ -1,3 +1,4 @@
+import glob
 import os
 import shutil
 import sh
@@ -52,6 +53,25 @@ class ReportlabRecipe(CompiledComponentsPythonRecipe):
     def is_patched(self, arch):
         recipe_dir = self.get_build_dir(arch.arch)
         return os.path.exists(os.path.join(recipe_dir, '.patched'))
+
+
+    def build_compiled_components(self, arch):
+        info('Building compiled components in {}'.format(self.name))
+        env = self.get_recipe_env(arch)
+        hostpython = sh.Command(self.hostpython_location)
+        with current_directory(self.get_build_dir(arch.arch)):
+            if self.install_in_hostpython:
+                shprint(hostpython, 'setup.py', 'clean', '--all', _env=env)
+            shprint(hostpython, 'setup.py', self.build_cmd, '-v',
+                    _env=env, *self.setup_extra_args)
+            # If no C extensions remain (removed for Python 3.14 compat),
+            # build/lib.* won't exist. Strip only if present.
+            build_dirs = glob.glob('build/lib.*')
+            if build_dirs:
+                shprint(sh.find, build_dirs[0], '-name', '"*.o"', '-exec',
+                        env['STRIP'], '{}', ';', _env=env)
+            else:
+                info('reportlab recipe: no C extensions to strip')
 
 
 recipe = ReportlabRecipe()
