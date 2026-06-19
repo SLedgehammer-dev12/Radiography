@@ -5,6 +5,7 @@ import sh
 
 from pythonforandroid.logger import info
 from pythonforandroid.recipe import CompiledComponentsPythonRecipe
+from pythonforandroid.toolchain import shprint
 from pythonforandroid.util import current_directory, ensure_dir, touch
 
 
