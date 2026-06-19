@@ -99,8 +99,9 @@ jobs:
           docker run --rm \
             -v ${{ github.workspace }}:/app \
             -w /app \
+            --entrypoint /bin/bash \
             ghcr.io/kivy/buildozer:latest \
-            /bin/bash -c "\
+            -c "\
               apt-get update -qq && \
               apt-get install -y -qq wget && \
               buildozer android debug"
