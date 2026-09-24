@@ -91,12 +91,13 @@ class TestUpdater(unittest.TestCase):
     def test_download_update_rejects_wrong_hash(self):
         # A local file:// URL with a mismatched expected SHA-256 must raise.
         from src.core.updater import UpdateChecker
+        import pathlib
         import tempfile
 
         with tempfile.NamedTemporaryFile("wb", suffix=".bin", delete=False) as f:
             f.write(b"malicious-payload")
             path = f.name
-        url = f"file://{path}"
+        url = pathlib.Path(path).as_uri()  # correct file:// URL on Windows too
         checker = UpdateChecker()
         try:
             with self.assertRaises(RuntimeError):
@@ -107,12 +108,13 @@ class TestUpdater(unittest.TestCase):
 
     def test_download_update_accepts_correct_hash(self):
         from src.core.updater import UpdateChecker, _sha256_file
+        import pathlib
         import tempfile
 
         with tempfile.NamedTemporaryFile("wb", suffix=".bin", delete=False) as f:
             f.write(b"good-payload")
             path = f.name
-        url = f"file://{path}"
+        url = pathlib.Path(path).as_uri()  # correct file:// URL on Windows too
         checker = UpdateChecker()
         try:
             downloaded = checker.download_update(url, expected_sha256=_sha256_file(path))

@@ -46,6 +46,9 @@
 - 185 new parametrized scenarios: geometry/Ug/f_min*/b helpers, DWSI physical
   constraint, Level 3 propagation, ASME geometry, PDF↔screen consistency,
   standards references and mobile parity (458 total tests)
+- Fixed Windows CI failure: the updater tests now build `file://` URLs with
+  `pathlib.Path.as_uri()` (the malformed `file://C:\...` URL was the reason the
+  v1.7.0 release pipeline never produced a release)
 
 ### Upgrade note
 - Calculation results intentionally change for planar/rigid detectors (b now
