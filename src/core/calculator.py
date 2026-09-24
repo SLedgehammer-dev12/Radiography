@@ -31,7 +31,7 @@ class RTCalculator:
     # Film gradient G̅ per ISO 11699-1 film class (average gradient over OD 1.5–3.5)
     # Slower films (C1) have higher contrast → steeper gradient → less extra
     # exposure needed for a given density increase.
-    # Source: ISO 17636-1:2022 Clause 5.3, ISO 11699-1:2008 Annex A.
+    # Source: ISO 17636-1:2022 Clause 7.3, ISO 11699-1:2008 Annex A.
     # -----------------------------------------------------------------------
     FILM_GRADIENT = {
         "C1": 4.0,   # slowest, finest grain — highest contrast (e.g. DR50)
@@ -115,13 +115,15 @@ class RTCalculator:
 
     # -----------------------------------------------------------------------
     # SNR_N Target Correction (Digital) — proportional to √(dose)
-    # Class A: SNR_N >= 70   → factor 1.0 (reference)
-    # Class B: SNR_N >= 130  → factor (130/70)² ≈ 3.45
-    # Source: ISO 17636-2 Clause 7.4.
+    # Class A: reference target 70        → factor 1.0
+    # Class B: legacy 2013 target 130     → factor (130/70)² ≈ 3.45
+    # NOTE: ISO 17636-2:2022 Tables 3/4 use dynamic Class B targets
+    # (100/120/150 depending on source and kV, 70 for thick sections).
+    # Source: ISO 17636-2:2022 Clause 7.3.1 (SNR_N) / Tables 3-4.
     # -----------------------------------------------------------------------
     SNR_CORRECTION = {
-        "class_a": 1.00,   # SNR_N >= 70
-        "class_b": 3.45,   # SNR_N >= 130  (~3.45× more dose)
+        "class_a": 1.00,   # reference target
+        "class_b": 3.45,   # ~3.45× more dose (legacy 130 target)
     }
 
     def __init__(self):
@@ -223,21 +225,43 @@ class RTCalculator:
     def calculate_geometric_unsharpness(self, d, b, f):
         """
         Calculates geometric unsharpness (Ug) in mm.
-        Formula: Ug = d * b / f
-        ISO 17636-2:2022 Clause 7.6 (implied by geometric requirements).
+        Formula: Ug = d * b / f where f is the SOURCE-TO-OBJECT distance.
+        ISO 17636-2:2022 Clause 3.22 / ASME Sec V Art 2 T-274.2.
+        Callers that only know SDD must pass f = SDD - b, or use
+        calculate_geometric_unsharpness_from_sfd().
         """
         if f <= 0:
             return 0.0
         return d * b / f
 
+    def calculate_geometric_unsharpness_from_sfd(self, d, b, sfd):
+        """
+        Geometric unsharpness from the source-to-detector distance (SDD/SFD).
+
+        Ug = d * b / f with f = SDD - b (source-to-object distance), per
+        ASME Sec V Art 2 T-274.2 and ISO 17636-2:2022 Clause 3.21/3.22
+        (SDD = f + b). Using SDD directly in place of f understates Ug.
+
+        Returns inf when the geometry is invalid (detector at/beyond source).
+        """
+        if b <= 0.0 or d <= 0.0:
+            return 0.0
+        f = sfd - b
+        if f <= 0.0:
+            return float("inf")
+        return d * b / f
+
     def calculate_f_min_star(self, d, b, t, testing_class):
         """
-        Calculates f_min* for planar/curved detectors per ISO 17636-2:2022 Clause 7.6.
-        Formula (13): f_min* = f_min(b=t) × (b/t)^(1/3) when b/t > 1.2.
-        Returns (f_min_star, ci_factor) where ci_factor = (b/t)^(1/3).
-        If b/t <= 1.2, returns (None, None) — magnification rule does not apply.
+        Calculates f_min* for PLANAR (rigid) detectors on curved objects per
+        ISO 17636-2:2022 Clause 7.6, Formula (13):
+            f_min* = f_min(b=t) × Ci,  Ci = (b/t)^(1/3)   for b/t > 1.2
+        This value GOVERNS for the planar-detector geometries of Figures
+        2 b), 5 b), 8 b), 13 b) and 14 b); it must not be max()-ed against
+        the plain Formula (2)/(3) value f_min(b) (which is always larger).
+        If b/t <= 1.2 the plain f_min(b=t) applies and (None, None) is returned.
         """
-        if b <= 1.2 * t:
+        if t is None or t <= 0.0 or b is None or b <= 0.0 or b <= 1.2 * t:
             return None, None
 
         # f_min computed with b = t (per Clause 7.6 b<1.2t rule)
@@ -245,6 +269,35 @@ class RTCalculator:
         f_min_at_t = self.calculate_f_min(d, t, testing_class, t)  # t ensures b_eff = t
         f_min_star = f_min_at_t * ci
         return f_min_star, ci
+
+    def calculate_asme_f_min(self, d, b, t):
+        """
+        Minimum source-to-object distance per ASME Sec V Art 2 T-274.2.
+        ASME limits the geometric unsharpness (Ug = d·b/f <= Ug_limit), so:
+            f_min,ASME = d · b / Ug_limit(t)
+        """
+        limit = self.get_asme_ug_limit(t)
+        if limit <= 0.0 or d <= 0.0 or b <= 0.0:
+            return 0.0
+        return d * b / limit
+
+    def calculate_b_ed(self, re, n_exposures):
+        """
+        Distance from the object surface to the edge of a PLANAR detector
+        (sagitta), ISO 17636-2:2022 Clause 7.6 Formula (10):
+            b_ed = (1 - cos α) · r_e,   α = π / N
+        Used for Figures 2 b), 8 b), 13 b), 14 b) and 22.
+        Returns 0.0 for invalid input.
+        """
+        try:
+            re = float(re)
+            n = max(1, int(n_exposures))
+        except (TypeError, ValueError):
+            return 0.0
+        if re <= 0.0:
+            return 0.0
+        alpha = math.pi / n
+        return (1.0 - math.cos(alpha)) * re
 
     def calculate_sdd_min(self, dd):
         """
@@ -272,19 +325,21 @@ class RTCalculator:
 
     def calculate_b_curved(self, bed, bgap, t, testing_class):
         """
-        Calculates object-to-detector distance b for curved/planar detectors.
+        Object-to-detector distance b for PLANAR (rigid) detectors on curved
+        objects (Figures 2 b), 8 b), 13 b), 14 b)).
         Formula (8) Class A: b = bed + bgap + 1.2 * t
         Formula (9) Class B: b = bed + bgap + 1.1 * t
-        ISO 17636-2:2022 Clause 7.6, Figures 2b, 8b, 13b, 14b.
+        ISO 17636-2:2022 Clause 7.6. For flexible/wrapped detectors b = t.
         """
         k = 1.2 if testing_class == "class_a" else 1.1
         return bed + bgap + k * t
 
     def calculate_b_panoramic(self, bed, bgap, t):
         """
-        Calculates object-to-detector distance b for panoramic central projection.
+        Object-to-detector distance b for panoramic central projection with a
+        PLANAR detector (Figure 5 b)).
         Formula (11): b = bed + bgap + t
-        ISO 17636-2:2022 Clause 7.6, Figure 5b.
+        ISO 17636-2:2022 Clause 7.6.
         """
         return bed + bgap + t
 
@@ -967,13 +1022,32 @@ class RTCalculator:
 
         - Class A: +20% thickness tolerance
         - Class B: +10% thickness tolerance
+
+        Physical guard: for DWSI the source is outside the pipe and the detector
+        on the opposite side, so the source-to-detector distance can never be
+        smaller than the outside diameter (De). Applied SFD values below De are
+        clamped to De before solving the geometry (otherwise y_s = sfd - R <= 0
+        puts the source inside the pipe and the angle search degenerates).
         """
+        try:
+            OD = float(OD)
+            t = float(t)
+            sfd = float(sfd)
+        except (TypeError, ValueError):
+            return max(3, self._lookup_dwsi_exposures(114.3, 8.56, testing_class))
+
         # ISO table minimum
         iso_min = self._lookup_dwsi_exposures(OD, t, testing_class)
 
         R = OD / 2.0
         Ri = R - t
-        y_s = sfd - R
+        if R <= 0.0 or Ri <= 0.0 or t <= 0.0:
+            # Degenerate "pipe" (no inner cavity); no geometric DWSI coverage model.
+            return max(3, iso_min)
+
+        # Physical floor: source outside the pipe (Figure 14 - source on surface)
+        sfd_eff = max(sfd, OD)
+        y_s = sfd_eff - R
 
         tolerance = 0.20 if testing_class == "class_a" else 0.10
         limit_thickness = t * (1.0 + tolerance)
@@ -1424,10 +1498,10 @@ class RTCalculator:
         the deviation exceeds 30%.
 
         ── REFERENCES ─────────────────────────────────────────────────────────
-          ISO 17636-1:2013 Clause 8   (Analog film)
-          ISO 17636-2:2013 Clause 8   (Digital)
+          ISO 17636-1:2022 Clause 7    (Recommended techniques — analog film)
+          ISO 17636-2:2022 Clause 7    (Recommended techniques — digital)
           ISO 11699-1:2008             (Film classification & speed)
-          ISO 17636-2:2013 Annex A    (DQE data for CR/DDA)
+          ISO 17636-2:2022 Clause 7.3  (Detector systems / DQE literature)
           ASTM E94-17                  (Exposure chart methodology)
           SCRATA Slide Rule            (R-Factor + gamma constants)
         """

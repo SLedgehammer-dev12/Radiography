@@ -27,6 +27,25 @@ def _esc(value):
         return str(value)
 
 
+def _valid_image(path):
+    """Eagerly verifies that an image file can be decoded by reportlab.
+
+    reportlab's Image flowable is lazy for PNG, so a corrupt/missing file would
+    only fail later inside doc.build() and abort the whole PDF. This check lets
+    the caller fall back to a placeholder text instead.
+    """
+    if not path:
+        return False
+    try:
+        if not os.path.exists(path) or os.path.getsize(path) <= 0:
+            return False
+        from reportlab.lib.utils import ImageReader
+        ImageReader(path)
+        return True
+    except Exception:
+        return False
+
+
 class PDFReportGenerator:
     _fonts_registered = False
 
@@ -180,12 +199,35 @@ class PDFReportGenerator:
 
     def generate_report(self, filepath, inputs, outputs, warnings_list, defect_eval, lvl3_active, sfd_comp_val, lang_obj, dynamic_img_path=None, standard_img_path=None):
         """
+        Generates the PDF report. Never raises: returns True on success and
+        False on any build/formatting error (the caller shows an error dialog).
+        """
+        try:
+            return self._generate_report_impl(
+                filepath, inputs, outputs, warnings_list, defect_eval,
+                lvl3_active, sfd_comp_val, lang_obj,
+                dynamic_img_path=dynamic_img_path,
+                standard_img_path=standard_img_path,
+            )
+        except Exception:
+            logger.exception("PDF report generation failed")
+            return False
+
+    def _generate_report_impl(self, filepath, inputs, outputs, warnings_list, defect_eval, lvl3_active, sfd_comp_val, lang_obj, dynamic_img_path=None, standard_img_path=None):
+        """
         Generates a professional PDF report of the RT calculation and defect evaluation.
         """
         # Set up document
         doc = SimpleDocTemplate(filepath, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
         story = []
         styles = getSampleStyleSheet()
+
+        # Language code — works with a Translation object (desktop) or a plain
+        # dict of translations (mobile pdf_helper).
+        if isinstance(lang_obj, dict):
+            lang_code = lang_obj.get("language", "tr")
+        else:
+            lang_code = getattr(lang_obj, "language", "tr")
 
         # Custom Styles
         title_style = ParagraphStyle(
@@ -389,9 +431,9 @@ class PDFReportGenerator:
         if exp_check is None:
             exp_check_str = "N/A"
         elif exp_check:
-            exp_check_str = "UYGUN" if getattr(lang_obj, "language", "tr") == "tr" else "OK"
+            exp_check_str = "UYGUN" if lang_code == "tr" else "OK"
         else:
-            exp_check_str = "UYGUN DEĞİL" if getattr(lang_obj, "language", "tr") == "tr" else "NOT OK"
+            exp_check_str = "UYGUN DEĞİL" if lang_code == "tr" else "NOT OK"
 
         outputs_data = [
             [Paragraph(lang_obj.get("w_nom"), label_style), Paragraph(f"{outputs.get('w_nom', 0.0):.2f} mm", value_style),
@@ -414,6 +456,20 @@ class PDFReportGenerator:
             [Paragraph(lang_obj.get("base_multiplier"), label_style), Paragraph(f"{outputs.get('base_multiplier', 1.0):.2f}", value_style),
              Paragraph("", label_style), Paragraph("", value_style)]
         ]
+
+        # Geometric unsharpness (always) and the ASME-derived f_min (ASME only)
+        f_min_asme = outputs.get("f_min_asme")
+        if f_min_asme is not None:
+            ug_pair = [
+                Paragraph(lang_obj.get("f_min_asme"), label_style),
+                Paragraph(f"{f_min_asme:.1f} mm", value_style),
+            ]
+        else:
+            ug_pair = [Paragraph("", label_style), Paragraph("", value_style)]
+        outputs_data.append([
+            Paragraph(lang_obj.get("ug"), label_style),
+            Paragraph(f"{outputs.get('ug', 0.0):.3f} mm", value_style),
+        ] + ug_pair)
 
         # ASME/ASTM IQI and radiation barrier distance (when available)
         asme_iqi = outputs.get("asme_iqi")
@@ -501,6 +557,7 @@ class PDFReportGenerator:
             story.append(Spacer(1, 15))
 
         # Section 5: Warnings & Diagnostic Messages
+        warnings_list = [w for w in (warnings_list or []) if str(w).strip()]
         if warnings_list:
             story.append(Paragraph(lang_obj.get("warnings"), section_style))
             warn_table_data = []
@@ -518,6 +575,8 @@ class PDFReportGenerator:
             story.append(Spacer(1, 30))
 
         # Section 6: Shooting Geometry Sketches (if images provided)
+        dynamic_img_path = dynamic_img_path if _valid_image(dynamic_img_path) else None
+        standard_img_path = standard_img_path if _valid_image(standard_img_path) else None
         if dynamic_img_path or standard_img_path:
             story.append(Paragraph("Shooting Geometry Sketches", section_style))
             img_data = []
@@ -583,28 +642,32 @@ class PDFReportGenerator:
         
         ref_rows = [
             [Paragraph("<b>Parameter</b>", ref_header_style), Paragraph("<b>Standard Reference & Clause</b>", ref_header_style)],
-            [Paragraph("Nominal Thickness (w_nom)", ref_style), Paragraph("ISO 17636-1 Clause 4.3 (SWSI: w_nom = t; DWSI/DWDI: w_nom = 2t)", ref_style)],
-            [Paragraph("Min Shooting Distance (f_min)", ref_style), Paragraph("ISO 17636-1 Clause 6.3, Equation (2) (f_min = C * d * b^(2/3); C=7.5 Class A, C=15 Class B)", ref_style)],
-            [Paragraph("Minimum Exposures (N)", ref_style), Paragraph("ISO 17636-1 Clause 6.4 (circumferential weld minimum number of exposures)", ref_style)],
-            [Paragraph("Single Wire IQI Target", ref_style), Paragraph("ISO 19232-1 & ISO 17636-1 Annex B Tables B.1 - B.3", ref_style)],
+            [Paragraph("Nominal Thickness (w_nom)", ref_style), Paragraph("ISO 17636-1:2022 Clause 3 (t/w definitions), Clause 6.9 &amp; Annex B (SWSI: w_nom = t; DWSI/DWDI: w_nom = 2t)", ref_style)],
+            [Paragraph("Min Shooting Distance (f_min)", ref_style), Paragraph("ISO 17636-1:2022 Clause 7.6, Formula (1) Class A / Formula (2) Class B (f_min = C·d·b^(2/3); C=7.5/15); planar detectors: Clause 7.6 Formula (13) f_min*", ref_style)],
+            [Paragraph("Minimum Exposures (N)", ref_style), Paragraph("ISO 17636-1:2022 Annex A (number of exposures for circumferential butt welds)", ref_style)],
+            [Paragraph("Single Wire IQI Target", ref_style), Paragraph("ISO 19232-1 &amp; ISO 17636-1:2022 Annex B Tables B.1–B.12", ref_style)],
+            [Paragraph("Geometric Unsharpness (Ug)", ref_style), Paragraph("Ug = d·b/f with f = SDD − b (ASME Sec V Art 2 T-274.2; ISO 17636-2:2022 Clauses 3.21–3.22)", ref_style)],
         ]
-        
+
+        if inputs.get("standard") == "asme":
+            ref_rows.append([Paragraph("ASME Min Distance (f_min, ASME)", ref_style), Paragraph("ASME Sec V Art 2 T-274.2 (Ug ≤ Ug_limit → f_min = d·b/Ug_limit; limits per Table T-274.2)", ref_style)])
+
         if inputs.get("source") == "x_ray":
-            ref_rows.append([Paragraph("Max Tube Voltage (U_max)", ref_style), Paragraph("ISO 17636-1 Annex C Table C.1 (Maximum X-Ray voltage caps)", ref_style)])
+            ref_rows.append([Paragraph("Max Tube Voltage (U_max)", ref_style), Paragraph("ISO 17636-1:2022 Annex C Table C.1 (approximation formulae for maximum tube voltage, informative)", ref_style)])
             
         if inputs.get("tech") == "digital":
-            ref_rows.append([Paragraph("Duplex Wire IQI Target", ref_style), Paragraph("ISO 19232-5 & ISO 17636-2 Clause 6.6 Table 3 (basic unsharpness / duplex)", ref_style)])
-            ref_rows.append([Paragraph("Target SNR_N", ref_style), Paragraph("ISO 17636-2 Clause 6.8 (Class A SNR_N >= 70, Class B SNR_N >= 130)", ref_style)])
-            ref_rows.append([Paragraph("SNR_N Measurement Location", ref_style), Paragraph("ISO 17636-2 Clause 7.3.1 (non-flush weld: target SNR_N x 1.4 when measured adjacent)", ref_style)])
-            ref_rows.append([Paragraph("Detector Basic Resolution (SRb)", ref_style), Paragraph("ISO 17636-2 Tables B.1 & B.2 (Maximum allowed basic spatial resolution)", ref_style)])
-            ref_rows.append([Paragraph("Compensation Principles (CP I/II)", ref_style), Paragraph("ISO 17636-2 Clause 5.2 (reduce contrast -> increase SNR; distance compensation)", ref_style)])
-            ref_rows.append([Paragraph("Panel Coverage Exposures", ref_style), Paragraph("ISO 17636-2 Clauses 7.6/7.8 & Annex A (flat-panel DDA coverage of circumference)", ref_style)])
+            ref_rows.append([Paragraph("Duplex Wire IQI Target", ref_style), Paragraph("ISO 19232-5 &amp; ISO 17636-2:2022 Clause 6.7.2; limits in Tables B.13/B.14", ref_style)])
+            ref_rows.append([Paragraph("Target SNR_N", ref_style), Paragraph("ISO 17636-2:2022 Clause 7.3.1 &amp; Tables 3/4 (dynamic Class A/B minimum SNR_N)", ref_style)])
+            ref_rows.append([Paragraph("SNR_N Measurement Location", ref_style), Paragraph("ISO 17636-2:2022 Clause 7.3.1 (non-flush weld: target SNR_N × 1.4 when measured adjacent)", ref_style)])
+            ref_rows.append([Paragraph("Detector Basic Resolution (SRb)", ref_style), Paragraph("ISO 17636-2:2022 Tables B.13 (Class A) &amp; B.14 (Class B) — maximum SRb", ref_style)])
+            ref_rows.append([Paragraph("Compensation Principles (CP I/II/III)", ref_style), Paragraph("ISO 17636-2:2022 Clause 5.2 (contrast/sharpness compensation by increased SNR)", ref_style)])
+            ref_rows.append([Paragraph("Panel Coverage Exposures", ref_style), Paragraph("ISO 17636-2:2022 Clause 7.8 &amp; Annex A (flat-panel DDA coverage of the circumference)", ref_style)])
         else:
-            ref_rows.append([Paragraph("Optical Density Target (D)", ref_style), Paragraph("ISO 17636-1 Clause 5.3 (Class A density >= 2.0, Class B >= 2.3)", ref_style)])
-            ref_rows.append([Paragraph("Film System Class", ref_style), Paragraph("ISO 17636-1 Table 2 (Required minimum film system class)", ref_style)])
-            ref_rows.append([Paragraph("Film Overlap", ref_style), Paragraph("ISO 17636-1 Clause 6.4 (Welded joints overlap must be >= 10 mm)", ref_style)])
+            ref_rows.append([Paragraph("Optical Density Target (D)", ref_style), Paragraph("ISO 17636-1:2022 Clause 7.8 &amp; Table 5 (Class A ≥ 2.0, Class B ≥ 2.3)", ref_style)])
+            ref_rows.append([Paragraph("Film System Class", ref_style), Paragraph("ISO 17636-1:2022 Tables 3/4 (film system class per ISO 11699-1)", ref_style)])
+            ref_rows.append([Paragraph("Film Overlap", ref_style), Paragraph("ISO 17636-1:2022 Clause 6.6 (overlap of films verified by a high-density marker)", ref_style)])
             
-        ref_rows.append([Paragraph("Filter / Screen Recommendation", ref_style), Paragraph("ISO 17636-1 Table 1 & Annex D, ASME Sec V Art 2 (Pb screens / filters)", ref_style)])
+        ref_rows.append([Paragraph("Filter / Screen Recommendation", ref_style), Paragraph("ISO 17636-1:2022 Clause 7.5.1 (metal screens/filters); ASME Sec V Art 2", ref_style)])
             
         ref_table = Table(ref_rows, colWidths=[180, 320])
         ref_table.setStyle(TableStyle([

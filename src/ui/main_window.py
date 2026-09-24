@@ -90,9 +90,9 @@ class MainWindow(QMainWindow,
         # Initialize standard figure list
         self.update_std_figure_list()
         
-        # Start with flat detector (hide bed/bgap)
-        self.txt_bed.setVisible(False)
-        self.txt_bgap.setVisible(False)
+        # Start with the planar/rigid detector model (bed/bgap visible)
+        self.txt_bed.setVisible(True)
+        self.txt_bgap.setVisible(True)
 
         # Hide user geometry overrides until digital + relevant tech is confirmed
         self.lbl_f_source.setVisible(True)
@@ -642,7 +642,7 @@ class MainWindow(QMainWindow,
         self.out_rows = {}
         self.info_buttons = {}
         out_fields = [
-            "w_nom", "w_eff", "u_max", "f_min", "sfd_min",
+            "w_nom", "w_eff", "u_max", "f_min", "f_min_asme", "sfd_min",
             "ug", "req_exposures", "exposures_panel", "exposures_applied", "exposures_check",
             "single_wire_iqi", "duplex_iqi",
             "asme_iqi", "quality_target", "calc_time", "detector_quality",
@@ -807,12 +807,14 @@ class MainWindow(QMainWindow,
 
     def on_detector_type_changed(self):
         is_digital = self.rad_digital.isChecked()
-        is_curved = is_digital and hasattr(self, 'rad_detector_curved') and self.rad_detector_curved.isChecked()
+        # Planar/rigid detectors need the edge lift (bed) and gap (bgap) inputs;
+        # flexible detectors wrapped on the pipe do not.
+        is_planar = is_digital and hasattr(self, 'rad_detector_flat') and self.rad_detector_flat.isChecked()
         if hasattr(self, 'lbl_bed'):
-            self.lbl_bed.setVisible(is_curved)
-            self.txt_bed.setVisible(is_curved)
-            self.lbl_bgap.setVisible(is_curved)
-            self.txt_bgap.setVisible(is_curved)
+            self.lbl_bed.setVisible(is_planar)
+            self.txt_bed.setVisible(is_planar)
+            self.lbl_bgap.setVisible(is_planar)
+            self.txt_bgap.setVisible(is_planar)
         self.update_calculations()
 
     def _update_output_visibility(self):
@@ -852,6 +854,10 @@ class MainWindow(QMainWindow,
         standard = self.cmb_standard.currentData() if hasattr(self, "cmb_standard") else "iso"
         if "asme_iqi" in self.out_rows:
             self.out_rows["asme_iqi"].setVisible(standard == "asme")
+
+        # ASME-derived f_min row only when ASME is selected
+        if "f_min_asme" in self.out_rows:
+            self.out_rows["f_min_asme"].setVisible(standard == "asme")
 
         # barrier_distance only for isotopes
         if "barrier_distance" in self.out_rows:
@@ -903,12 +909,12 @@ class MainWindow(QMainWindow,
         if hasattr(self, 'lbl_det_shape'):
             self.lbl_det_shape.setVisible(is_digital)
             self.det_type_widget.setVisible(is_digital)
-        is_curved = is_digital and hasattr(self, 'rad_detector_curved') and self.rad_detector_curved.isChecked()
+        is_planar = is_digital and hasattr(self, 'rad_detector_flat') and self.rad_detector_flat.isChecked()
         if hasattr(self, 'lbl_bed'):
-            self.lbl_bed.setVisible(is_curved)
-            self.txt_bed.setVisible(is_curved)
-            self.lbl_bgap.setVisible(is_curved)
-            self.txt_bgap.setVisible(is_curved)
+            self.lbl_bed.setVisible(is_planar)
+            self.txt_bed.setVisible(is_planar)
+            self.lbl_bgap.setVisible(is_planar)
+            self.txt_bgap.setVisible(is_planar)
         
         # Also update procedure compliance label and default value
         if is_digital:
@@ -1780,6 +1786,7 @@ class MainWindow(QMainWindow,
                 w.setText(str(state[attr]))
         for attr, widget in (("rad_analog", self.rad_analog),
                              ("rad_detector_flat", self.rad_detector_flat),
+                             ("rad_detector_curved", self.rad_detector_curved),
                              ("chk_source_side_iqi", self.chk_source_side_iqi)):
             if attr in state:
                 v = state[attr]
@@ -1883,14 +1890,38 @@ class MainWindow(QMainWindow,
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Could not import CSV: {e}")
 
-    def _compute_geometry(self, od, t, d, sfd, geometry, testing_class):
+    def _compute_geometry(self, od, t, d, sfd, geometry, testing_class,
+                          standard=None, lvl3_settings=None):
         """
         Shared geometric calculation block used by update_calculations and
         export_pdf_report so the UI and the PDF always agree.
-        Returns dict: b_dist, b_eff, b_rule_applied, f_min, sfd_min, sdd_min,
-        ug, f_min_star, ci_factor.
+
+        Detector model — ISO 17636-2:2022 Clause 7.6:
+          * Planar/rigid detector (Figures 2 b), 8 b), 13 b), 14 b)):
+              b = b_ed + b_gap + k·t (Formulae 8/9, k = 1.2 Class A / 1.1 Class B)
+              f_min* = f_min(b=t) · (b/t)^(1/3) when b/t > 1.2 (Formula 13).
+              For the central projection (Figure 5 b)): b = b_ed + b_gap + t.
+          * Flexible detector wrapped on the pipe (Figures 2 a), 8 a), 13 a), ...):
+              b = t (SWSI/DWSI) or De (DWDI, Clause 6.7.2);
+              f_min = C · d · b_eff^(2/3) (Formulae 2/3).
+
+        Ug is evaluated with f = SDD − b (ASME Sec V Art 2 T-274.2; ISO 3.21/3.22).
+
+        Level 3 reductions (ISO 17636-2 Clause 7.6) and the DWSI physical SFD
+        floor (source outside the pipe) are applied HERE so that the screen,
+        the compliance checker and the PDF all consume the same values.
+
+        Returns dict: b_dist, b_eff, b_rule_applied, f_min (governing, after
+        L3), f_min_iso, f_min_asme, sfd_min, sdd_min, dwsi_physical_min,
+        lvl3_dw, lvl3_central, ug, f_min_star, ci_factor, is_planar, ...
         """
-        is_curved = self.rad_detector_curved.isChecked()
+        if standard is None:
+            standard = self.cmb_standard.currentData() if hasattr(self, "cmb_standard") else "iso"
+        if lvl3_settings is None:
+            lvl3_settings = getattr(self, "lvl3_settings", {}) or {}
+
+        # "flat" = planar/rigid detector; "curved" = flexible detector wrapped on the pipe
+        is_planar = self.rad_detector_flat.isChecked() if hasattr(self, "rad_detector_flat") else True
         std_figure = self.cmb_std_figure.currentData() if hasattr(self, 'cmb_std_figure') else None
         try:
             bed = self._to_mm(float(self.txt_bed.text().replace(",", ".")))
@@ -1901,42 +1932,86 @@ class MainWindow(QMainWindow,
         except ValueError:
             bgap = 5.0
 
-        if is_curved and self.calc.is_central_projection(geometry, std_figure):
-            b_dist = self.calc.calculate_b_panoramic(bed, bgap, t)
-        elif is_curved:
-            b_dist = self.calc.calculate_b_curved(bed, bgap, t, testing_class)
+        f_min_star = None
+        ci_factor = None
+        if geometry in ["dwdi_elliptic", "dwdi_super"]:
+            # ISO 17636-2:2022 Clause 7.6: for DWDI (Figures 11/12) b is always
+            # replaced by the external diameter De, whatever the detector type.
+            b_dist = od
+            f_min_iso_base = self.calc.calculate_f_min(d, b_dist, testing_class, t)
+        elif is_planar:
+            if self.calc.is_central_projection(geometry, std_figure):
+                b_dist = self.calc.calculate_b_panoramic(bed, bgap, t)
+            else:
+                b_dist = self.calc.calculate_b_curved(bed, bgap, t, testing_class)
+            # Formula (13): f_min* governs planar detectors. If b/t <= 1.2 the
+            # plain f_min(b=t) applies (Formulae 2/3 with b replaced by t).
+            f_min_star, ci_factor = self.calc.calculate_f_min_star(d, b_dist, t, testing_class)
+            if f_min_star is not None:
+                f_min_iso_base = f_min_star
+            else:
+                f_min_iso_base = self.calc.calculate_f_min(d, t, testing_class, t)
         else:
-            b_dist = t if geometry in ["swsi", "dwsi"] else od
+            b_dist = t
+            f_min_iso_base = self.calc.calculate_f_min(d, b_dist, testing_class, t)
         b_eff, b_rule_applied = self.calc.get_effective_b(b_dist, t)
 
-        f_min = self.calc.calculate_f_min(d, b_dist, testing_class, t)
-        f_min_star, ci_factor = self.calc.calculate_f_min_star(d, b_dist, t, testing_class)
-        if f_min_star is not None and f_min_star > f_min:
-            f_min = f_min_star
+        # ASME Sec V Art 2 T-274.2: f_min is derived from the allowed Ug limit
+        f_min_asme_base = None
+        if standard == "asme":
+            f_min_asme_base = self.calc.calculate_asme_f_min(d, b_dist, t)
 
-        sfd_min = f_min + b_dist
+        # Detector size constraint: SDD >= 1.4 * dd (Clause 7.6 Formula 7)
         try:
             dd = self._to_mm(float(self.txt_dd.text().replace(",", ".")))
         except ValueError:
             dd = 200.0
         sdd_min = self.calc.calculate_sdd_min(dd)
+
+        # Physical floor for DWSI: source outside, detector across the pipe
+        dwsi_physical_min = 0.0
+        if geometry == "dwsi" and od > 0.0:
+            dwsi_physical_min = od + max(0.0, bgap)
+
+        # Level 3 reductions (ISO 17636-2:2022 Clause 7.6)
+        lvl3_dw = bool(lvl3_settings.get("dw_reduction")) and self.calc.is_double_wall_technique(geometry)
+        lvl3_central = bool(lvl3_settings.get("central_proj_reduction")) and self.calc.is_central_projection(geometry, std_figure)
+        l3_factor = (0.8 if lvl3_dw else 1.0) * (0.5 if lvl3_central else 1.0)
+
+        f_min_iso = f_min_iso_base * l3_factor
+        f_min_asme = f_min_asme_base * l3_factor if f_min_asme_base is not None else None
+        f_min = f_min_asme if standard == "asme" else f_min_iso
+
+        sfd_min = f_min + b_dist
         if sdd_min > sfd_min:
             sfd_min = sdd_min
+        if dwsi_physical_min > sfd_min:
+            sfd_min = dwsi_physical_min
 
-        ug = self.calc.calculate_geometric_unsharpness(d, b_dist, sfd)
+        # Ug = d·b/f with f = SDD − b (never SDD itself)
+        ug = self.calc.calculate_geometric_unsharpness_from_sfd(d, b_dist, sfd)
 
         return {
             "b_dist": b_dist,
             "b_eff": b_eff,
             "b_rule_applied": b_rule_applied,
             "f_min": f_min,
+            "f_min_iso": f_min_iso,
+            "f_min_asme": f_min_asme,
+            "f_min_iso_base": f_min_iso_base,
+            "f_min_asme_base": f_min_asme_base,
             "sfd_min": sfd_min,
             "sdd_min": sdd_min,
+            "dwsi_physical_min": dwsi_physical_min,
+            "lvl3_dw": lvl3_dw,
+            "lvl3_central": lvl3_central,
             "ug": ug,
             "f_min_star": f_min_star,
             "ci_factor": ci_factor,
-            "is_curved": is_curved,
+            "is_planar": is_planar,
+            "is_curved": not is_planar,
             "std_figure": std_figure,
+            "standard": standard,
             "bed": bed,
             "bgap": bgap,
             "dd": dd,
@@ -1977,12 +2052,19 @@ class MainWindow(QMainWindow,
         # Tube Voltage kV
         u_max = self.calc.calculate_u_max(w_nom, material)
 
+        # Inspection standard (ISO 17636 / ASME Sec V Art 2)
+        standard = self.cmb_standard.currentData() if hasattr(self, "cmb_standard") else "iso"
+
         # Shared geometry block (b, f_min, sfd_min, sdd_min, ug, f_min*)
-        geo = self._compute_geometry(od, t, d, sfd, geometry, testing_class)
+        # Level 3 reductions and the DWSI physical floor are applied inside.
+        geo = self._compute_geometry(od, t, d, sfd, geometry, testing_class,
+                                     standard=standard, lvl3_settings=self.lvl3_settings)
         b_dist = geo["b_dist"]
         b_eff = geo["b_eff"]
         b_rule_applied = geo["b_rule_applied"]
         f_min = geo["f_min"]
+        f_min_iso = geo["f_min_iso"]
+        f_min_asme = geo["f_min_asme"]
         sfd_min = geo["sfd_min"]
         sdd_min = geo["sdd_min"]
         ug = geo["ug"]
@@ -1991,9 +2073,6 @@ class MainWindow(QMainWindow,
         std_figure = geo["std_figure"]
         bgap = geo["bgap"]
         dd = geo["dd"]
-
-        # Inspection standard (ISO 17636 / ASME Sec V Art 2)
-        standard = self.cmb_standard.currentData() if hasattr(self, "cmb_standard") else "iso"
 
         # ASME/ASTM IQI sensitivity selector visibility (ASME only)
         if hasattr(self, "cmb_asme_sensitivity"):
@@ -2265,49 +2344,59 @@ class MainWindow(QMainWindow,
             else:
                 warnings.append(f"NOTE (Annex F): Ug/SRb ({annex_f_ratio:.1f}) > 2. Increase f_min or SNR for IQI visibility.")
 
+        # DWSI physical SFD floor: source outside the pipe, detector across it
+        if geo["dwsi_physical_min"] > 0.0:
+            if sfd < geo["dwsi_physical_min"]:
+                if self.trans.language == "tr":
+                    warnings.append(f"UYARI (Madde 7.6): DWSI'de uygulanan SFD ({sfd:.1f} mm) fiziksel asgari mesafenin (OD+bgap = {geo['dwsi_physical_min']:.1f} mm) altında. Kaynak boru dışında olamaz.")
+                else:
+                    warnings.append(f"WARNING (Clause 7.6): Applied SFD ({sfd:.1f} mm) is below the physical minimum for DWSI (OD+bgap = {geo['dwsi_physical_min']:.1f} mm). The source cannot be inside the pipe.")
+            elif geo["dwsi_physical_min"] > geo["f_min"] + b_dist:
+                if self.trans.language == "tr":
+                    warnings.append(f"BİLGİ (Madde 7.6): DWSI fiziksel tabanı SFD_min'i {geo['dwsi_physical_min']:.1f} mm'ye (OD+bgap) yükseltti; f_min yalnızca et kalınlığına göre belirlenir.")
+                else:
+                    warnings.append(f"NOTE (Clause 7.6): The DWSI physical floor raised SFD_min to {geo['dwsi_physical_min']:.1f} mm (OD+bgap); f_min itself is determined only by wall thickness.")
+
         # Double-wall technique: up to 20% f_min reduction allowed per Clause 7.6
         if self.calc.is_double_wall_technique(geometry):
-            f_min_80 = f_min * 0.8
-            if self.lvl3_settings.get("dw_reduction", False):
-                f_min = f_min_80
+            if geo["lvl3_dw"]:
                 if self.trans.language == "tr":
-                    warnings.append(f"Level 3: Çift duvar tekniğinde f_min %20 düşürüldü ({f_min_80:.1f} mm).")
+                    warnings.append(f"Level 3: Çift duvar tekniğinde f_min %20 düşürüldü ({f_min:.1f} mm).")
                 else:
-                    warnings.append(f"Level 3: Double-wall technique f_min reduced 20% to {f_min_80:.1f} mm.")
+                    warnings.append(f"Level 3: Double-wall technique f_min reduced 20% to {f_min:.1f} mm.")
             else:
+                f_min_80 = f_min * 0.8
                 if self.trans.language == "tr":
                     warnings.append(f"BİLGİ (Madde 7.6): Çift duvar tekniğinde f_min %20 düşürülebilir ({f_min_80:.1f} mm). IQI şartları sağlanmalıdır.")
                 else:
                     warnings.append(f"NOTE (Clause 7.6): Double-wall technique allows 20% f_min reduction (to {f_min_80:.1f} mm). IQI requirements must be met.")
 
         # Central projection (Fig 5): up to 50% f_min reduction allowed
-        std_figure = self.cmb_std_figure.currentData() if hasattr(self, 'cmb_std_figure') else None
-        is_central = self.calc.is_central_projection(geometry, std_figure)
-        if is_central:
-            f_min_50 = f_min * 0.5
-            if self.lvl3_settings.get("central_proj_reduction", False):
-                f_min = f_min_50
+        if self.calc.is_central_projection(geometry, std_figure):
+            if geo["lvl3_central"]:
                 if self.trans.language == "tr":
-                    warnings.append(f"Level 3: Merkezi projeksiyonda f_min %%50 düşürüldü ({f_min_50:.1f} mm).")
+                    warnings.append(f"Level 3: Merkezi projeksiyonda f_min %50 düşürüldü ({f_min:.1f} mm).")
                 else:
-                    warnings.append(f"Level 3: Central projection f_min reduced 50% to {f_min_50:.1f} mm.")
+                    warnings.append(f"Level 3: Central projection f_min reduced 50% to {f_min:.1f} mm.")
                 # Duplex/SRb tolerance also applies
                 if self.trans.language == "tr":
                     warnings.append("BİLGİ (Madde 7.6): Merkezi projeksiyonda 1 duplex adım veya 1 SRb toleransı uygulanır.")
                 else:
                     warnings.append("NOTE (Clause 7.6): Central projection allows 1 duplex step or 1 SRb tolerance.")
             else:
+                f_min_50 = f_min * 0.5
                 if self.trans.language == "tr":
-                    warnings.append(f"BİLGİ (Madde 7.6): Merkezi projeksiyonda f_min %%50 düşürülebilir ({f_min_50:.1f} mm). Level 3 onayı gerekiyor.")
+                    warnings.append(f"BİLGİ (Madde 7.6): Merkezi projeksiyonda f_min %50 düşürülebilir ({f_min_50:.1f} mm). Level 3 onayı gerekiyor.")
                 else:
-                    warnings.append(f"NOTE (Clause 7.6): Central projection allows 50%% f_min reduction (to {f_min_50:.1f} mm). Requires Level 3 approval.")
+                    warnings.append(f"NOTE (Clause 7.6): Central projection allows 50% f_min reduction (to {f_min_50:.1f} mm). Requires Level 3 approval.")
 
-        # f_min* magnification rule: warn when b/t > 1.2 triggers Ci factor
+        # f_min* magnification rule: planar detectors use Formula (13) as the
+        # governing value when b/t > 1.2
         if f_min_star is not None and ci_factor is not None:
             if self.trans.language == "tr":
-                warnings.append(f"BİLGİ (Madde 7.6): b/t = {b_dist/t:.2f} > 1.2 olduğundan f_min* = f_min × Ci (Ci = {ci_factor:.3f}) uygulandı.")
+                warnings.append(f"BİLGİ (Madde 7.6): Planar dedektör, b/t = {b_dist/t:.2f} > 1.2 → f_min* = f_min(b=t) × Ci (Ci = {ci_factor:.3f}) geçerlidir.")
             else:
-                warnings.append(f"NOTE (Clause 7.6): b/t = {b_dist/t:.2f} > 1.2, applying f_min* = f_min × Ci (Ci = {ci_factor:.3f}).")
+                warnings.append(f"NOTE (Clause 7.6): Planar detector, b/t = {b_dist/t:.2f} > 1.2 → f_min* = f_min(b=t) × Ci (Ci = {ci_factor:.3f}) governs.")
 
         # ISO 17636-2:2022 Table 2 — Source-thickness compliance
         is_valid, min_lim, max_lim, table2_msg = self.calc.validate_source_thickness(
@@ -2425,7 +2514,11 @@ class MainWindow(QMainWindow,
         else:
             self.out_labels["u_max"][1].setText("N/A")
 
-        self.out_labels["f_min"][1].setText(f"{f_min:.1f} mm")
+        self.out_labels["f_min"][1].setText(f"{f_min_iso:.1f} mm")
+        if standard == "asme" and f_min_asme is not None:
+            self.out_labels["f_min_asme"][1].setText(f"{f_min_asme:.1f} mm")
+        else:
+            self.out_labels["f_min_asme"][1].setText("N/A")
         self.out_labels["sfd_min"][1].setText(f"{sfd_min:.1f} mm")
         self.out_labels["ug"][1].setText(f"{ug:.3f} mm")
         self.out_labels["req_exposures"][1].setText(f"{exposures}")
@@ -2530,6 +2623,12 @@ class MainWindow(QMainWindow,
             "collimator_hvl": hvl_layers,
             "barrier_limit_usvh": limit_usvh,
             "f_min": f_min,
+            "f_min_iso": f_min_iso,
+            "f_min_asme": f_min_asme,
+            "is_planar": geo["is_planar"],
+            "lvl3_dw": geo["lvl3_dw"],
+            "lvl3_central": geo["lvl3_central"],
+            "dwsi_physical_min": geo["dwsi_physical_min"],
             "b_dist": b_dist,
             "b_eff": b_eff,
             "required_wire_no": wire_no,
@@ -2547,6 +2646,7 @@ class MainWindow(QMainWindow,
         self.last_calculated["base_multiplier"] = base_multiplier
         if tech == "digital":
             self.last_calculated["required_snr"] = target_snr_val
+            self.last_calculated["sfd_comp_target"] = sfd_comp_target
         else:
             self.last_calculated["required_density"] = required_density
 
@@ -2781,6 +2881,13 @@ class MainWindow(QMainWindow,
         geom_keys = ["dwsi", "swsi", "dwdi_elliptic", "dwdi_super"]
         geometry = geom_keys[self.cmb_geometry.currentIndex()]
 
+        # Mirror the DWDI -> DWSI forcing applied by update_calculations so the
+        # report always describes the same technique as the screen.
+        if od > 100.0 and geometry in ["dwdi_elliptic", "dwdi_super"]:
+            geometry = "dwsi"
+
+        standard = self.cmb_standard.currentData() if hasattr(self, "cmb_standard") else "iso"
+
         try:
             input_kv = float(self.txt_app_kv.text().replace(",", "."))
         except ValueError:
@@ -2809,7 +2916,7 @@ class MainWindow(QMainWindow,
             "source_text": self.trans.get(source),
             "geometry": geometry,
             "geometry_text": self.trans.get(geometry),
-            "standard": self.cmb_standard.currentData() if hasattr(self, "cmb_standard") else "iso",
+            "standard": standard,
             "report_info": self.get_report_info(),
             "input_kv": input_kv,
             "overlap": overlap,
@@ -2817,13 +2924,18 @@ class MainWindow(QMainWindow,
             "snr_location": self.cmb_snr_location.currentData()
         }
 
-        # Gather outputs
+        # Gather outputs — use the same shared geometry block as the screen
+        # (Level 3 reductions and the DWSI physical floor included), so the PDF
+        # can never disagree with the UI.
         w_nom, w_eff = self.calc.calculate_thicknesses(t, cap, geometry)
         u_max = self.calc.calculate_u_max(w_nom, material)
-        geo = self._compute_geometry(od, t, d, sfd, geometry, testing_class)
-        f_min = geo["f_min"]
+        geo = self._compute_geometry(od, t, d, sfd, geometry, testing_class,
+                                     standard=standard, lvl3_settings=self.lvl3_settings)
+        f_min_iso = geo["f_min_iso"]
+        f_min_asme = geo["f_min_asme"]
         sfd_min = geo["sfd_min"]
-        
+        ug = geo["ug"]
+
         if geometry == "swsi":
             exposures = 1
         elif geometry == "dwdi_elliptic":
@@ -2832,6 +2944,7 @@ class MainWindow(QMainWindow,
             exposures = 3
         else:
             exposures = self.calc.calculate_dwsi_exposures(od, t, sfd, testing_class)
+        exposures = self.last_calculated.get("exposures_graph", exposures)
 
         film_side = not self.chk_source_side_iqi.isChecked()
         iqi_type = self.cmb_iqi_type.currentData()
@@ -2849,8 +2962,10 @@ class MainWindow(QMainWindow,
             "w_nom": w_nom,
             "w_eff": w_eff,
             "u_max": u_max if source == "x_ray" else None,
-            "f_min": f_min,
+            "f_min": f_min_iso,
+            "f_min_asme": f_min_asme,
             "sfd_min": sfd_min,
+            "ug": ug,
             "exposures": exposures,
             "exposures_panel": self.last_calculated.get("exposures_panel"),
             "exposures_applied": self.last_calculated.get("exposures_applied"),
@@ -2930,10 +3045,19 @@ class MainWindow(QMainWindow,
         warnings_text = self.txt_warnings.text()
         warnings_list = warnings_text.split("\n") if warnings_text != "No active warnings." else []
 
-        sfd_comp_val = None
-        if self.lvl3_settings["sfd_comp"] and sfd < sfd_min:
-            base_snr = 130.0 if testing_class == "class_b" else 70.0
+        # Distance-compensation target SNR: reuse the value computed for the
+        # screen (dynamic Table 3/4 base, 1.4x HAZ factor, final sfd_min).
+        sfd_comp_val = self.last_calculated.get("sfd_comp_target")
+        if sfd_comp_val is None and self.lvl3_settings.get("sfd_comp") and sfd < sfd_min:
+            base_snr = self.last_calculated.get("required_snr")
+            if base_snr is None:
+                base_snr = 130.0 if testing_class == "class_b" else 70.0
             sfd_comp_val = base_snr * (sfd_min / max(10.0, sfd))
+
+        lvl3_active = any(self.lvl3_settings.get(k) for k in (
+            "sfd_comp", "voltage_override", "isotope_flex",
+            "source_flex", "central_proj_reduction", "dw_reduction",
+        ))
 
         # Save sketch images to temporary files for PDF embedding
         tmp_dynamic = None
@@ -2960,7 +3084,7 @@ class MainWindow(QMainWindow,
 
         success = self.pdf_gen.generate_report(
             filepath, inputs, outputs, warnings_list, defect_eval, 
-            self.lvl3_settings["sfd_comp"] or self.lvl3_settings["voltage_override"] or self.lvl3_settings["isotope_flex"],
+            lvl3_active,
             sfd_comp_val, self.trans,
             dynamic_img_path=dynamic_img_path,
             standard_img_path=standard_img_path

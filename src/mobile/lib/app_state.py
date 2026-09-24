@@ -66,6 +66,7 @@ class AppState:
         self.app_srb = 80.0
         self.app_wire = 10
         self.app_duplex = 6
+        self.app_exposures = 0
         self.film_class_used = "C5"
         self.snr_location = "weld"
         self.iqi_type = "wire"
@@ -113,6 +114,7 @@ class AppState:
             "kv": self.kv,
             "output_val": output_val,
             "base_multiplier": self.base_multiplier,
+            "sfd": self.sfd,
             "app_sfd": self.app_sfd,
             "app_kv": self.app_kv,
             "app_activity": self.app_activity,
@@ -122,6 +124,7 @@ class AppState:
             "app_srb": self.app_srb,
             "app_wire": self.app_wire,
             "app_duplex": self.app_duplex,
+            "app_exposures": self.app_exposures,
             "film_class_used": self.film_class_used,
             "film_class": self.film_class,
             "snr_location": self.snr_location,
@@ -195,22 +198,24 @@ class AppState:
         if sdd_min > sfd_min:
             sfd_min = sdd_min
 
-        # 6. Geometric unsharpness (Ug) - use applied SFD
+        # 6. Geometric unsharpness (Ug) - use applied SFD, f = SFD - b
         try:
-            sfd = float(vals.get("app_sfd", 600.0))
+            sfd = float(vals.get("app_sfd", vals.get("sfd", 600.0)))
         except (TypeError, ValueError):
             sfd = 600.0
         try:
-            ug = self.calc.calculate_geometric_unsharpness(d, b_dist, sfd)
+            ug = self.calc.calculate_geometric_unsharpness_from_sfd(d, b_dist, sfd)
         except Exception:
             logger.exception("calculate_geometric_unsharpness failed")
             ug = 0.0
 
         # 7. IQI targets (single wire / duplex) - these return (display_str, wire_no) tuples
+        #    film_side is the inverse of "IQI on source side" (desktop parity)
+        film_side = not bool(vals.get("film_side", False))
         try:
             single_wire_iqi = self.calc.get_single_wire_iqi(
                 vals["t"], vals["cap"], vals["testing_class"],
-                vals["geometry"], vals["tech"], vals["film_side"],
+                vals["geometry"], vals["tech"], film_side,
                 self.language
             )
         except Exception:
@@ -230,7 +235,7 @@ class AppState:
                   (20.0 if vals["source"] == "isotope_co60" else
                    (150.0 if vals["source"] == "isotope_yb169" else 500.0))))
             _min, _sec, calc_time = self.calc.calculate_exposure_time(
-                sfd=vals["app_sfd"],
+                sfd=sfd,
                 w_eff=w_eff,
                 source=vals["source"],
                 output_val=vals["output_val"],
@@ -255,14 +260,37 @@ class AppState:
         calc_time = calc_time * f_mult
 
         # 9. Quality targets
+        # get_target_snr returns (base_snr, table_name, description)
         try:
-            target_snr = self.calc.get_target_snr(
+            base_snr, snr_table, _snr_desc = self.calc.get_target_snr(
                 vals["material"], vals["source"], vals["kv"],
                 w_nom, vals["testing_class"], self.language
             )
         except Exception:
             logger.exception("get_target_snr failed")
-            target_snr = 0
+            base_snr, snr_table = 70.0, ""
+        # 1.4x SNR_N target for adjacent (HAZ) measurement on a non-flush weld
+        # and for Se-75 w < 12 mm Class B (ISO 17636-2:2022 Clauses 7.3.1/6.9)
+        is_flush = (vals["cap"] == 0.0)
+        se75_thin_class_b = (
+            vals["material"] in ("steel", "copper_nickel")
+            and vals["source"] == "isotope_se75"
+            and w_nom < 12.0
+            and vals["testing_class"] == "class_b"
+        )
+        target_snr = base_snr
+        if (vals.get("snr_location") == "adjacent" and not is_flush) or se75_thin_class_b:
+            target_snr = base_snr * 1.4
+        # Required optical density (analog)
+        if (
+            vals["material"] in ("steel", "copper_nickel")
+            and vals["source"] == "isotope_se75"
+            and w_nom < 12.0
+            and vals["testing_class"] == "class_b"
+        ):
+            required_density = 3.0
+        else:
+            required_density = 2.3 if vals["testing_class"] == "class_b" else 2.0
         try:
             req_film = self.calc.get_required_film_class(w_nom, vals["testing_class"], vals["material"], vals["source"])
         except Exception:
@@ -283,7 +311,7 @@ class AppState:
             elif geometry == "dwdi_super":
                 exposures = 3
             else:  # dwsi
-                exposures = self.calc.calculate_dwsi_exposures(vals["od"], vals["t"], sfd_min, testing_class)
+                exposures = self.calc.calculate_dwsi_exposures(vals["od"], vals["t"], sfd, testing_class)
         except Exception:
             logger.exception("exposure count calculation failed")
             exposures = 0
@@ -344,7 +372,9 @@ class AppState:
             "barrier_distance": barrier_str,
             "required_film_class": req_film,
             "filter_recommendation": filter_rec,
-            "required_quality": target_snr if vals["tech"] == "digital" else 2.0,
+            "required_quality": target_snr if vals["tech"] == "digital" else required_density,
+            "required_density": required_density,
+            "snr_table": snr_table,
         }
 
         # 14. Procedure compliance check
@@ -359,11 +389,14 @@ class AppState:
                 "required_wire_no": wire_no,
                 "required_duplex_no": duplex_no,
                 "required_film_class": req_film,
-                "required_density": 2.0,
+                "required_density": required_density,
                 "required_snr": target_snr,
                 "ug": ug,
                 "calc_time_raw": calc_time,
                 "max_srb": max_srb,
+                "required_exposures": exposures,
+                "exposures_graph": exposures,
+                "exposures_panel": None,
             }
             applied = {
                 "applied_kv": vals["app_kv"],
@@ -376,6 +409,7 @@ class AppState:
                 "applied_srb": vals["app_srb"],
                 "applied_time": vals["app_time"],
                 "applied_activity": vals["app_activity"],
+                "applied_exposures": vals.get("app_exposures", 0),
             }
             inputs = {
                 "tech": vals["tech"],
@@ -385,7 +419,7 @@ class AppState:
                 "material": vals["material"],
                 "t": vals["t"],
                 "iqi_type": vals["iqi_type"],
-                "film_side": vals["film_side"],
+                "film_side": film_side,
             }
             self.compliance = self.proc_checker.check_compliance(
                 inputs, calced, applied, {}, self.language
@@ -430,10 +464,22 @@ class AppState:
                 is_ok, result = self.defect_eval
                 note = self.get_text("defect_approx_note")
                 self.defect_eval = (is_ok, f"{result}\n\n{note}")
+            self.defect_eval = self._normalize_defect_result(self.defect_eval)
         except Exception as e:
             logger.exception("evaluate_defect failed")
             self.defect_eval = {"status": False, "result": "error", "details": str(e)}
         return self.defect_eval
+
+    @staticmethod
+    def _normalize_defect_result(result):
+        """Normalizes (is_accepted, message) tuples / dicts into one dict shape
+        so the Kivy screens and the mobile PDF helper can always use .get()."""
+        if isinstance(result, tuple) and len(result) == 2:
+            ok, msg = result
+            return {"status": bool(ok), "result": str(msg), "details": str(msg)}
+        if isinstance(result, dict):
+            return result
+        return {"status": False, "result": str(result), "details": str(result)}
 
     def get_text(self, key):
         return self.trans.get(key)

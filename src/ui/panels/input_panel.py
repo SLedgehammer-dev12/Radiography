@@ -139,10 +139,12 @@ class InputPanelMixin:
         self.cmb_std_figure.currentIndexChanged.connect(self.on_std_figure_changed)
         grp_inputs_layout.addRow(self.trans.get("standard_fig"), self.cmb_std_figure)
 
-        # Detector shape (flat/curved) - digital only
+        # Detector shape: planar/rigid panel vs flexible (wrapped) CR/IP
         self.lbl_det_shape = QLabel(self.trans.get("detector_type"))
-        self.rad_detector_flat = QRadioButton(self.trans.get("detector_flat"))
-        self.rad_detector_curved = QRadioButton(self.trans.get("detector_curved"))
+        self.rad_detector_flat = QRadioButton(self.trans.get("detector_planar"))
+        self.rad_detector_curved = QRadioButton(self.trans.get("detector_flexible"))
+        self.rad_detector_flat.setToolTip(self.trans.get("tt_detector_planar"))
+        self.rad_detector_curved.setToolTip(self.trans.get("tt_detector_flexible"))
         self.rad_detector_flat.setChecked(True)
         self.det_type_widget = QWidget()
         det_type_layout = QHBoxLayout(self.det_type_widget)
@@ -190,8 +192,15 @@ class InputPanelMixin:
             "lbl_f_source": "source_dist",
             "lbl_b_object": "object_dist",
             "lbl_weld_width": "weld_width",
+            "lbl_bed": "bed",
+            "lbl_bgap": "bgap",
         }
         for attr, key in labels.items():
             getattr(self, attr).setText(self.trans.get(key))
         self.txt_f_source.setPlaceholderText(self.trans.get("auto_calc"))
         self.txt_b_object.setPlaceholderText(self.trans.get("auto_calc"))
+        # Detector model radio labels / tooltips
+        self.rad_detector_flat.setText(self.trans.get("detector_planar"))
+        self.rad_detector_curved.setText(self.trans.get("detector_flexible"))
+        self.rad_detector_flat.setToolTip(self.trans.get("tt_detector_planar"))
+        self.rad_detector_curved.setToolTip(self.trans.get("tt_detector_flexible"))

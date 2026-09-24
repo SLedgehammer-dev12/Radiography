@@ -50,6 +50,7 @@ class StepExposure(MDScreen):
     def on_kv(self, text):
         try:
             self.state.set("kv", float(text))
+            self.state.set("app_kv", float(text))
         except ValueError:
             pass
 
@@ -72,6 +73,7 @@ class StepExposure(MDScreen):
     def on_time(self, text):
         try:
             self.state.set("exposure_time", float(text))
+            self.state.set("app_time", float(text))
         except ValueError:
             pass
 
@@ -83,12 +85,15 @@ class StepExposure(MDScreen):
 
     def on_sfd(self, text):
         try:
-            self.state.set("sfd", float(text))
+            val = float(text)
+            self.state.set("sfd", val)
+            self.state.set("app_sfd", val)
         except ValueError:
             pass
 
     def on_slider_kv(self, value):
         self.state.set("kv", round(value, 1))
+        self.state.set("app_kv", round(value, 1))
         self.ids.kv_input.text = str(round(value, 1))
 
     def on_slider_ma(self, value):
@@ -97,10 +102,12 @@ class StepExposure(MDScreen):
 
     def on_slider_time(self, value):
         self.state.set("exposure_time", round(value, 1))
+        self.state.set("app_time", round(value, 1))
         self.ids.time_input.text = str(round(value, 1))
 
     def on_slider_sfd(self, value):
         self.state.set("sfd", round(value, 1))
+        self.state.set("app_sfd", round(value, 1))
         self.ids.sfd_input.text = str(round(value, 1))
 
     def open_film_menu(self):
