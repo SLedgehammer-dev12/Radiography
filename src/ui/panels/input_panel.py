@@ -106,12 +106,33 @@ class InputPanelMixin:
         self.txt_d.textChanged.connect(self.update_calculations)
         grp_inputs_layout.addRow(self.lbl_focal_size, self.txt_d)
 
-        # Detector size (digital only)
-        self.lbl_dd = QLabel(self.trans.get("detector_size"))
-        self.txt_dd = QLineEdit("200.0")
-        self.txt_dd.setValidator(QDoubleValidator(1.0, 1000.0, 1))
-        self.txt_dd.textChanged.connect(self.update_calculations)
-        grp_inputs_layout.addRow(self.lbl_dd, self.txt_dd)
+        # Film sheet dimensions (analog only) - used to derive df for the
+        # SFD >= 1.4*df coverage check (ISO 17636-1:2022 Formula 4).
+        self.lbl_film_size = QLabel(self.trans.get("film_size"))
+        self.cmb_film_size = QComboBox()
+        self._film_size_presets = {
+            "80x300": (80.0, 300.0),
+            "100x400": (100.0, 400.0),
+            "300x400": (300.0, 400.0),
+            "100x500": (100.0, 500.0),
+        }
+        for key in ("80x300", "100x400", "300x400", "100x500", "custom"):
+            self.cmb_film_size.addItem(self.trans.get(f"film_size_{key}"), key)
+        self.cmb_film_size.setCurrentIndex(1)  # default 100 x 400 mm
+        self.cmb_film_size.currentIndexChanged.connect(self.on_film_size_changed)
+        grp_inputs_layout.addRow(self.lbl_film_size, self.cmb_film_size)
+
+        self.lbl_film_width = QLabel(self.trans.get("film_width"))
+        self.txt_film_width = QLineEdit("100.0")
+        self.txt_film_width.setValidator(QDoubleValidator(1.0, 2000.0, 1))
+        self.txt_film_width.textChanged.connect(self.update_calculations)
+        grp_inputs_layout.addRow(self.lbl_film_width, self.txt_film_width)
+
+        self.lbl_film_height = QLabel(self.trans.get("film_height"))
+        self.txt_film_height = QLineEdit("400.0")
+        self.txt_film_height.setValidator(QDoubleValidator(1.0, 2000.0, 1))
+        self.txt_film_height.textChanged.connect(self.update_calculations)
+        grp_inputs_layout.addRow(self.lbl_film_height, self.txt_film_height)
 
         # Testing class
         self.cmb_class = QComboBox()
@@ -194,6 +215,9 @@ class InputPanelMixin:
             "lbl_weld_width": "weld_width",
             "lbl_bed": "bed",
             "lbl_bgap": "bgap",
+            "lbl_film_size": "film_size",
+            "lbl_film_width": "film_width",
+            "lbl_film_height": "film_height",
         }
         for attr, key in labels.items():
             getattr(self, attr).setText(self.trans.get(key))
@@ -204,3 +228,22 @@ class InputPanelMixin:
         self.rad_detector_curved.setText(self.trans.get("detector_flexible"))
         self.rad_detector_flat.setToolTip(self.trans.get("tt_detector_planar"))
         self.rad_detector_curved.setToolTip(self.trans.get("tt_detector_flexible"))
+        # Film size combo labels
+        for i in range(self.cmb_film_size.count()):
+            key = self.cmb_film_size.itemData(i)
+            self.cmb_film_size.setItemText(i, self.trans.get(f"film_size_{key}"))
+
+    def on_film_size_changed(self):
+        """Applies a preset film size or enables the custom width/height fields."""
+        key = self.cmb_film_size.currentData()
+        is_custom = key == "custom"
+        self.txt_film_width.setEnabled(is_custom)
+        self.txt_film_height.setEnabled(is_custom)
+        preset = self._film_size_presets.get(key)
+        if preset is not None:
+            w, h = preset
+            for widget, value in ((self.txt_film_width, w), (self.txt_film_height, h)):
+                widget.blockSignals(True)
+                widget.setText(f"{value:.0f}")
+                widget.blockSignals(False)
+        self.update_calculations()

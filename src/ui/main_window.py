@@ -815,6 +815,8 @@ class MainWindow(QMainWindow,
             self.txt_bed.setVisible(is_planar)
             self.lbl_bgap.setVisible(is_planar)
             self.txt_bgap.setVisible(is_planar)
+        # The available standard figures depend on the detector shape
+        self.update_std_figure_list()
         self.update_calculations()
 
     def _update_output_visibility(self):
@@ -849,6 +851,16 @@ class MainWindow(QMainWindow,
         if "detector_quality" in self.out_labels:
             dq_name = "detector_quality" if is_digital else "film_class_req"
             self.out_labels["detector_quality"][0].setText(self.trans.get(dq_name))
+
+        # SFD_min (analog) vs SDD_min (digital) row label
+        if "sfd_min" in self.out_labels:
+            self.out_labels["sfd_min"][0].setText(
+                self.trans.get("sfd_min" if is_digital else "sfd_min_analog"))
+
+        # Applied source-to-receptor distance label
+        if hasattr(self, "lbl_app_sfd"):
+            self.lbl_app_sfd.setText(
+                self.trans.get("applied_sdd" if is_digital else "applied_sfd"))
 
         # asme_iqi only when ASME Sec V Art 2 standard is selected
         standard = self.cmb_standard.currentData() if hasattr(self, "cmb_standard") else "iso"
@@ -903,18 +915,26 @@ class MainWindow(QMainWindow,
         self.txt_b_object.setVisible(is_digital)
 
         # Input panel digital elements
-        if hasattr(self, 'lbl_dd'):
-            self.lbl_dd.setVisible(is_digital)
-            self.txt_dd.setVisible(is_digital)
         if hasattr(self, 'lbl_det_shape'):
             self.lbl_det_shape.setVisible(is_digital)
             self.det_type_widget.setVisible(is_digital)
+        # Analog film sheet dimensions (df) / digital panel active area (dd)
+        if hasattr(self, 'lbl_film_size'):
+            self.lbl_film_size.setVisible(not is_digital)
+            self.cmb_film_size.setVisible(not is_digital)
+            self.lbl_film_width.setVisible(not is_digital)
+            self.txt_film_width.setVisible(not is_digital)
+            self.lbl_film_height.setVisible(not is_digital)
+            self.txt_film_height.setVisible(not is_digital)
         is_planar = is_digital and hasattr(self, 'rad_detector_flat') and self.rad_detector_flat.isChecked()
         if hasattr(self, 'lbl_bed'):
             self.lbl_bed.setVisible(is_planar)
             self.txt_bed.setVisible(is_planar)
             self.lbl_bgap.setVisible(is_planar)
             self.txt_bgap.setVisible(is_planar)
+
+        # Figure list depends on technology and detector shape
+        self.update_std_figure_list()
         
         # Also update procedure compliance label and default value
         if is_digital:
@@ -1084,30 +1104,59 @@ class MainWindow(QMainWindow,
     def update_std_figure_list(self):
         # Prevent recursion by temporarily disconnecting the signal
         self.cmb_std_figure.blockSignals(True)
-        
+
         # Get selected geometry
         geom_keys = ["dwsi", "swsi", "dwdi_elliptic", "dwdi_super"]
         geometry = geom_keys[self.cmb_geometry.currentIndex()]
-        
+
         # Save previous selection
         prev_data = self.cmb_std_figure.currentData()
 
+        is_digital = self.rad_digital.isChecked() if hasattr(self, "rad_digital") else True
+        is_planar = is_digital and (
+            self.rad_detector_flat.isChecked() if hasattr(self, "rad_detector_flat") else True)
+
         self.cmb_std_figure.clear()
-        
-        if geometry == "swsi":
-            self.cmb_std_figure.addItem(self.trans.get("fig5_title"), "fig5")
-            self.cmb_std_figure.addItem(self.trans.get("fig6_title"), "fig6")
-            self.cmb_std_figure.addItem(self.trans.get("fig7_title"), "fig7")
-            self.cmb_std_figure.addItem(self.trans.get("fig8b_title"), "fig8b")
-            self.cmb_std_figure.addItem(self.trans.get("fig9b_title"), "fig9b")
-        elif geometry in ["dwdi_elliptic", "dwdi_super"]:
-            self.cmb_std_figure.addItem(self.trans.get("fig11_title"), "fig11")
-            self.cmb_std_figure.addItem(self.trans.get("fig12_title"), "fig12")
-            self.cmb_std_figure.addItem(self.trans.get("fig14b_title"), "fig14b")
-        else: # dwsi
-            self.cmb_std_figure.addItem(self.trans.get("fig13_title"), "fig13")
-            self.cmb_std_figure.addItem(self.trans.get("fig10b_title"), "fig10b")
-            
+
+        def add(key, data):
+            self.cmb_std_figure.addItem(self.trans.get(key), data)
+
+        if is_digital:
+            if geometry == "swsi":
+                if is_planar:
+                    add("fig2b_title", "fig2b")
+                    add("fig5b_title", "fig5b")
+                    add("fig8b_title", "fig8b")
+                    add("fig9b_title", "fig9b")
+                    add("fig10b_title", "fig10b")
+                else:
+                    add("fig5a_title", "fig5a")
+                    add("fig6a_title", "fig6a")
+                    add("fig7a_title", "fig7a")
+                    add("fig8a_title", "fig8a")
+                    add("fig9a_title", "fig9a")
+                    add("fig10a_title", "fig10a")
+            elif geometry in ["dwdi_elliptic", "dwdi_super"]:
+                add("fig11_title", "fig11")
+                add("fig12_title", "fig12")
+            else:  # dwsi
+                if is_planar:
+                    add("fig13b_title", "fig13b")
+                    add("fig14b_title", "fig14b")
+                else:
+                    add("fig13a_title", "fig13a")
+        else:  # analog - ISO 17636-1 film arrangements
+            if geometry == "swsi":
+                add("fig5_title", "fig5")
+                add("fig6_title", "fig6")
+                add("fig7_title", "fig7")
+            elif geometry in ["dwdi_elliptic", "dwdi_super"]:
+                add("fig11_title", "fig11")
+                add("fig12_title", "fig12")
+            else:  # dwsi
+                add("fig13_title", "fig13")
+                add("fig14_title", "fig14")
+
         # Try to restore previous selection
         found = False
         for i in range(self.cmb_std_figure.count()):
@@ -1206,10 +1255,12 @@ class MainWindow(QMainWindow,
         self.cmb_class.setCurrentIndex(class_idx)
 
         geom_idx = self.cmb_geometry.currentIndex()
+        self.cmb_geometry.blockSignals(True)
         self.cmb_geometry.clear()
         for key in ("dwsi", "swsi", "dwdi_elliptic", "dwdi_super"):
             self.cmb_geometry.addItem(self.trans.get(key), key)
         self.cmb_geometry.setCurrentIndex(geom_idx)
+        self.cmb_geometry.blockSignals(False)
 
         # Update input labels & text boxes labels
         self.lbl_std_od.setText(self.trans.get("std_pipe_od"))
@@ -1263,6 +1314,9 @@ class MainWindow(QMainWindow,
                     lbl.setText(self.trans.get("single_step_hole_iqi"))
                 else:
                     lbl.setText(self.trans.get("single_wire_iqi"))
+            elif name == "sfd_min":
+                lbl.setText(self.trans.get(
+                    "sfd_min" if self.rad_digital.isChecked() else "sfd_min_analog"))
             else:
                 lbl.setText(self.trans.get(name))
             
@@ -1285,7 +1339,8 @@ class MainWindow(QMainWindow,
             for attr, key, _ in self._report_fields:
                 self._report_labels[attr].setText(self.trans.get(key))
 
-        self.lbl_app_sfd.setText(self.trans.get("applied_sfd"))
+        self.lbl_app_sfd.setText(self.trans.get(
+            "applied_sdd" if self.rad_digital.isChecked() else "applied_sfd"))
         self.lbl_app_time.setText(self.trans.get("applied_time"))
         self.lbl_app_kv.setText(self.trans.get("applied_kv"))
         self.lbl_app_activity.setText(self.trans.get("applied_activity"))
@@ -1372,7 +1427,8 @@ class MainWindow(QMainWindow,
     # Main dimensional inputs that participate in the mm <-> inch toggle.
     _MM_FIELDS = [
         "txt_custom_od", "txt_custom_t", "txt_cap", "txt_weld_width",
-        "txt_d", "txt_app_sfd", "txt_dd", "txt_bed", "txt_bgap",
+        "txt_d", "txt_app_sfd", "txt_bed", "txt_bgap",
+        "txt_film_width", "txt_film_height",
         "txt_panel_width", "txt_panel_height", "txt_app_overlap",
         "txt_f_source", "txt_b_object",
         "txt_defect_length", "txt_defect_width", "txt_defect_accum",
@@ -1508,7 +1564,8 @@ class MainWindow(QMainWindow,
             (self.txt_panel_height, 10.0, 2000.0),
             (self.txt_panel_overlap, 0.0, 50.0),
             (self.txt_app_exposures, 1.0, 100.0),
-            (self.txt_dd, 1.0, 1000.0),
+            (self.txt_film_width, 1.0, 2000.0),
+            (self.txt_film_height, 1.0, 2000.0),
             (self.txt_bed, 0.0, 500.0),
             (self.txt_bgap, 0.0, 100.0),
             (self.txt_f_source, 1.0, 5000.0),
@@ -1652,6 +1709,22 @@ class MainWindow(QMainWindow,
             app_exposures = 6
         return panel_width, panel_height, overlap, app_exposures
 
+    def get_film_inputs(self):
+        """
+        Parses the analog film sheet dimensions.
+        Returns (width_mm, height_mm, diagonal_mm); diagonal is 0 when the
+        dimensions are missing/invalid (ISO 17636-1:2022 df).
+        """
+        def _float(widget, default):
+            try:
+                return float(widget.text().strip().replace(",", "."))
+            except (ValueError, AttributeError):
+                return default
+
+        width = self._to_mm(max(0.0, _float(getattr(self, "txt_film_width", None), 0.0)))
+        height = self._to_mm(max(0.0, _float(getattr(self, "txt_film_height", None), 0.0)))
+        return width, height, self.calc.calculate_diagonal(width, height)
+
     def get_geometry_override_inputs(self):
         """
         Parses the user-provided geometry overrides.
@@ -1722,7 +1795,7 @@ class MainWindow(QMainWindow,
         "cmb_geometry", "cmb_film_class_used", "cmb_detector_type",
         "cmb_chart_source", "cmb_standard", "cmb_collimator", "cmb_iqi_type",
         "cmb_snr_location", "cmb_app_duplex", "cmb_app_wire",
-        "cmb_activity_unit", "cmb_std_figure",
+        "cmb_activity_unit", "cmb_std_figure", "cmb_film_size",
     ]
     _PRESET_EDITS = [
         "txt_custom_od", "txt_custom_t", "txt_cap", "txt_weld_width", "txt_d",
@@ -1733,7 +1806,7 @@ class MainWindow(QMainWindow,
         "txt_panel_height", "txt_panel_overlap", "txt_app_exposures",
         "txt_base_multiplier", "txt_f_source", "txt_b_object", "txt_app_kv",
         "txt_app_time", "txt_app_overlap", "txt_app_srb", "txt_app_quality",
-        "txt_dd", "txt_bed", "txt_bgap",
+        "txt_film_width", "txt_film_height", "txt_bed", "txt_bgap",
     ]
 
     def collect_form_state(self):
@@ -1749,7 +1822,9 @@ class MainWindow(QMainWindow,
         for attr in self._PRESET_COMBOS:
             w = getattr(self, attr, None)
             if w is not None:
-                state[attr] = w.currentIndex()
+                # Store the data key for the standard figure: its list depends
+                # on technology and detector shape, so an index is not stable.
+                state[attr] = w.currentData() if attr == "cmb_std_figure" else w.currentIndex()
         for attr in self._PRESET_EDITS:
             w = getattr(self, attr, None)
             if w is not None:
@@ -1920,13 +1995,33 @@ class MainWindow(QMainWindow,
         if lvl3_settings is None:
             lvl3_settings = getattr(self, "lvl3_settings", {}) or {}
 
-        # "flat" = planar/rigid detector; "curved" = flexible detector wrapped on the pipe
-        is_planar = self.rad_detector_flat.isChecked() if hasattr(self, "rad_detector_flat") else True
+        # "flat" = planar/rigid detector; "curved" = flexible detector wrapped
+        # on the pipe. The planar-detector Formulae (8)/(9)/(13) exist only in
+        # ISO 17636-2 (digital); analog film always uses the film model.
+        is_digital = self.rad_digital.isChecked() if hasattr(self, "rad_digital") else True
+        is_planar = is_digital and (
+            self.rad_detector_flat.isChecked() if hasattr(self, "rad_detector_flat") else True)
         std_figure = self.cmb_std_figure.currentData() if hasattr(self, 'cmb_std_figure') else None
         try:
             bed = self._to_mm(float(self.txt_bed.text().replace(",", ".")))
         except ValueError:
             bed = 0.0
+
+        # Planar detector edge lift b_ed (ISO 17636-2 Formula 10). For DWSI the
+        # value can be derived from the number of exposures N (alpha = pi/N,
+        # Figure 23); it is used automatically when the bed field is left at 0.
+        bed_user = bed
+        bed_auto = False
+        bed_auto_suggested = None
+        if is_planar and geometry == "dwsi" and od > 0.0:
+            try:
+                n_exposures = self.calc.calculate_dwsi_exposures(od, t, sfd, testing_class)
+            except Exception:
+                n_exposures = 3
+            bed_auto_suggested = self.calc.calculate_b_ed(od / 2.0, n_exposures)
+            if bed <= 0.0:
+                bed = bed_auto_suggested
+                bed_auto = True
         try:
             bgap = self._to_mm(float(self.txt_bgap.text().replace(",", ".")))
         except ValueError:
@@ -1961,12 +2056,22 @@ class MainWindow(QMainWindow,
         if standard == "asme":
             f_min_asme_base = self.calc.calculate_asme_f_min(d, b_dist, t)
 
-        # Detector size constraint: SDD >= 1.4 * dd (Clause 7.6 Formula 7)
-        try:
-            dd = self._to_mm(float(self.txt_dd.text().replace(",", ".")))
-        except ValueError:
-            dd = 200.0
-        sdd_min = self.calc.calculate_sdd_min(dd)
+        # Receptor diagonal for the coverage constraint:
+        #   digital -> dd = diagonal of the panel active area (ISO 17636-2 F7)
+        #   analog  -> df = diagonal of the film sheet      (ISO 17636-1 F4)
+        if is_digital:
+            try:
+                panel_w, panel_h, _panel_ov, _panel_app = self.get_panel_inputs()
+            except Exception:
+                panel_w, panel_h = 200.0, 200.0
+            receptor_w, receptor_h = panel_w, panel_h
+            dd = self.calc.calculate_diagonal(panel_w, panel_h)
+            df = None
+        else:
+            receptor_w, receptor_h, df = self.get_film_inputs()
+            dd = None
+        receptor_size = dd if is_digital else df
+        coverage_min = self.calc.calculate_coverage_min(receptor_size)
 
         # Physical floor for DWSI: source outside, detector across the pipe
         dwsi_physical_min = 0.0
@@ -1983,8 +2088,8 @@ class MainWindow(QMainWindow,
         f_min = f_min_asme if standard == "asme" else f_min_iso
 
         sfd_min = f_min + b_dist
-        if sdd_min > sfd_min:
-            sfd_min = sdd_min
+        if coverage_min > sfd_min:
+            sfd_min = coverage_min
         if dwsi_physical_min > sfd_min:
             sfd_min = dwsi_physical_min
 
@@ -2001,7 +2106,14 @@ class MainWindow(QMainWindow,
             "f_min_iso_base": f_min_iso_base,
             "f_min_asme_base": f_min_asme_base,
             "sfd_min": sfd_min,
-            "sdd_min": sdd_min,
+            "sdd_min": coverage_min,
+            "coverage_min": coverage_min,
+            "receptor_w": receptor_w,
+            "receptor_h": receptor_h,
+            "receptor_size": receptor_size,
+            "df": df,
+            "dd": dd,
+            "is_digital": is_digital,
             "dwsi_physical_min": dwsi_physical_min,
             "lvl3_dw": lvl3_dw,
             "lvl3_central": lvl3_central,
@@ -2013,8 +2125,10 @@ class MainWindow(QMainWindow,
             "std_figure": std_figure,
             "standard": standard,
             "bed": bed,
+            "bed_user": bed_user,
+            "bed_auto": bed_auto,
+            "bed_auto_suggested": bed_auto_suggested,
             "bgap": bgap,
-            "dd": dd,
         }
 
     def update_calculations(self):
@@ -2067,12 +2181,16 @@ class MainWindow(QMainWindow,
         f_min_asme = geo["f_min_asme"]
         sfd_min = geo["sfd_min"]
         sdd_min = geo["sdd_min"]
+        coverage_min = geo["coverage_min"]
         ug = geo["ug"]
         f_min_star = geo["f_min_star"]
         ci_factor = geo["ci_factor"]
         std_figure = geo["std_figure"]
         bgap = geo["bgap"]
         dd = geo["dd"]
+        df = geo["df"]
+        receptor_size = geo["receptor_size"]
+        is_digital = geo["is_digital"]
 
         # ASME/ASTM IQI sensitivity selector visibility (ASME only)
         if hasattr(self, "cmb_asme_sensitivity"):
@@ -2180,12 +2298,21 @@ class MainWindow(QMainWindow,
             wire_str, wire_no = self.calc.get_step_hole_iqi(t, cap, testing_class, geometry, tech=tech, film_side=film_side, lang=self.trans.language)
         else:
             wire_str, wire_no = self.calc.get_single_wire_iqi(t, cap, testing_class, geometry, tech=tech, film_side=film_side, lang=self.trans.language)
-            
-        duplex_str, duplex_no = self.calc.get_duplex_iqi(w_nom, testing_class, geometry, lang=self.trans.language)
+
+        # Digital-only quality values are not computed in analog mode (and vice
+        # versa) so that no cross-mode value leaks into the UI or the report.
+        if tech == "digital":
+            duplex_str, duplex_no = self.calc.get_duplex_iqi(w_nom, testing_class, geometry, lang=self.trans.language)
+        else:
+            duplex_str, duplex_no = "N/A", None
 
         # Step 7: Detector Quality
-        film_class_req = self.calc.get_required_film_class(w_nom, testing_class, material, source)
-        max_srb_req = self.calc.get_max_srb(w_nom, testing_class, geometry)
+        if tech == "analog":
+            film_class_req = self.calc.get_required_film_class(w_nom, testing_class, material, source)
+            max_srb_req = None
+        else:
+            film_class_req = None
+            max_srb_req = self.calc.get_max_srb(w_nom, testing_class, geometry)
         if tech == "analog":
             detector_quality_str = f"{film_class_req} Film"
         else:
@@ -2329,20 +2456,52 @@ class MainWindow(QMainWindow,
             else:
                 warnings.append(f"NOTE (Clause 7.6): b ({b_dist:.1f} mm) < 1.2×t ({1.2*t:.1f} mm), using b = t ({t:.1f} mm).")
 
-        # SDD rule: warn when detector size limits SFD
-        if sdd_min > f_min + b_dist:
+        # Planar detector edge lift b_ed (Formula 10) provenance
+        if geo["bed_auto"]:
             if self.trans.language == "tr":
-                warnings.append(f"BİLGİ (Madde 7.6): Dedektör boyutu (dd={dd:.0f} mm) SFD_min'i {sdd_min:.0f} mm'ye yükseltti.")
+                warnings.append(f"BİLGİ (Madde 7.6): Planar dedektör kenar yüksekliği (bed) girilmedi; Formül (10) ile b_ed = {geo['bed']:.1f} mm otomatik kullanıldı (N poz, α=π/N).")
             else:
-                warnings.append(f"NOTE (Clause 7.6): Detector size (dd={dd:.0f} mm) raises SFD_min to {sdd_min:.0f} mm.")
+                warnings.append(f"NOTE (Clause 7.6): Planar detector edge lift (bed) not provided; b_ed = {geo['bed']:.1f} mm computed automatically with Formula (10) (N exposures, alpha=pi/N).")
+        elif geo["is_planar"] and geometry == "swsi" and geo["bed_user"] <= 0.0:
+            if self.trans.language == "tr":
+                warnings.append("UYARI (Madde 7.6): Planar dedektörde bed=0; kenar yüksekliğini Şekil 23 / ölçekli çizimden girin (b_ed = (1−cos α)·r_e).")
+            else:
+                warnings.append("WARNING (Clause 7.6): Planar detector with bed=0; enter the edge lift from Figure 23 / a scaled drawing (b_ed = (1-cos alpha)*r_e).")
+        elif (geo["bed_auto_suggested"] is not None and 0.0 < geo["bed_user"] < geo["bed_auto_suggested"]):
+            if self.trans.language == "tr":
+                warnings.append(f"BİLGİ (Madde 7.6): Girilen bed ({geo['bed_user']:.1f} mm) Formül (10) değerinden ({geo['bed_auto_suggested']:.1f} mm) küçük — kontrol edin.")
+            else:
+                warnings.append(f"NOTE (Clause 7.6): Entered bed ({geo['bed_user']:.1f} mm) is smaller than the Formula (10) value ({geo['bed_auto_suggested']:.1f} mm) - please verify.")
 
-        # Annex F IQI compensation check: Ug/SRb > 2 -> needs compensation
-        annex_f_needed, annex_f_ratio = self.calc.check_annex_f_compensation(ug, max_srb_req)
-        if annex_f_needed:
-            if self.trans.language == "tr":
-                warnings.append(f"BİLGİ (Annex F): Ug/SRb ({annex_f_ratio:.1f}) > 2. IQI görünürlüğü için f_min artırılmalı veya SNR yükseltilmelidir.")
+        # Coverage rule: warn when the receptor diagonal raises the minimum
+        # distance (ISO 17636-1 Formula 4 for film / ISO 17636-2 Formula 7 for
+        # digital detectors).
+        if coverage_min > f_min + b_dist:
+            if is_digital:
+                if self.trans.language == "tr":
+                    warnings.append(f"BİLGİ (Madde 7.6): Dedektör boyutu (dd={receptor_size:.0f} mm) SDD_min'i {coverage_min:.0f} mm'ye yükseltti.")
+                else:
+                    warnings.append(f"NOTE (Clause 7.6): Detector size (dd={receptor_size:.0f} mm) raises SDD_min to {coverage_min:.0f} mm.")
             else:
-                warnings.append(f"NOTE (Annex F): Ug/SRb ({annex_f_ratio:.1f}) > 2. Increase f_min or SNR for IQI visibility.")
+                if self.trans.language == "tr":
+                    warnings.append(f"BİLGİ (Madde 7.6): Film köşegeni (df={receptor_size:.0f} mm) SFD_min'i {coverage_min:.0f} mm'ye yükseltti.")
+                else:
+                    warnings.append(f"NOTE (Clause 7.6): Film diagonal (df={receptor_size:.0f} mm) raises SFD_min to {coverage_min:.0f} mm.")
+        elif (not is_digital) and coverage_min <= 0.0:
+            if self.trans.language == "tr":
+                warnings.append("BİLGİ: Film köşegeni (df) girilmedi; SFD ≥ 1,4·df kontrolü yapılamadı (örn. 300×400 mm film → df=500 mm).")
+            else:
+                warnings.append("NOTE: Film diagonal (df) not provided; the SFD >= 1.4*df check could not be performed (e.g. 300x400 mm film -> df=500 mm).")
+
+        # Annex F IQI compensation check (ISO 17636-2, digital only):
+        # Ug/SRb > 2 -> needs compensation
+        if is_digital:
+            annex_f_needed, annex_f_ratio = self.calc.check_annex_f_compensation(ug, max_srb_req)
+            if annex_f_needed:
+                if self.trans.language == "tr":
+                    warnings.append(f"BİLGİ (Annex F): Ug/SRb ({annex_f_ratio:.1f}) > 2. IQI görünürlüğü için f_min artırılmalı veya SNR yükseltilmelidir.")
+                else:
+                    warnings.append(f"NOTE (Annex F): Ug/SRb ({annex_f_ratio:.1f}) > 2. Increase f_min or SNR for IQI visibility.")
 
         # DWSI physical SFD floor: source outside the pipe, detector across it
         if geo["dwsi_physical_min"] > 0.0:
@@ -2626,11 +2785,18 @@ class MainWindow(QMainWindow,
             "f_min_iso": f_min_iso,
             "f_min_asme": f_min_asme,
             "is_planar": geo["is_planar"],
+            "is_digital": is_digital,
             "lvl3_dw": geo["lvl3_dw"],
             "lvl3_central": geo["lvl3_central"],
             "dwsi_physical_min": geo["dwsi_physical_min"],
             "b_dist": b_dist,
             "b_eff": b_eff,
+            "df": df,
+            "dd": dd,
+            "receptor_size": receptor_size,
+            "coverage_min": coverage_min,
+            "bed_used": geo["bed"],
+            "bed_auto": geo["bed_auto"],
             "required_wire_no": wire_no,
             "required_duplex_no": duplex_no,
             "calc_time_raw": raw_time,

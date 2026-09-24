@@ -421,7 +421,9 @@ class TestMainWindowInit(unittest.TestCase):
         self.assertTrue(self.win.cmb_detector_type.isHidden())
         self.assertTrue(self.win.lbl_app_srb.isHidden())
         self.assertTrue(self.win.lbl_app_duplex.isHidden())
-        self.assertTrue(self.win.lbl_dd.isHidden())
+        self.assertFalse(self.win.lbl_film_size.isHidden())
+        self.assertFalse(self.win.cmb_film_size.isHidden())
+        self.assertTrue(self.win.lbl_panel_width.isHidden())
 
         # Select Digital
         self.win.rad_digital.setChecked(True)
@@ -431,7 +433,9 @@ class TestMainWindowInit(unittest.TestCase):
         self.assertFalse(self.win.cmb_detector_type.isHidden())
         self.assertFalse(self.win.lbl_app_srb.isHidden())
         self.assertFalse(self.win.lbl_app_duplex.isHidden())
-        self.assertFalse(self.win.lbl_dd.isHidden())
+        self.assertTrue(self.win.lbl_film_size.isHidden())
+        self.assertTrue(self.win.cmb_film_size.isHidden())
+        self.assertFalse(self.win.lbl_panel_width.isHidden())
 
     def test_dynamic_visibility_xray_vs_isotope(self):
         # Select X-Ray (index 0)

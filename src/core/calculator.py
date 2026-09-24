@@ -299,22 +299,61 @@ class RTCalculator:
         alpha = math.pi / n
         return (1.0 - math.cos(alpha)) * re
 
+    def calculate_diagonal(self, width, height):
+        """
+        Diagonal of a rectangular receptor (film sheet or panel active area):
+            diagonal = sqrt(width^2 + height^2)
+        ISO 17636-1:2022 symbol df = "value of the diagonal extension of the
+        film"; ISO 17636-2:2022 Formula (6) uses the detector size (dd).
+        Returns 0.0 for invalid (non-positive) input.
+        """
+        try:
+            w = float(width)
+            h = float(height)
+        except (TypeError, ValueError):
+            return 0.0
+        if w <= 0.0 or h <= 0.0:
+            return 0.0
+        return math.hypot(w, h)
+
+    def calculate_coverage_min(self, receptor_size):
+        """
+        Minimum source-to-receptor distance so that the tube opening angle
+        (2beta) covers the whole receptor.
+
+        ISO 17636-1:2022 Formula (3)/(4) for film:
+            SFD >= 0.5 * df / tan(beta), simplified to SFD >= 1.4 * df
+            for the typical NDT opening angle 2beta = 40 deg.
+        ISO 17636-2:2022 Formula (6)/(7) for digital detectors:
+            SDD >= 0.5 * dd / tan(beta), simplified to SDD >= 1.4 * dd.
+
+        `receptor_size` is the receptor diagonal (df or dd) in mm.
+        Returns 0.0 (no constraint) for missing/invalid input.
+        """
+        try:
+            size = float(receptor_size)
+        except (TypeError, ValueError):
+            return 0.0
+        if size <= 0.0:
+            return 0.0
+        return 1.4 * size
+
     def calculate_sdd_min(self, dd):
         """
-        Calculates minimum Source-to-Detector Distance (SDD_min) per ISO 17636-2:2022 Clause 7.6.
-        Simplified Formula (7): for 2beta = 40° (typical NDT tube opening angle), SDD >= 1.4 * dd.
-        If dd is None or <= 0, returns 0 (no constraint).
+        Backwards-compatible alias of calculate_coverage_min for the digital
+        detector size dd (ISO 17636-2:2022 Formula 7: SDD >= 1.4 * dd).
         """
-        if dd is None or dd <= 0:
-            return 0.0
-        return 1.4 * dd
+        return self.calculate_coverage_min(dd)
 
     def is_central_projection(self, geometry, std_figure):
         """
-        Returns True if the setup is central projection (Figure 5):
-        SWSI + standard figure = fig5 (panoramic central source).
+        Returns True if the setup is central projection (panoramic source at
+        the pipe centre): SWSI + Figure 5, in any of its variants:
+          fig5  -> ISO 17636-1 (film)
+          fig5a -> ISO 17636-2 (flexible detector)
+          fig5b -> ISO 17636-2 (planar detector)
         """
-        return geometry == "swsi" and std_figure == "fig5"
+        return geometry == "swsi" and std_figure in ("fig5", "fig5a", "fig5b")
 
     def is_double_wall_technique(self, geometry):
         """
@@ -595,6 +634,9 @@ class RTCalculator:
                 else:
                     table_name = "Table B.7" if lang == "en" else "Tablo B.7"
 
+        # Prefix the active standard (analog ISO 17636-1 / digital ISO 17636-2)
+        table_name = f"ISO 17636-{1 if tech == 'analog' else 2} {table_name}"
+
         # Reference thickness text
         if geometry == "dwsi":
             t_label = "2 * t"
@@ -784,6 +826,9 @@ class RTCalculator:
                     table_name = "Table B.4" if lang == "en" else "Tablo B.4"
                 else:
                     table_name = "Table B.8" if lang == "en" else "Tablo B.8"
+
+        # Prefix the active standard (analog ISO 17636-1 / digital ISO 17636-2)
+        table_name = f"ISO 17636-{1 if tech == 'analog' else 2} {table_name}"
 
         # Reference thickness text
         if geometry == "dwsi":

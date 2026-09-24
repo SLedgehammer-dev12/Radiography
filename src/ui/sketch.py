@@ -268,7 +268,7 @@ class StandardSchematicCanvas(FigureCanvas):
 
     def draw_figure(self, fig_name, lang_obj, is_dark=True):
         self.axes.clear()
-        
+
         bg_color = '#1e1e2e' if is_dark else '#ffffff'
         text_color = '#ffffff' if is_dark else '#000000'
         pipe_color = '#89b4fa' if is_dark else '#1b5e20'
@@ -279,6 +279,12 @@ class StandardSchematicCanvas(FigureCanvas):
 
         self.fig.patch.set_facecolor(bg_color)
         self.axes.set_facecolor(bg_color)
+
+        # ISO 17636-2 flexible-detector (a) variants reuse the existing film
+        # drawings; only the title is overridden below.
+        orig_name = fig_name
+        alias = {"fig5a": "fig5", "fig6a": "fig6", "fig7a": "fig7", "fig13a": "fig13"}
+        fig_name = alias.get(fig_name, fig_name)
 
         R = 1.0
         Ri = 0.8
@@ -503,6 +509,120 @@ class StandardSchematicCanvas(FigureCanvas):
             self.axes.text(-0.5, 0, "b = OD", color=text_color, fontsize=10)
             self.axes.text(0.6, 0.8, "f", color=text_color, fontsize=10)
             self.axes.set_title(lang_obj.get("fig14b_title"), color=text_color, fontsize=10)
+
+        elif fig_name == "fig2b":  # Fig 2b: SWSI, source outside, planar detector
+            self.axes.add_patch(patches.Circle((0, 0), R, color=pipe_color, fill=False, linewidth=2))
+            self.axes.add_patch(patches.Circle((0, 0), Ri, color=pipe_color, fill=False, linewidth=1.5, linestyle='--'))
+            ys = 1.8
+            self.axes.plot(0, ys, marker='o', color=source_color, markersize=10)
+            self.axes.text(0.1, ys + 0.1, "S", color=text_color, fontsize=9, fontweight='bold')
+            # Planar detector tangent below the pipe
+            self.axes.plot([-0.9, 0.9], [-1.15, -1.15], color=det_color, linewidth=4)
+            self.axes.plot([0, 0], [-R, -1.15], color=det_color, linewidth=1, linestyle='--')
+            self.axes.plot([0, -0.9], [ys, -1.15], color=beam_color, linestyle=':')
+            self.axes.plot([0, 0.9], [ys, -1.15], color=beam_color, linestyle=':')
+            self.axes.plot(0, R, marker='s', color=weld_color, markersize=6)
+            self.axes.text(-0.6, 0.4, "f", color=text_color, fontsize=9)
+            self.axes.text(-0.7, -1.0, "b = b_ed + b_gap + k·t", color=text_color, fontsize=8)
+            self.axes.set_title(lang_obj.get("fig2b_title"), color=text_color, fontsize=10)
+
+        elif fig_name == "fig5b":  # Fig 5b: panoramic central source, planar detector
+            self.axes.add_patch(patches.Circle((0, 0), R, color=pipe_color, fill=False, linewidth=2))
+            self.axes.add_patch(patches.Circle((0, 0), Ri, color=pipe_color, fill=False, linewidth=1.5, linestyle='--'))
+            self.axes.plot(0, 0, marker='*', color=source_color, markersize=12)
+            self.axes.text(0.1, 0.1, "S (Panoramic)", color=text_color, fontsize=9, fontweight='bold')
+            # Planar detector outside, tangent at the bottom
+            self.axes.plot([-0.9, 0.9], [-1.25, -1.25], color=det_color, linewidth=4)
+            for x in (-0.9, 0.9):
+                self.axes.plot([0, x], [0, -1.25], color=beam_color, linestyle=':', alpha=0.8)
+            self.axes.text(0.15, -0.55, "f = R\nb = b_ed + b_gap + t", color=text_color, fontsize=9,
+                           bbox=dict(facecolor=bg_color, alpha=0.5))
+            self.axes.set_title(lang_obj.get("fig5b_title"), color=text_color, fontsize=10)
+
+        elif fig_name == "fig8a":  # Fig 8a: eccentric source inside, flexible detector
+            self.axes.add_patch(patches.Circle((0, 0), R, color=pipe_color, fill=False, linewidth=2))
+            self.axes.add_patch(patches.Circle((0, 0), Ri, color=pipe_color, fill=False, linewidth=1.5, linestyle='--'))
+            ys = 0.5
+            self.axes.plot(0, ys, marker='*', color=source_color, markersize=10)
+            self.axes.text(0.1, ys + 0.1, "S", color=text_color, fontsize=9, fontweight='bold')
+            det = patches.Arc((0, 0), R * 2.08, R * 2.08, theta1=220, theta2=320,
+                              color=det_color, linewidth=4)
+            self.axes.add_patch(det)
+            self.axes.plot([0, R * np.sin(np.radians(-40))], [ys, -R * np.cos(np.radians(-40))],
+                           color=beam_color, linestyle=':')
+            self.axes.plot([0, R * np.sin(np.radians(40))], [ys, -R * np.cos(np.radians(40))],
+                           color=beam_color, linestyle=':')
+            self.axes.text(-0.6, -0.2, "f", color=text_color, fontsize=9)
+            self.axes.text(-0.5, -1.0, "b = t", color=text_color, fontsize=9)
+            self.axes.set_title(lang_obj.get("fig8a_title"), color=text_color, fontsize=10)
+
+        elif fig_name == "fig9a":  # Fig 9a: eccentric source near wall, flexible detector
+            self.axes.add_patch(patches.Circle((0, 0), R, color=pipe_color, fill=False, linewidth=2))
+            self.axes.add_patch(patches.Circle((0, 0), Ri, color=pipe_color, fill=False, linewidth=1.5, linestyle='--'))
+            ys = 0.75
+            self.axes.plot(0, ys, marker='*', color=source_color, markersize=10)
+            self.axes.text(0.1, ys + 0.1, "S", color=text_color, fontsize=9, fontweight='bold')
+            det = patches.Arc((0, 0), Ri * 2.0, Ri * 2.0, theta1=220, theta2=320,
+                              color=det_color, linewidth=4)
+            self.axes.add_patch(det)
+            self.axes.plot([0, Ri * np.sin(np.radians(-40))], [ys, -Ri * np.cos(np.radians(-40))],
+                           color=beam_color, linestyle=':')
+            self.axes.plot([0, Ri * np.sin(np.radians(40))], [ys, -Ri * np.cos(np.radians(40))],
+                           color=beam_color, linestyle=':')
+            self.axes.text(-0.5, -0.1, "f", color=text_color, fontsize=9)
+            self.axes.text(-0.4, -0.8, "b = t", color=text_color, fontsize=9)
+            self.axes.set_title(lang_obj.get("fig9a_title"), color=text_color, fontsize=10)
+
+        elif fig_name == "fig10a":  # Fig 10a: eccentric source lower, flexible detector
+            self.axes.add_patch(patches.Circle((0, 0), R, color=pipe_color, fill=False, linewidth=2))
+            self.axes.add_patch(patches.Circle((0, 0), Ri, color=pipe_color, fill=False, linewidth=1.5, linestyle='--'))
+            ys = 0.2
+            self.axes.plot(0, ys, marker='*', color=source_color, markersize=10)
+            self.axes.text(0.1, ys + 0.1, "S", color=text_color, fontsize=9, fontweight='bold')
+            det = patches.Arc((0, 0), R * 2.08, R * 2.08, theta1=230, theta2=310,
+                              color=det_color, linewidth=4)
+            self.axes.add_patch(det)
+            self.axes.plot([0, R * np.sin(np.radians(-35))], [ys, -R * np.cos(np.radians(-35))],
+                           color=beam_color, linestyle=':')
+            self.axes.plot([0, R * np.sin(np.radians(35))], [ys, -R * np.cos(np.radians(35))],
+                           color=beam_color, linestyle=':')
+            self.axes.text(-0.5, -0.3, "f", color=text_color, fontsize=9)
+            self.axes.text(-0.4, -1.0, "b = t", color=text_color, fontsize=9)
+            self.axes.set_title(lang_obj.get("fig10a_title"), color=text_color, fontsize=10)
+
+        elif fig_name == "fig13b":  # Fig 13b: DWSI, source outside, planar detector
+            self.axes.add_patch(patches.Circle((0, 0), R, color=pipe_color, fill=False, linewidth=2))
+            self.axes.add_patch(patches.Circle((0, 0), Ri, color=pipe_color, fill=False, linewidth=1.5, linestyle='--'))
+            ys = 1.8
+            self.axes.plot(0, ys, marker='o', color=source_color, markersize=10)
+            self.axes.text(0.1, ys + 0.1, "S", color=text_color, fontsize=9, fontweight='bold')
+            self.axes.plot([-0.9, 0.9], [-1.15, -1.15], color=det_color, linewidth=4)
+            self.axes.plot([0, -0.9], [ys, -1.15], color=beam_color, linestyle=':')
+            self.axes.plot([0, 0.9], [ys, -1.15], color=beam_color, linestyle=':')
+            self.axes.plot(-0.2, -R, marker='s', color=weld_color, markersize=6)
+            self.axes.text(-0.7, 0.3, "f'", color=text_color, fontsize=9)
+            self.axes.text(-0.8, -1.0, "b = b_ed + b_gap + k·t", color=text_color, fontsize=8)
+            self.axes.set_title(lang_obj.get("fig13b_title"), color=text_color, fontsize=10)
+
+        elif fig_name == "fig14":  # Fig 14 (ISO 17636-1): DWSI, source on the surface
+            self.axes.add_patch(patches.Circle((0, 0), R, color=pipe_color, fill=False, linewidth=2))
+            self.axes.add_patch(patches.Circle((0, 0), Ri, color=pipe_color, fill=False, linewidth=1.5, linestyle='--'))
+            self.axes.plot(0, R, marker='o', color=source_color, markersize=10)
+            self.axes.text(0.1, R + 0.1, "S", color=text_color, fontsize=9, fontweight='bold')
+            det = patches.Arc((0, 0), R * 2.08, R * 2.08, theta1=220, theta2=320,
+                              color=det_color, linewidth=4)
+            self.axes.add_patch(det)
+            self.axes.plot([0, R * np.sin(np.radians(-40))], [R, -R * np.cos(np.radians(-40))],
+                           color=beam_color, linestyle=':')
+            self.axes.plot([0, R * np.sin(np.radians(40))], [R, -R * np.cos(np.radians(40))],
+                           color=beam_color, linestyle=':')
+            self.axes.text(-0.6, 0.35, "f'", color=text_color, fontsize=9)
+            self.axes.text(-0.5, -0.95, "b = t", color=text_color, fontsize=9)
+            self.axes.set_title(lang_obj.get("fig14_title"), color=text_color, fontsize=10)
+
+        # a-variant title override (drawing reused from the film figures)
+        if orig_name in ("fig5a", "fig6a", "fig7a", "fig13a"):
+            self.axes.set_title(lang_obj.get(f"{orig_name}_title"), color=text_color, fontsize=10)
 
         # Uniform Limits
         self.axes.set_xlim(-2.0, 2.0)

@@ -141,7 +141,7 @@ def test_dw_reduction_label_warning_present(win):
 # Central projection 50 % reduction
 # ---------------------------------------------------------------------------
 def test_central_projection_reduces_f_min_by_50_percent(win):
-    _configure(win, geometry="swsi", od=323.9, t=10.0, sfd=600.0, std_fig="fig5")
+    _configure(win, geometry="swsi", od=323.9, t=10.0, sfd=600.0, std_fig="fig5b")
     win.lvl3_settings["central_proj_reduction"] = False
     win.update_calculations()
     base = win.last_calculated["f_min"]
@@ -152,7 +152,7 @@ def test_central_projection_reduces_f_min_by_50_percent(win):
 
 
 def test_central_projection_recomputes_sfd_min(win):
-    _configure(win, geometry="swsi", od=323.9, t=10.0, sfd=600.0, std_fig="fig5")
+    _configure(win, geometry="swsi", od=323.9, t=10.0, sfd=600.0, std_fig="fig5b")
     win.lvl3_settings["central_proj_reduction"] = True
     win.update_calculations()
     lc = win.last_calculated
