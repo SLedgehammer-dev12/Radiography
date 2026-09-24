@@ -23,6 +23,10 @@ Radiography.spec
 # Reports (generated PDFs)
 RT_Inspection_Report_*.pdf
 
+# Standard reference PDFs (copyrighted, not distributed)
+ISO 17636-*.pdf
+pdfcoffee.com_*.pdf
+
 # Coverage
 .coverage
 htmlcov/
