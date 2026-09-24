@@ -1,5 +1,60 @@
 # Changelog
 
+## [1.8.0] - 2026-09-24
+
+### Fixed (geometry correctness — ISO 17636-1/2:2022, ASME Sec V Art 2)
+- Geometric unsharpness now uses f = SDD − b (source-to-object distance) instead
+  of the full SDD; the previous value understated Ug (up to ~15 %+ for DWDI/large
+  object-to-detector distances) and could wrongly pass ASME/Annex F checks
+- Planar/rigid detector model corrected and UI labels renamed:
+  "Planar (Rigid Panel)" now uses b = bed + bgap + k·t (Formulae 8/9) and
+  Formula (13) f_min* as the GOVERNING value; "Flexible (Wrapped CR/IP)" uses
+  b = t and Formulae (2)/(3). The previous flat/curved behaviour was inverted and
+  the Formula (13) result was silently discarded by max(f_min, f_min*)
+- DWDI always uses b = De per Clause 7.6 (the planar-detector formula was wrongly
+  applied to DWDI as well)
+- DWSI physical SFD floor: SFD_min = max(f_min + b, 1.4·dd, De + bgap); a warning
+  is emitted when the applied SFD is physically impossible (source inside pipe).
+  ISO 7.6 determines f_min for DWSI by wall thickness only — b = t is unchanged
+- `calculate_dwsi_exposures` clamps impossible SFD values (SFD ≤ De/2 previously
+  produced nonsense counts) and guards degenerate (solid) pipes
+- Level 3 reductions (DW −20 %, central projection −50 %) are now applied inside
+  the shared geometry block, so f_min AND sfd_min are updated consistently in the
+  UI, `last_calculated`, the compliance checker and the PDF report
+- ASME Sec V Art 2 mode now derives f_min = d·b/Ug_limit(T-274.2) and shows it in
+  a separate row; SFD compliance is checked against the ASME value. The ASME Ug
+  check now uses the corrected denominator
+- Standards references updated to the 2022 editions (f_min → 7.6 Formulae 1/2,
+  exposures → Annex A, density → 7.8/Table 5, film class → Tables 3/4,
+  duplex → 6.7.2, SNR_N → 7.3.1/Tables 3-4, SRb → B.13/B.14, panel → 7.8/Annex A)
+- PDF report now renders the same f_min/sfd_min/Ug values as the screen (it used
+  to recompute without Level 3 reductions), adds the Ug and ASME f_min rows and
+  uses the dynamic target SNR for distance compensation instead of hardcoded
+  130/70
+- Report generator never raises: formatting/image errors return False instead of
+  aborting, corrupt sketch images fall back to a placeholder, blank warnings are
+  filtered, and plain dict language objects (mobile) now render the correct
+  language
+- Mobile (Phase 1): digital compliance no longer crashes (SNR tuple unpacking),
+  the exposure screen SFD now drives Ug/time/exposure counts, applied values and
+  the exposure-count check are wired, source-side IQI semantics match desktop,
+  required optical density is 2.0/2.3/3.0, defect results are normalized to dicts
+- Missing tooltips added (`tt_ug`, `tt_req_exposures`, `tt_single_wire_iqi`,
+  `tt_duplex_iqi`, `tt_f_min_asme`) and stale clause texts removed
+
+### Tests
+- 185 new parametrized scenarios: geometry/Ug/f_min*/b helpers, DWSI physical
+  constraint, Level 3 propagation, ASME geometry, PDF↔screen consistency,
+  standards references and mobile parity (458 total tests)
+
+### Upgrade note
+- Calculation results intentionally change for planar/rigid detectors (b now
+  includes bed + bgap + k·t and Formula (13) f_min* governs) and for large-diameter
+  DWSI (physical SFD floor De + bgap). These corrections follow ISO 17636-2:2022
+  Clause 7.6; review existing procedures/technique sheets before re-use.
+- Saved presets remain compatible; the detector-shape radio buttons are renamed
+  ("Planar (Rigid Panel)" / "Flexible (Wrapped CR/IP)") but keep their state keys.
+
 ## [1.7.0] - 2026-08-29
 
 ### Fixed (macOS crash hardening)
