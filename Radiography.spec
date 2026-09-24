@@ -22,8 +22,6 @@ datas = [
     ("exposure_chart_dataset.json", "."),
     ("exposure_chart_dataset.csv", "."),
     ("X-Ray Exposure Chart steel.png", "."),
-    ("ISO 17636-2 2022(E).pdf", "."),
-    ("pdfcoffee.com_iso-17636-1-2022-pdf-free.pdf", "."),
     ("src/mobile/assets/fonts/NotoSans-Regular.ttf", "src/mobile/assets/fonts"),
     ("src/mobile/assets/fonts/NotoSans-Bold.ttf", "src/mobile/assets/fonts"),
     ("src/mobile/assets/fonts/NotoSans-Italic.ttf", "src/mobile/assets/fonts"),
