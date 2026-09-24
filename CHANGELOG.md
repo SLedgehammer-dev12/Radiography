@@ -1,5 +1,49 @@
 # Changelog
 
+## [1.8.1] - 2026-09-24
+
+### Fixed (analog/digital separation — ISO 17636-1 vs ISO 17636-2)
+- Analog radiography now always uses the film model (b = t for SWSI/DWSI,
+  b = De for DWDI, f_min = C·d·b^(2/3)); the digital-only planar-detector
+  formulae (8)/(9)/(13), b_ed and f_min* no longer leak into analog mode through
+  the hidden detector-shape radio
+- SFD_min/SDD_min receptor constraint is now mode-aware:
+  analog uses the film diagonal (SFD >= 1.4·df, ISO 17636-1 Formula 4), digital
+  uses the panel active-area diagonal (SDD >= 1.4·dd, ISO 17636-2 Formula 7)
+- Analog film size input added (preset 80x300 / 100x400 / 300x400 / 100x500 +
+  custom width/height) with automatic df = sqrt(w²+h²) and an explanatory
+  warning when df is missing
+- The standalone "Detector Size (dd)" field was removed; dd is now derived from
+  the existing panel active-area dimensions (single source of truth). Default
+  200x200 panel -> dd = 282.8 mm -> SDD_min = 396 mm (was 280 mm)
+- Mode isolation: Annex F (Ug/SRb) runs only for digital, and digital-only
+  values (SRb, duplex, SNR, panel exposures) / analog-only values (film class,
+  optical density, film overlap) are no longer computed or stored in the other
+  mode
+- Output labels are mode-aware: "Minimum Source-to-Film (SFD_min)" vs
+  "Minimum Source-to-Detector (SDD_min)", "Applied SFD/SDD"
+- Wire/step-hole IQI display now carries the active standard prefix
+  (ISO 17636-1 for analog, ISO 17636-2 for digital)
+
+### Fixed (standard figures + b_ed)
+- Standard-figure list is filtered by technology AND detector shape:
+  analog -> ISO 17636-1 figures (5, 6, 7, 11, 12, 13, 14);
+  digital flexible -> 5a, 6a, 7a, 8a, 9a, 10a, 11, 12, 13a;
+  digital planar -> 2b, 5b, 8b, 9b, 10b, 13b, 14b, 11, 12
+- Figure 14b is now correctly listed under DWSI (not DWDI) and Figure 10b under
+  SWSI (not DWSI); Figure 14 (ISO 17636-1) and the digital 2b/5b/13b/8a/9a/10a
+  schematics were added
+- Presets store/restore the standard figure by data key (index is no longer
+  stable because the list depends on technology and detector shape)
+- Planar DWSI: when the edge lift (bed) is left at 0 it is computed
+  automatically with Formula (10) (b_ed = (1-cos(pi/N))·r_e) and reported; SWSI
+  planar with bed = 0 emits a warning to use Figure 23 / a scaled drawing
+
+### Tests
+- 91 new scenarios (mode separation, film model, df/dd engine, figure mapping,
+  b_ed automation, schematic coverage); matrix oracle DWSI wire-IQI reference
+  corrected to w = 2t per ISO 17636-1/2:2022 6.9 (697 total tests)
+
 ## [1.8.0] - 2026-09-24
 
 ### Fixed (geometry correctness — ISO 17636-1/2:2022, ASME Sec V Art 2)
