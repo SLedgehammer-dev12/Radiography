@@ -1,0 +1,17 @@
+{
+  "name": "Radiography RT Calculator",
+  "short_name": "Radiography",
+  "description": "Radiographic Testing (RT) exposure calculator and inspection report generator (ISO 17636 / ASME Sec V)",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1e1e2e",
+  "theme_color": "#1e1e2e",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

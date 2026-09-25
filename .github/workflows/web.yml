@@ -1,0 +1,175 @@
+name: Web (Pyodide PWA)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - "src/core/**"
+      - "src/__init__.py"
+      - "src/mobile/assets/fonts/**"
+      - "tests/**"
+      - "requirements.txt"
+      - "exposure_chart_dataset.json"
+      - ".github/workflows/web.yml"
+  pull_request:
+    paths:
+      - "web/**"
+      - "src/core/**"
+      - "src/__init__.py"
+      - "tests/**"
+      - ".github/workflows/web.yml"
+  workflow_dispatch:
+
+jobs:
+  core-tests:
+    name: Python core tests (shared engine)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install system Qt libraries
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libgl1 libxkbcommon-x11-0
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest
+      - name: Run the shared test suite
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: pytest tests/ -q
+
+  web-build-e2e:
+    name: Web build + Playwright E2E
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+      - name: Build (typecheck + bundle + asset sync)
+        run: npm run build
+      - name: Run E2E tests
+        run: npx playwright test
+      - name: Package launchers (macOS / Windows)
+        working-directory: .
+        run: python3 web/launcher/package.py
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: radiography-web-dist
+          path: web/dist
+          if-no-files-found: error
+      - name: Upload launcher packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: radiography-web-launchers
+          path: release-artifacts/Radiography-Web-*.zip
+          if-no-files-found: error
+
+  build-launcher:
+    name: Web launcher (${{ matrix.os }})
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build web app
+        working-directory: web
+        run: npm ci && npm run build
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install PyInstaller
+        run: pip install "pyinstaller<7" pillow
+      - name: Package launcher (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: python web/launcher/package.py --onefile
+      - name: Package launcher (macOS)
+        if: runner.os == 'macOS'
+        run: python3 web/launcher/package.py --onefile --dmg
+      - name: Smoke test (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          BIN=$(ls release-artifacts/*Windows-x64.exe | head -1)
+          "$BIN" --no-gui --no-browser --port 8767 &
+          PID=$!
+          ok=0
+          for i in $(seq 1 30); do
+            sleep 1
+            if curl -sf --max-time 2 http://127.0.0.1:8767/healthz >/dev/null; then ok=1; break; fi
+          done
+          curl -s --max-time 3 http://127.0.0.1:8767/healthz || true
+          kill $PID 2>/dev/null || true
+          test "$ok" = "1"
+      - name: Smoke test (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          APP=$(ls -d "release-artifacts/Radiography Web "*.app | head -1)
+          BIN="$APP/Contents/MacOS/$(basename "$APP" .app)"
+          "$BIN" --no-gui --no-browser --port 8767 &
+          PID=$!
+          ok=0
+          for i in $(seq 1 30); do
+            sleep 1
+            if curl -sf --max-time 2 http://127.0.0.1:8767/healthz >/dev/null; then ok=1; break; fi
+          done
+          curl -s --max-time 3 http://127.0.0.1:8767/healthz || true
+          kill $PID 2>/dev/null || true
+          test "$ok" = "1"
+      - name: Upload launcher
+        uses: actions/upload-artifact@v4
+        with:
+          name: radiography-web-launcher-${{ matrix.os }}
+          path: |
+            release-artifacts/*.exe
+            release-artifacts/*.dmg
+          if-no-files-found: error
+
+  deploy-pages:
+    name: Deploy to GitHub Pages
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [core-tests, web-build-e2e]
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build
+        working-directory: web
+        run: npm ci && npm run build
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+      - id: deployment
+        uses: actions/deploy-pages@v4
