@@ -14,7 +14,7 @@ def _app_version():
         from src.core.version import VERSION
         return str(VERSION)
     except Exception:
-        return "1.8.2"
+        return "1.8.3"
 
 
 APP_NAME = "Radiography"

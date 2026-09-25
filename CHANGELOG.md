@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.8.3] - 2026-09-25
+
+### Fixed (Android build)
+- The FileProvider `<provider>` block was placed in
+  `android.extra_manifest_application_arguments`, which only accepts attributes
+  on the `<application>` tag; the resulting AndroidManifest.xml could not be
+  parsed by the manifest merger. The provider is now injected by a small
+  python-for-android hook (`src/android/p4a_manifest_hook.py`, `after_apk_build`)
+  and `@xml/file_paths` is copied via `android.res_xml`
+- With the kivy recipe fix from 1.8.2, the Android pipeline now reaches the
+  gradle assembly stage instead of failing while building kivy
+
 ## [1.8.2] - 2026-09-24
 
 ### Fixed (CI / Android build)

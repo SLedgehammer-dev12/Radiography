@@ -38,7 +38,7 @@ source.exclude_dirs = tests, bin, venv, __pycache__, .git, src/ui
 
 # (str) Application versioning (method 1)
 # CI rewrites this from src/core/version.py before building; keep in sync manually.
-version = 1.8.2
+version = 1.8.3
 
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy
@@ -156,9 +156,14 @@ android.accept_sdk_license = True
 # use that parameter to provide a filename from where to load your custom XML code
 #android.extra_manifest_xml = ./src/android/extra_manifest.xml
 
-# (str) Extra xml to write directly inside the <manifest><application> tag of AndroidManifest.xml
-# use that parameter to provide a filename from where to load your custom XML arguments:
-android.extra_manifest_application_arguments = ./src/android/extra_manifest_application_arguments.xml
+# NOTE: android.extra_manifest_application_arguments only supports ATTRIBUTES on
+# the <application> tag, so it cannot express the FileProvider <provider> child.
+# The provider is injected by the p4a hook below instead.
+# (str) Filename of the python-for-android hook module
+p4a.hook = ./src/android/p4a_manifest_hook.py
+
+# (list) XML resource files copied to res/xml (referenced by the FileProvider)
+android.res_xml = src/android/res/xml/file_paths.xml
 
 # (str) Full name including package path of the Java class that implements Python Service
 # use that parameter to set custom Java class which extends PythonService
