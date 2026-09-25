@@ -178,27 +178,35 @@ jobs:
         env:
           NO_RL_ACCEL: "1"
         run: |
+          ok=0
           for i in 1 2 3 4; do
-            docker run --rm \
+            if docker run --rm \
               -e NO_RL_ACCEL=1 \
               -e PIP_RETRIES=10 \
               -e PIP_TIMEOUT=60 \
+              -e NDKPLATFORM=NOTNONE \
+              -e KIVY_CROSS_PLATFORM=android \
               -v ${{ github.workspace }}:/app \
               -w /app \
               --entrypoint /bin/bash \
               ghcr.io/kivy/buildozer:latest \
-              -c "apt-get update -qq && apt-get install -y -qq wget libgl1-mesa-dev libglu1-mesa-dev mesa-common-dev && buildozer android debug" \
-              && break
+              -c "apt-get update -qq && apt-get install -y -qq wget libgl1-mesa-dev libglu1-mesa-dev mesa-common-dev && buildozer android debug"; then
+              ok=1
+              break
+            fi
             echo "Android build attempt $i failed; retrying in 30s..."
             sleep 30
           done
+          if [ "$ok" != "1" ]; then
+            echo "::error::Android build failed after 4 attempts"
+            exit 1
+          fi
       - name: Upload APK artifact
-        if: hashFiles('bin/*.apk') != ''
         uses: actions/upload-artifact@v4
         with:
           name: Radiography-Android-APK
           path: bin/*.apk
-          if-no-files-found: warn
+          if-no-files-found: error
       - name: Upload AAB artifact
         if: hashFiles('bin/*.aab') != ''
         uses: actions/upload-artifact@v4
