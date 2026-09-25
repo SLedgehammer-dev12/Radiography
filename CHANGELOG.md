@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.8.2] - 2026-09-24
+
+### Fixed (CI / Android build)
+- The local kivymd and reportlab recipes installed their dependencies with pip
+  without `--no-deps`, which made pip rebuild kivy from source outside the kivy
+  recipe environment (no `NDKPLATFORM`) and fail with `GL/gl.h file not found`.
+  Both recipes now pass `--no-deps`; Pillow is provided by its p4a recipe
+- The Android retry loop no longer masks failures: the job fails after four
+  failed attempts, and a missing APK artifact is now an error instead of a
+  warning. `NDKPLATFORM`/`KIVY_CROSS_PLATFORM` are also exported to the build
+  container as a safeguard
+
 ## [1.8.1] - 2026-09-24
 
 ### Fixed (analog/digital separation — ISO 17636-1 vs ISO 17636-2)
