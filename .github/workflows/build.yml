@@ -215,9 +215,85 @@ jobs:
           path: bin/*.aab
           if-no-files-found: warn
 
+  build-web-launcher:
+    name: Build Web Launcher (${{ matrix.os }})
+    needs: [check-version, test]
+    if: needs.check-version.outputs.should_release == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build web app
+        working-directory: web
+        run: npm ci && npm run build
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install PyInstaller
+        run: pip install "pyinstaller<7" pillow
+      - name: Package launcher (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: python web/launcher/package.py --onefile
+      - name: Package launcher (macOS)
+        if: runner.os == 'macOS'
+        run: python3 web/launcher/package.py --onefile --dmg
+      - name: Smoke test launcher (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          BIN=$(ls release-artifacts/*Windows-x64.exe | head -1)
+          "$BIN" --no-gui --no-browser --port 8767 &
+          PID=$!
+          ok=0
+          for i in $(seq 1 30); do
+            sleep 1
+            if curl -sf --max-time 2 http://127.0.0.1:8767/healthz >/dev/null; then ok=1; break; fi
+          done
+          curl -s --max-time 3 http://127.0.0.1:8767/healthz || true
+          kill $PID 2>/dev/null || true
+          test "$ok" = "1"
+      - name: Smoke test launcher (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          APP=$(ls -d "release-artifacts/Radiography Web "*.app | head -1)
+          BIN="$APP/Contents/MacOS/$(basename "$APP" .app)"
+          "$BIN" --no-gui --no-browser --port 8767 &
+          PID=$!
+          ok=0
+          for i in $(seq 1 30); do
+            sleep 1
+            if curl -sf --max-time 2 http://127.0.0.1:8767/healthz >/dev/null; then ok=1; break; fi
+          done
+          curl -s --max-time 3 http://127.0.0.1:8767/healthz || true
+          kill $PID 2>/dev/null || true
+          test "$ok" = "1"
+      - name: Upload Windows launcher
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Radiography-Web-Windows
+          path: release-artifacts/*.exe
+          if-no-files-found: error
+      - name: Upload macOS launcher
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Radiography-Web-macOS
+          path: release-artifacts/*.dmg
+          if-no-files-found: error
+
   create-release:
     name: Create GitHub Release
-    needs: [check-version, build-windows, build-macos, build-android]
+    needs: [check-version, build-windows, build-macos, build-android, build-web-launcher]
     if: |
       always() &&
       !cancelled() &&
@@ -251,6 +327,18 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: Radiography-Android-AAB
+          path: release-artifacts
+      - name: Download Web launcher (Windows)
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: Radiography-Web-Windows
+          path: release-artifacts
+      - name: Download Web launcher (macOS)
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: Radiography-Web-macOS
           path: release-artifacts
       - name: List release artifacts
         run: ls -lh release-artifacts/
