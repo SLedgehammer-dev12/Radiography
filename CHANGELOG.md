@@ -1,5 +1,61 @@
 # Changelog
 
+## [1.9.0] - 2026-09-26
+
+### Added
+- **Browser version (web/)**: React + TypeScript front-end running the Python
+  core in the browser via Pyodide (WebAssembly). Full desktop capability
+  parity: all inputs/outputs, live validation, warnings, 12-point procedure
+  compliance, defect module (API 1104 / ISO 5817 / ASME B31.3 / VIII), Level 3
+  panel, isotope decay tool, TR/EN languages, mm/inch, dark/light theme,
+  presets/projects (desktop-compatible JSON/CSV), PDF report with QR and
+  embedded sketches, offline PWA (service worker) and responsive layout
+- **Single-file launchers** for the web version: `Radiography-Web-<ver>-Windows-x64.exe`
+  (PyInstaller onefile, icon + file version info) and
+  `Radiography-Web-<ver>-macOS.dmg` (iconed `Radiography Web <ver>.app`).
+  Double-click starts a local server, opens the browser and shows a small
+  control window (Tk) with "Open in browser" / "Close"
+- **Shared calculation engine** (`src/core/engine.py`): the desktop window and
+  the mobile AppState now run the exact same calculation chain
+- **ISO 17636 Annex A exposure model**: Figures A.1-A.4 digitized from the
+  standard PDFs (`src/core/annex_a.py`, `src/core/data/annex_a_iso17636_1.json`,
+  `tools/digitize_annex_a.py`). DWSI (film outside) uses A.2/A.4 (t/De and
+  De/SFD); SWSI with the film inside (Figure 2) uses A.1/A.3 (De/f); the
+  panoramic Figure 5 remains a single exposure
+- **Provenance displays** for SFD_min/SDD_min (f_min+b, receptor diagonal
+  1.4·df/1.4·dd or DWSI physical floor), for the required exposure count
+  (figure, t/De, ratio, next boundary) and for f_min (base value, formula,
+  Level 3 reductions) on screen, in tooltips and in the PDF report
+- Web parity harness: 147 matrix scenarios executed through the Pyodide bridge
+  and compared to a committed fixture; 15 Playwright E2E tests
+
+### Fixed
+- DWSI/SWSI minimum exposure counts now follow the ISO 17636-1/2:2022 Annex A
+  charts (the previous OD/t lookup table and the purely geometric solver gave
+  wrong values, e.g. Class B DWSI with De/SFD < 1 starts at 4 exposures)
+- Figure catalogues now list only circumferential butt-weld arrangements:
+  Figures 6/7/9/10 (and the digital a/b equivalents) are set-in/set-on corner
+  welds and were removed; SWSI offers Figures 2/5/8 (analog) and 2a/5a/8a,
+  2b/5b/8b (digital); DWSI curved offers 13a/14a
+- Analog mode now shows the "Applied Exposures" input (it was hidden) and
+  labels the distance as SFD_min (source-to-film) instead of SDD_min; digital
+  keeps SDD_min
+- Manual film size entry (custom width/height) for analog; film class C3/C4
+  compliance and the missing `film_class_req` translation key
+- Web build: `src/core/data/*.json` are bundled into the Pyodide filesystem
+
+### Changed
+- Desktop and mobile calculation orchestration moved to `src/core/engine.py`
+  (single source of truth); `main_window.py` and `app_state.py` are thin
+  adapters
+- CI: new `web.yml` (core tests + web build + Playwright + optional Pages
+  deploy); `build.yml` builds the web launchers on Windows/macOS and attaches
+  them to the GitHub Release
+
+### Tests
+- 724 tests + 717 subtests (engine, Annex A tables, provenance, report,
+  launcher, web parity fixture) and 15 Playwright E2E tests
+
 ## [1.8.3] - 2026-09-25
 
 ### Fixed (Android build)
