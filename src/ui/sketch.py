@@ -283,7 +283,9 @@ class StandardSchematicCanvas(FigureCanvas):
         # ISO 17636-2 flexible-detector (a) variants reuse the existing film
         # drawings; only the title is overridden below.
         orig_name = fig_name
-        alias = {"fig5a": "fig5", "fig6a": "fig6", "fig7a": "fig7", "fig13a": "fig13"}
+        alias = {"fig2": "fig2b", "fig2a": "fig2b", "fig8": "fig8a", "fig5a": "fig5",
+                 "fig6a": "fig6", "fig7a": "fig7", "fig13a": "fig13",
+                 "fig14a": "fig14"}
         fig_name = alias.get(fig_name, fig_name)
 
         R = 1.0
@@ -621,7 +623,8 @@ class StandardSchematicCanvas(FigureCanvas):
             self.axes.set_title(lang_obj.get("fig14_title"), color=text_color, fontsize=10)
 
         # a-variant title override (drawing reused from the film figures)
-        if orig_name in ("fig5a", "fig6a", "fig7a", "fig13a"):
+        if orig_name in ("fig2", "fig2a", "fig8", "fig5a", "fig6a", "fig7a",
+                         "fig13a", "fig14a"):
             self.axes.set_title(lang_obj.get(f"{orig_name}_title"), color=text_color, fontsize=10)
 
         # Uniform Limits

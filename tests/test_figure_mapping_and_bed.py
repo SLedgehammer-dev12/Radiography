@@ -48,14 +48,14 @@ def _keys(win):
 
 
 @pytest.mark.parametrize("tech,planar,geometry,expected", [
-    ("digital", True, "swsi", {"fig2b", "fig5b", "fig8b", "fig9b", "fig10b"}),
-    ("digital", False, "swsi", {"fig5a", "fig6a", "fig7a", "fig8a", "fig9a", "fig10a"}),
+    ("digital", True, "swsi", {"fig2b", "fig5b", "fig8b"}),
+    ("digital", False, "swsi", {"fig2a", "fig5a", "fig8a"}),
     ("digital", True, "dwsi", {"fig13b", "fig14b"}),
-    ("digital", False, "dwsi", {"fig13a"}),
+    ("digital", False, "dwsi", {"fig13a", "fig14a"}),
     ("digital", True, "dwdi_elliptic", {"fig11", "fig12"}),
     ("digital", False, "dwdi_super", {"fig11", "fig12"}),
-    ("analog", True, "swsi", {"fig5", "fig6", "fig7"}),
-    ("analog", False, "swsi", {"fig5", "fig6", "fig7"}),
+    ("analog", True, "swsi", {"fig2", "fig5", "fig8"}),
+    ("analog", False, "swsi", {"fig2", "fig5", "fig8"}),
     ("analog", True, "dwsi", {"fig13", "fig14"}),
     ("analog", True, "dwdi_elliptic", {"fig11", "fig12"}),
 ])
@@ -71,21 +71,33 @@ def test_figure_14b_is_dwsi_not_dwdi(win):
     assert "fig14b" not in _keys(win)
 
 
-def test_figure_10b_is_swsi_not_dwsi(win):
+def test_swsi_figures_are_not_offered_for_dwsi(win):
     _set(win, "digital", True, "swsi")
-    assert "fig10b" in _keys(win)
+    assert "fig2b" in _keys(win) and "fig8b" in _keys(win)
     _set(win, "digital", True, "dwsi")
-    assert "fig10b" not in _keys(win)
+    assert "fig2b" not in _keys(win)
+    assert "fig8b" not in _keys(win)
+
+
+def test_corner_weld_figures_are_excluded(win):
+    """Figures 6/7 (and 9/10) are set-in/set-on corner welds, not butt welds."""
+    _set(win, "analog", True, "swsi")
+    assert _keys(win).isdisjoint({"fig6", "fig7", "fig9", "fig10"})
+    _set(win, "digital", False, "swsi")
+    assert _keys(win).isdisjoint(
+        {"fig6a", "fig7a", "fig9a", "fig10a"})
+    _set(win, "digital", True, "swsi")
+    assert _keys(win).isdisjoint({"fig9b", "fig10b"})
 
 
 def test_preset_roundtrip_keeps_std_figure(win):
     _set(win, "digital", True, "swsi")
-    win.cmb_std_figure.setCurrentIndex(win.cmb_std_figure.findData("fig9b"))
+    win.cmb_std_figure.setCurrentIndex(win.cmb_std_figure.findData("fig8b"))
     state = win.collect_form_state()
-    assert state["cmb_std_figure"] == "fig9b"
+    assert state["cmb_std_figure"] == "fig8b"
     win.cmb_std_figure.setCurrentIndex(win.cmb_std_figure.findData("fig2b"))
     win.apply_form_state(state)
-    assert win.cmb_std_figure.currentData() == "fig9b"
+    assert win.cmb_std_figure.currentData() == "fig8b"
 
 
 # ---------------------------------------------------------------------------

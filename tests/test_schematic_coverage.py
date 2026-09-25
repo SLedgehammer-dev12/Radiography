@@ -9,11 +9,11 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 FIGURES = [
-    # ISO 17636-1 (analog)
-    "fig5", "fig6", "fig7", "fig11", "fig12", "fig13", "fig14",
+    # ISO 17636-1 (analog) butt-weld arrangements only
+    "fig2", "fig5", "fig8", "fig11", "fig12", "fig13", "fig14",
     # ISO 17636-2 digital, flexible (a) and planar (b)
-    "fig5a", "fig6a", "fig7a", "fig8a", "fig9a", "fig10a",
-    "fig2b", "fig5b", "fig8b", "fig9b", "fig10b", "fig13a", "fig13b", "fig14b",
+    "fig2a", "fig5a", "fig8a", "fig13a", "fig14a",
+    "fig2b", "fig5b", "fig8b", "fig13b", "fig14b",
 ]
 
 
