@@ -377,22 +377,25 @@ class TestRTCalculator(unittest.TestCase):
         n_b = self.calc.calculate_dwsi_exposures(114.3, 8.56, 600.0, "class_b")
         self.assertGreaterEqual(n_b, n_a)
 
-    def test_dwsi_table_lookup(self):
-        # D/t = 114.3 / 8.56 ≈ 13.35 → Class A: 4, Class B: 5
-        n_a = self.calc._lookup_dwsi_exposures(114.3, 8.56, "class_a")
-        self.assertEqual(n_a, 4)
-        n_b = self.calc._lookup_dwsi_exposures(114.3, 8.56, "class_b")
-        self.assertEqual(n_b, 5)
+    def test_dwsi_annex_a_lookup(self):
+        # ISO 17636-1/2:2022 Annex A, Figure A.2/A.4 (film outside).
+        n_b = self.calc.annex_a_exposures(8.56, 114.3, 600.0, "class_b", film_inside=False)
+        n_a = self.calc.annex_a_exposures(8.56, 114.3, 600.0, "class_a", film_inside=False)
+        self.assertIsNotNone(n_b)
+        self.assertIsNotNone(n_a)
+        self.assertGreaterEqual(n_b, n_a)
+        self.assertGreaterEqual(n_a, 3)
 
-        # D/t >= 20 → both classes return 3
-        n_a = self.calc._lookup_dwsi_exposures(200.0, 8.0, "class_a")
-        self.assertEqual(n_a, 3)
-        n_b = self.calc._lookup_dwsi_exposures(200.0, 8.0, "class_b")
-        self.assertEqual(n_b, 3)
+        # User-verified chart reference: A.2, De/SFD just below 1, thin wall → 4
+        self.assertEqual(
+            self.calc.annex_a_exposures(0.5, 100.0, 101.0, "class_b", film_inside=False),
+            4,
+        )
 
-        # D/t < 5 → both classes return 8
-        n = self.calc._lookup_dwsi_exposures(40.0, 10.0, "class_a")
-        self.assertEqual(n, 8)
+        # Out-of-chart inputs fall back to None (engine then uses the solver).
+        self.assertIsNone(
+            self.calc.annex_a_exposures(5.0, 100.0, 40.0, "class_b", film_inside=False),
+        )
 
     def test_density_correction_factor(self):
         # Class A always returns 1.0 regardless of film class

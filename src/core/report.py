@@ -498,6 +498,34 @@ class PDFReportGenerator:
         story.append(outputs_table)
         story.append(Spacer(1, 15))
 
+        # Provenance notes: where SFD_min/SDD_min and the required exposure
+        # count come from (provided by the engine; optional).
+        provenance_lines = []
+        if outputs.get("f_min_provenance_text"):
+            provenance_lines.append(
+                f"<b>{_esc(lang_obj.get('f_min'))}</b> — "
+                f"{_esc(outputs['f_min_provenance_text'])}")
+        if outputs.get("sfd_min_provenance_text"):
+            provenance_lines.append(
+                f"<b>{_esc(lang_obj.get('sfd_min'))}</b> — "
+                f"{_esc(outputs['sfd_min_provenance_text'])}")
+        if outputs.get("exposures_provenance_text"):
+            provenance_lines.append(
+                f"<b>{_esc(lang_obj.get('req_exposures'))}</b> — "
+                f"{_esc(outputs['exposures_provenance_text'])}")
+        if provenance_lines:
+            provenance_style = ParagraphStyle(
+                name='ProvenanceNote',
+                fontName=self._resolve_font('Arial-Oblique'),
+                fontSize=8,
+                leading=11,
+                textColor=colors.HexColor('#616161'),
+            )
+            story.append(Paragraph(
+                "<br/>".join(line.replace("\n", " | ") for line in provenance_lines),
+                provenance_style))
+            story.append(Spacer(1, 8))
+
         # Field Correction Factor (F) context note (only when it deviates from 1.0)
         if outputs.get("base_multiplier", 1.0) != 1.0:
             note_style = ParagraphStyle(

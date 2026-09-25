@@ -1036,62 +1036,54 @@ class RTCalculator:
         )
         return mu * (1.0 - reduction)
 
-    def _lookup_dwsi_exposures(self, OD, t, testing_class):
-        dt_ratio = OD / t if t > 0 else 999.0
-        # Simplified D/t lookup mirroring the spirit of ISO 17636-1:2022
-        # Annex A (minimum exposures for circumferential coverage). The exact
-        # thresholds here are engineering approximations of the Annex A charts,
-        # not a verbatim reproduction of a specific table row; the geometric
-        # solver in calculate_dwsi_exposures() provides the governing value and
-        # the stricter of the two is returned.
-        table = {
-            "class_a": [
-                (20.0, 3), (15.0, 3), (10.0, 4), (7.0, 5), (5.0, 6), (0.0, 8),
-            ],
-            "class_b": [
-                (20.0, 3), (15.0, 4), (10.0, 5), (7.0, 6), (5.0, 7), (0.0, 8),
-            ],
-        }
-        rows = table.get(testing_class, table["class_a"])
-        for threshold, n in rows:
-            if dt_ratio >= threshold:
-                return n
-        return 8
+    def annex_a_exposures(self, t, OD, distance, testing_class="class_b",
+                          film_inside=False):
+        """ISO 17636-1/2:2022 Annex A minimum exposures (digitized charts).
+
+        ``distance`` is f (source-to-object) for the film/detector-inside
+        arrangement (Figures 2/A.1/A.3) and SFD/SDD for the film/detector-
+        outside arrangements (Figures 8/13, A.2/A.4). Returns ``None`` when the
+        query falls outside the digitized chart range.
+        """
+        from src.core.annex_a import minimum_exposures
+        return minimum_exposures(
+            t=t, de=OD, distance=distance,
+            testing_class=testing_class, film_inside=film_inside,
+        )
 
     def calculate_dwsi_exposures(self, OD, t, sfd, testing_class):
         """
-        Calculates the required minimum number of exposures for DWSI geometry.
+        Required minimum number of exposures for DWSI geometry.
 
-        Uses ISO 17636-1:2022 Annex C Table C.1 as primary lookup (based on D/t ratio),
-        backed by geometric binary search for edge cases.
+        ISO 17636-1/2:2022 Annex A, Figures A.2 (class B) / A.4 (class A):
+        the film/detector is outside, so the chart is a function of t/De and
+        De/SFD. For DWSI the source is outside the pipe, so SFD is clamped to
+        the outside diameter (source on the surface) before the lookup.
 
-        - Class A: +20% thickness tolerance
-        - Class B: +10% thickness tolerance
-
-        Physical guard: for DWSI the source is outside the pipe and the detector
-        on the opposite side, so the source-to-detector distance can never be
-        smaller than the outside diameter (De). Applied SFD values below De are
-        clamped to De before solving the geometry (otherwise y_s = sfd - R <= 0
-        puts the source inside the pipe and the angle search degenerates).
+        Falls back to the geometric ray-tracing solver when the query is
+        outside the digitized chart range.
         """
         try:
             OD = float(OD)
             t = float(t)
             sfd = float(sfd)
         except (TypeError, ValueError):
-            return max(3, self._lookup_dwsi_exposures(114.3, 8.56, testing_class))
+            return 3
 
-        # ISO table minimum
-        iso_min = self._lookup_dwsi_exposures(OD, t, testing_class)
+        sfd_eff = max(sfd, OD)
+        annex_n = self.annex_a_exposures(
+            t, OD, sfd_eff, testing_class, film_inside=False)
+        if annex_n is not None:
+            return max(3, int(annex_n))
 
+        # Legacy geometric fallback (only for out-of-chart inputs).
         R = OD / 2.0
         Ri = R - t
         if R <= 0.0 or Ri <= 0.0 or t <= 0.0:
             # Degenerate "pipe" (no inner cavity); no geometric DWSI coverage model.
-            return max(3, iso_min)
+            return 3
 
         # Physical floor: source outside the pipe (Figure 14 - source on surface)
-        sfd_eff = max(sfd, OD)
         y_s = sfd_eff - R
 
         tolerance = 0.20 if testing_class == "class_a" else 0.10
@@ -1159,8 +1151,7 @@ class RTCalculator:
         N = math.pi / max_theta
         geo_n = max(3, int(math.ceil(N)))
 
-        # Return the stricter of geometric calculation vs ISO table
-        return max(geo_n, iso_min)
+        return geo_n
 
     def get_dwdi_elliptical_exposures(self, od, t):
         """

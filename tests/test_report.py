@@ -271,3 +271,78 @@ class TestPDFReportGenerator(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestReportProvenance(unittest.TestCase):
+    """The PDF must show where SFD_min and the exposure count come from."""
+
+    def setUp(self):
+        from src.core.engine import (
+            CalculationEngine, format_exposures_provenance,
+            format_f_min_provenance, format_sfd_provenance)
+        self.gen = PDFReportGenerator()
+        self.trans = Translation()
+        self.trans.set_language("en")
+        self.tmpdir = tempfile.mkdtemp()
+        engine = CalculationEngine()
+        result = engine.calculate({
+            "od": 114.3, "t": 6.0, "tech": "analog", "testing_class": "class_b",
+            "geometry": "dwsi", "std_figure": "fig13", "sfd": 155.0, "d": 3.0,
+            "film_width": 80.0, "film_height": 50.0, "film_class_used": "C3",
+        }, {}, "en")
+        self.result = result
+        self.fmin_text = format_f_min_provenance(
+            result["calculated"]["f_min_provenance"], self.trans)
+        self.sfd_text = format_sfd_provenance(
+            result["calculated"]["sfd_min_provenance"], self.trans)
+        self.exp_text = format_exposures_provenance(
+            result["calculated"]["exposures_provenance"], self.trans)
+
+    def test_pdf_contains_provenance_notes(self):
+        from pypdf import PdfReader
+
+        filepath = os.path.join(self.tmpdir, "provenance.pdf")
+        inputs = {
+            "material_text": "Steel", "class_text": "Class B", "od": 114.3,
+            "t": 6.0, "cap": 0.0, "d": 3.0, "sfd": 155.0, "output_val": 5.0,
+            "base_e": 3.0, "speed": "C3", "tech": "analog",
+            "tech_text": "Analog Film", "source": "x_ray",
+            "source_text": "X-Ray Tube", "geometry": "dwsi",
+            "geometry_text": "DWSI", "standard": "iso", "report_info": {},
+            "input_kv": 120.0, "overlap": 10.0, "iqi_type": "wire",
+            "snr_location": "weld",
+        }
+        outputs = {
+            "w_nom": 12.0, "w_eff": 12.0, "u_max": 196.2, "f_min": 148.6,
+            "sfd_min": 154.6, "exposures": 5,
+            "single_wire_iqi": "W14", "duplex_iqi": "N/A",
+            "quality_target": ">= 2.3", "calc_time": "60 s",
+            "detector_quality": "C4 Film", "filter_recommendation": "None",
+            "f_min_provenance_text": self.fmin_text,
+            "sfd_min_provenance_text": self.sfd_text,
+            "exposures_provenance_text": self.exp_text,
+        }
+        self.assertTrue(self.gen.generate_report(
+            filepath, inputs, outputs, [], None, False, None, self.trans))
+        text = " ".join(
+            (page.extract_text() or "") for page in PdfReader(filepath).pages)
+        flat = " ".join(text.split())
+        self.assertIn("Base f_min", flat)
+        self.assertIn("Annex A Figure A2", flat)
+        self.assertIn("N=5", flat)
+        self.assertIn("158.3", flat)
+
+    def test_pdf_works_without_provenance_keys(self):
+        filepath = os.path.join(self.tmpdir, "no_provenance.pdf")
+        inputs = {
+            "material_text": "Steel", "class_text": "Class B", "od": 114.3,
+            "t": 6.0, "cap": 0.0, "d": 2.0, "sfd": 600.0, "output_val": 5.0,
+            "base_e": 3.0, "speed": "C5", "tech": "digital",
+            "tech_text": "Digital", "source": "x_ray", "source_text": "X-Ray",
+            "geometry": "dwsi", "geometry_text": "DWSI", "standard": "iso",
+            "report_info": {}, "input_kv": 120.0, "overlap": 10.0,
+            "iqi_type": "wire", "snr_location": "weld",
+        }
+        outputs = {"w_nom": 12.0, "w_eff": 15.0, "exposures": 8}
+        self.assertTrue(self.gen.generate_report(
+            filepath, inputs, outputs, [], None, False, None, self.trans))

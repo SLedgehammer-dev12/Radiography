@@ -546,14 +546,38 @@ def expected_values(sc):
     out["table2_defined"] = defined
     out["table2_valid"] = valid
     out["table2_note"] = note
-    # Exposures
+    # Exposures — ISO 17636-1/2:2022 Annex A (digitized charts).
+    from src.core.annex_a import minimum_exposures
+
     eg = sc["effective_geometry"]
+    figure = sc.get("std_figure")
     if eg == "swsi":
-        out["exposures_graph"] = 1
+        if figure in ("fig2", "fig2a", "fig2b"):
+            if sc.get("planar") and sc.get("tech") == "digital":
+                k = 1.2 if sc["testing_class"] == "class_a" else 1.1
+                b_dist = sc.get("bed", 0.0) + sc.get("bgap", 5.0) + k * t
+            else:
+                b_dist = t
+            n = minimum_exposures(
+                t, od, max(sc["sfd"] - b_dist, 1.0),
+                sc["testing_class"], film_inside=True)
+            out["exposures_graph"] = int(n) if n is not None else 1
+        elif figure in ("fig8", "fig8a", "fig8b"):
+            n = minimum_exposures(
+                t, od, sc["sfd"], sc["testing_class"], film_inside=False)
+            out["exposures_graph"] = max(3, int(n)) if n is not None else 3
+        else:
+            out["exposures_graph"] = 1
     elif eg in ("dwdi_elliptic", "dwdi_super"):
         out["exposures_graph"] = expected_dwdi_exposures(eg, od, t)
     else:
-        out["exposures_graph"] = dwsi_geometric_oracle(od, t, sc["sfd"], sc["testing_class"])
+        n = minimum_exposures(
+            t, od, max(sc["sfd"], od), sc["testing_class"], film_inside=False)
+        if n is not None:
+            out["exposures_graph"] = max(3, int(n))
+        else:
+            out["exposures_graph"] = dwsi_geometric_oracle(
+                od, t, sc["sfd"], sc["testing_class"])
     out["forced_dwsi"] = sc["forced_dwsi"]
     return out
 

@@ -214,11 +214,16 @@ DWSI_CASES = [
 
 
 @pytest.mark.parametrize("od,t,sfd,cls", DWSI_CASES)
-def test_dwsi_exposures_at_least_table_and_three(calc, od, t, sfd, cls):
+def test_dwsi_exposures_follow_annex_a(calc, od, t, sfd, cls):
+    from src.core.annex_a import minimum_exposures
+
     n = calc.calculate_dwsi_exposures(od, t, sfd, cls)
     assert isinstance(n, int)
     assert n >= 3
-    assert n >= calc._lookup_dwsi_exposures(od, t, cls)
+    expected = minimum_exposures(
+        t, od, max(sfd, od), cls, film_inside=False)
+    if expected is not None:
+        assert n == max(3, int(expected))
 
 
 def test_exposure_comparison_governing_value(calc):
