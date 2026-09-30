@@ -201,16 +201,16 @@ def handle(request_json):
         if tech == "digital":
             if geometry == "swsi":
                 if curved:
-                    figures = ["fig2a", "fig5a", "fig8a"]
+                    figures = ["fig5a", "fig2a", "fig8a"]
                 else:
-                    figures = ["fig2b", "fig5b", "fig8b"]
+                    figures = ["fig5b", "fig2b", "fig8b"]
             elif geometry in ("dwdi_elliptic", "dwdi_super"):
                 figures = ["fig11", "fig12"]
             else:  # dwsi
                 figures = ["fig13a", "fig14a"] if curved else ["fig13b", "fig14b"]
         else:
             if geometry == "swsi":
-                figures = ["fig2", "fig5", "fig8"]
+                figures = ["fig5", "fig2", "fig8"]
             elif geometry in ("dwdi_elliptic", "dwdi_super"):
                 figures = ["fig11", "fig12"]
             else:  # dwsi

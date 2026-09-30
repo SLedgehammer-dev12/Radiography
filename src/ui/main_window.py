@@ -470,6 +470,7 @@ class MainWindow(QMainWindow,
         grp_exposure_layout.addRow(self.lbl_asme_sensitivity, self.cmb_asme_sensitivity)
 
         # Chart Source
+        self.lbl_chart_source = QLabel(self.trans.get("chart_source"))
         self.cmb_chart_source = QComboBox()
         self.cmb_chart_source.addItem(self.trans.get("chart_model"), "model")
         self.cmb_chart_source.addItem("AA400 (C5)", "AA400")
@@ -479,7 +480,7 @@ class MainWindow(QMainWindow,
         self.cmb_chart_source.addItem("M100 (C2)", "M100")
         self.cmb_chart_source.addItem(self.trans.get("chart_type_x"), "type_x")
         self.cmb_chart_source.currentIndexChanged.connect(self.on_chart_source_changed)
-        grp_exposure_layout.addRow(self.trans.get("chart_source"), self.cmb_chart_source)
+        grp_exposure_layout.addRow(self.lbl_chart_source, self.cmb_chart_source)
 
         # Film class in use
         self.lbl_film_class_used = QLabel(self.trans.get("film_class_used"))
@@ -512,7 +513,7 @@ class MainWindow(QMainWindow,
                                 "detector_dda_si", "detector_dda_se", "detector_dda_gdos"]
         for key, tkey in zip(self._det_keys, self._det_trans_keys):
             self.cmb_detector_type.addItem(self.trans.get(tkey), key)
-        self.cmb_detector_type.currentIndexChanged.connect(self.update_calculations)
+        self.cmb_detector_type.currentIndexChanged.connect(self.on_detector_model_changed)
         grp_exposure_layout.addRow(self.lbl_detector_type, self.cmb_detector_type)
 
         # Applied Panel SRb
@@ -939,8 +940,9 @@ class MainWindow(QMainWindow,
             self.lbl_bgap.setVisible(is_planar)
             self.txt_bgap.setVisible(is_planar)
 
-        # Figure list depends on technology and detector shape
+        # Figure list and chart source list depend on technology and detector type
         self.update_std_figure_list()
+        self.update_chart_source_list()
         
         # Also update procedure compliance label and default value
         if is_digital:
@@ -963,6 +965,54 @@ class MainWindow(QMainWindow,
         self._update_output_visibility()
         self.update_calculations()
 
+    def on_detector_model_changed(self):
+        self.update_chart_source_list()
+        self.update_calculations()
+
+    def update_chart_source_list(self):
+        """Populates cmb_chart_source with Analog Film charts or Digital CR/DDA methods."""
+        if not hasattr(self, "cmb_chart_source"):
+            return
+        is_digital = self.rad_digital.isChecked() if hasattr(self, "rad_digital") else True
+        det_type = (
+            self.cmb_detector_type.currentData()
+            if hasattr(self, "cmb_detector_type")
+            else "cr_standard"
+        )
+        is_dda = det_type in ("dda_si", "dda_se", "dda_gdos")
+        prev_data = self.cmb_chart_source.currentData()
+
+        if hasattr(self, "lbl_chart_source"):
+            self.lbl_chart_source.setText(
+                self.trans.get("chart_source_digital" if is_digital else "chart_source")
+            )
+
+        self.cmb_chart_source.blockSignals(True)
+        self.cmb_chart_source.clear()
+
+        if is_digital:
+            self.cmb_chart_source.addItem(self.trans.get("chart_digital_model"), "model")
+            if is_dda:
+                self.cmb_chart_source.addItem(self.trans.get("chart_dda_frame"), "dda_frame_method")
+                self.cmb_chart_source.addItem(self.trans.get("chart_dda_panel"), "dda_panel_chart")
+                self.cmb_chart_source.addItem(self.trans.get("chart_digital_xray"), "digital_xray_chart")
+            else:
+                self.cmb_chart_source.addItem(self.trans.get("chart_cr_ips"), "cr_ips_chart")
+                self.cmb_chart_source.addItem(self.trans.get("chart_digital_xray"), "digital_xray_chart")
+        else:
+            self.cmb_chart_source.addItem(self.trans.get("chart_model"), "model")
+            self.cmb_chart_source.addItem("AA400 (C5)", "AA400")
+            self.cmb_chart_source.addItem("MX125 (C3)", "MX125")
+            self.cmb_chart_source.addItem("T200 (C4)", "T200")
+            self.cmb_chart_source.addItem("HS800 (C6)", "HS800")
+            self.cmb_chart_source.addItem("M100 (C2)", "M100")
+            self.cmb_chart_source.addItem(self.trans.get("chart_type_x"), "type_x")
+
+        idx = self.cmb_chart_source.findData(prev_data)
+        self.cmb_chart_source.setCurrentIndex(idx if idx >= 0 else 0)
+        self.cmb_chart_source.blockSignals(False)
+        self._update_base_e()
+
     def _update_base_e(self):
         """Refreshes the exposure chart constant (E) label, tooltip and visibility.
 
@@ -973,7 +1023,7 @@ class MainWindow(QMainWindow,
         self.lbl_base_e.setText(f"{self.trans.get('base_factor')} ({unit}):")
         self.txt_base_e.setToolTip(self.trans.get("tt_base_factor"))
         chart = self.cmb_chart_source.currentData()
-        visible = (chart == "model")
+        visible = chart in ("model", "dda_frame_method")
         self.lbl_base_e.setVisible(visible)
         self.txt_base_e.setVisible(visible)
 
@@ -1051,7 +1101,7 @@ class MainWindow(QMainWindow,
 
     def on_chart_source_changed(self):
         chart_source = self.cmb_chart_source.currentData()
-        if chart_source == "type_x":
+        if chart_source in ("type_x", "digital_xray_chart"):
             if self.cmb_source.currentIndex() != 0:
                 self.cmb_source.setCurrentIndex(0)
             self.txt_app_kv.setVisible(True)
@@ -1278,9 +1328,10 @@ class MainWindow(QMainWindow,
         self.rad_digital.setText(self.trans.get("digital_cr_dda"))
         self.lbl_film_class_used.setText(self.trans.get("film_class_used"))
         self.lbl_detector_type.setText(self.trans.get("detector_type"))
-        # Refresh detector type combobox labels
+        # Refresh detector type combobox labels and chart source options
         for i, tkey in enumerate(self._det_trans_keys):
             self.cmb_detector_type.setItemText(i, self.trans.get(tkey))
+        self.update_chart_source_list()
         self._retranslate_input_panel()
         self._retranslate_warnings_panel()
         self._retranslate_compliance_panel()
@@ -1843,28 +1894,6 @@ class MainWindow(QMainWindow,
             return
         if "language" in state and state["language"] in ("tr", "en"):
             self.trans.set_language(state["language"])
-        for attr in self._PRESET_COMBOS:
-            w = getattr(self, attr, None)
-            val = state.get(attr)
-            if w is None or val is None:
-                continue
-            if isinstance(val, int):
-                idx = val
-            elif isinstance(val, str):
-                try:
-                    idx = int(val)
-                except ValueError:
-                    idx = w.findData(val)
-            else:
-                idx = w.findData(val)
-            if 0 <= idx < w.count():
-                w.blockSignals(True)
-                w.setCurrentIndex(idx)
-                w.blockSignals(False)
-        for attr in self._PRESET_EDITS:
-            w = getattr(self, attr, None)
-            if w is not None and attr in state:
-                w.setText(str(state[attr]))
         for attr, widget in (("rad_analog", self.rad_analog),
                              ("rad_digital", self.rad_digital),
                              ("rad_detector_flat", self.rad_detector_flat),
@@ -1875,6 +1904,32 @@ class MainWindow(QMainWindow,
                 if isinstance(v, str):
                     v = v.lower() in ("1", "true", "yes", "checked")
                 widget.setChecked(bool(v))
+        for attr in self._PRESET_COMBOS:
+            if attr == "cmb_chart_source":
+                self.update_chart_source_list()
+            w = getattr(self, attr, None)
+            val = state.get(attr)
+            if w is None or val is None:
+                continue
+            if isinstance(val, int):
+                idx = val
+            elif isinstance(val, str):
+                idx = w.findData(val)
+                if idx < 0:
+                    try:
+                        idx = int(val)
+                    except ValueError:
+                        idx = -1
+            else:
+                idx = w.findData(val)
+            if 0 <= idx < w.count():
+                w.blockSignals(True)
+                w.setCurrentIndex(idx)
+                w.blockSignals(False)
+        for attr in self._PRESET_EDITS:
+            w = getattr(self, attr, None)
+            if w is not None and attr in state:
+                w.setText(str(state[attr]))
         self.retranslate_ui()
         self.update_calculations()
 

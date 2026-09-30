@@ -242,67 +242,131 @@ export function WeldSetupSvg({
   let ySourceCoord = 0;
   let xSourceCoord = 0;
 
+  const renderBeamCone = (
+    sx: number,
+    sy: number,
+    cxShift: number,
+    t1: number,
+    t2: number,
+  ) => {
+    const rDet = R * 1.04;
+    const rad1 = (t1 * Math.PI) / 180;
+    const rad2 = (t2 * Math.PI) / 180;
+    let p1: [number, number] = [
+      cxShift + rDet * Math.cos(rad1),
+      rDet * Math.sin(rad1),
+    ];
+    let p2: [number, number] = [
+      cxShift + rDet * Math.cos(rad2),
+      rDet * Math.sin(rad2),
+    ];
+    let conePath: string;
+    let midTarget: [number, number] = [cxShift, -rDet];
+
+    if (panelWidth) {
+      const yPanel = -R - R * 0.15;
+      const halfPanel = (panelWidth / 2) * 0.92;
+      const projectX = (px: number, py: number) => {
+        const dy = py - sy;
+        if (Math.abs(dy) < 1e-6) return px;
+        const xAtPanel = sx + ((px - sx) * (yPanel - sy)) / dy;
+        return Math.max(-halfPanel, Math.min(halfPanel, xAtPanel));
+      };
+      p1 = [projectX(p1[0], p1[1]), yPanel];
+      p2 = [projectX(p2[0], p2[1]), yPanel];
+      midTarget = [(p1[0] + p2[0]) / 2, yPanel];
+      conePath = `M ${transform.X(sx)},${transform.Y(sy)} L ${transform.X(p1[0])},${transform.Y(p1[1])} L ${transform.X(p2[0])},${transform.Y(p2[1])} Z`;
+    } else {
+      const large = Math.abs(t2 - t1) > 180 ? 1 : 0;
+      const sweep = t2 > t1 ? 0 : 1;
+      const rScaled = rDet * transform.scale;
+      conePath = `M ${transform.X(sx)},${transform.Y(sy)} L ${transform.X(p1[0])},${transform.Y(p1[1])} A ${rScaled} ${rScaled} 0 ${large} ${sweep} ${transform.X(p2[0])},${transform.Y(p2[1])} Z`;
+    }
+
+    return (
+      <g key="beam-group">
+        <path d={conePath} fill={beamColor} opacity={0.16} />
+        <path d={conePath} fill="url(#beam-hatch-2d)" opacity={0.65} />
+        <line
+          x1={transform.X(sx)}
+          y1={transform.Y(sy)}
+          x2={transform.X(p1[0])}
+          y2={transform.Y(p1[1])}
+          stroke={beamColor}
+          strokeWidth={1.5}
+          strokeDasharray="5 3"
+          opacity={0.85}
+        />
+        <line
+          x1={transform.X(sx)}
+          y1={transform.Y(sy)}
+          x2={transform.X(p2[0])}
+          y2={transform.Y(p2[1])}
+          stroke={beamColor}
+          strokeWidth={1.5}
+          strokeDasharray="5 3"
+          opacity={0.85}
+        />
+        <line
+          x1={transform.X(sx)}
+          y1={transform.Y(sy)}
+          x2={transform.X(midTarget[0])}
+          y2={transform.Y(midTarget[1])}
+          stroke={beamColor}
+          strokeWidth={1}
+          strokeDasharray="3 3"
+          opacity={0.45}
+        />
+      </g>
+    );
+  };
+
   if (geometry === "swsi") {
     elements.push(<SourceMarker key="s" transform={transform} kind="star" x={0} y={0} />);
-    elements.push(
-      <path
-        key="det"
-        d={arcPath(transform, R * 1.04, 180, 360)}
-        fill="none"
-        stroke={detColor}
-        strokeWidth={4}
-      />,
-    );
-    elements.push(
-      <polygon
-        key="beam"
-        points={`${transform.X(0)},${transform.Y(0)} ${transform.X(-R * 0.25)},${transform.Y(-R)} ${transform.X(R * 0.25)},${transform.Y(-R)}`}
-        fill={beamColor}
-        opacity={0.15}
-      />,
-    );
+    if (!panelWidth) {
+      elements.push(
+        <path
+          key="det"
+          d={arcPath(transform, R * 1.04, 180, 360)}
+          fill="none"
+          stroke={detColor}
+          strokeWidth={4}
+        />,
+      );
+    }
+    elements.push(renderBeamCone(0, 0, 0, 225, 315));
     labelItems.push({ text: labels.source, x: 0, y: R * 1.35 });
   } else {
     const offset =
       geometry === "dwdi_elliptic"
         ? Math.min(sfd * Math.tan((15 * Math.PI) / 180), R * 0.9)
         : 0;
-    const ySource = sfd - R;
+    const ySource = geometry === "dwsi" ? Math.max(R * 1.04, sfd - R) : sfd - R;
     xSourceCoord = offset;
     ySourceCoord = ySource;
     elements.push(
       <SourceMarker key="s" transform={transform} kind="dot" x={offset} y={ySource} />,
     );
-    const arc =
+    const arc: [number, number] =
       geometry === "dwsi"
         ? [220, 320]
         : geometry === "dwdi_elliptic"
           ? [200, 340]
           : [210, 330];
     const cx = geometry === "dwdi_elliptic" ? -offset * 0.5 : 0;
-    elements.push(
-      <path
-        key="det"
-        d={arcPath(transform, R * 1.04, arc[0], arc[1])}
-        fill="none"
-        stroke={detColor}
-        strokeWidth={4}
-        transform={`translate(${transform.X(cx) - transform.X(0)}, 0)`}
-      />,
-    );
-    const spread = geometry === "dwdi_elliptic" ? [-50, 30] : [-40, 40];
-    const targets = spread.map((angle) => {
-      const rad = (angle * Math.PI) / 180;
-      return [cx + R * Math.cos(rad), R * Math.sin(rad)] as [number, number];
-    });
-    elements.push(
-      <polygon
-        key="beam"
-        points={`${transform.X(offset)},${transform.Y(ySource)} ${transform.X(targets[0][0])},${transform.Y(targets[0][1])} ${transform.X(targets[1][0])},${transform.Y(targets[1][1])}`}
-        fill={beamColor}
-        opacity={0.15}
-      />,
-    );
+    if (!panelWidth) {
+      elements.push(
+        <path
+          key="det"
+          d={arcPath(transform, R * 1.04, arc[0], arc[1])}
+          fill="none"
+          stroke={detColor}
+          strokeWidth={4}
+          transform={`translate(${transform.X(cx) - transform.X(0)}, 0)`}
+        />,
+      );
+    }
+    elements.push(renderBeamCone(offset, ySource, cx, arc[0], arc[1]));
     labelItems.push({ text: labels.source, x: offset, y: ySource + R * 0.22 });
     if (geometry === "dwdi_elliptic") {
       // Source offset dimension arrow
@@ -556,6 +620,25 @@ export function WeldSetupSvg({
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="sketch-svg" role="img" aria-label={labels.pipe}>
+      <defs>
+        <pattern
+          id="beam-hatch-2d"
+          width="7"
+          height="7"
+          patternTransform="rotate(45 0 0)"
+          patternUnits="userSpaceOnUse"
+        >
+          <line
+            x1="0"
+            y1="0"
+            x2="0"
+            y2="7"
+            stroke={beamColor}
+            strokeWidth="1.2"
+            opacity="0.55"
+          />
+        </pattern>
+      </defs>
       <circle
         cx={transform.X(0)}
         cy={transform.Y(0)}
@@ -1305,6 +1388,25 @@ export function StandardFigureSvg({ figure, title }: { figure: string; title: st
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="sketch-svg" role="img" aria-label={title}>
+      <defs>
+        <pattern
+          id="beam-hatch-std"
+          width="7"
+          height="7"
+          patternTransform="rotate(45 0 0)"
+          patternUnits="userSpaceOnUse"
+        >
+          <line
+            x1="0"
+            y1="0"
+            x2="0"
+            y2="7"
+            stroke={beamColor}
+            strokeWidth="1.2"
+            opacity="0.5"
+          />
+        </pattern>
+      </defs>
       <circle
         cx={transform.X(0)}
         cy={transform.Y(0)}
@@ -1324,29 +1426,60 @@ export function StandardFigureSvg({ figure, title }: { figure: string; title: st
       />
       {spec.beams?.map((beam, index) => {
         const [a1, a2] = beam.angles;
-        const p1 = [
+        let p1: [number, number] = [
           beam.radius * Math.cos((a1 * Math.PI) / 180),
           beam.radius * Math.sin((a1 * Math.PI) / 180),
         ];
-        const p2 = [
+        let p2: [number, number] = [
           beam.radius * Math.cos((a2 * Math.PI) / 180),
           beam.radius * Math.sin((a2 * Math.PI) / 180),
         ];
+        let conePath: string;
+        if (spec.detector.kind === "flat") {
+          const yFlat = spec.detector.y ?? -1.2;
+          const xMin = spec.detector.x1 ?? -1;
+          const xMax = spec.detector.x2 ?? 1;
+          const projX = (px: number, py: number) => {
+            const dy = py - beam.from[1];
+            if (Math.abs(dy) < 1e-6) return px;
+            const xAt = beam.from[0] + ((px - beam.from[0]) * (yFlat - beam.from[1])) / dy;
+            return Math.max(xMin, Math.min(xMax, xAt));
+          };
+          p1 = [projX(p1[0], p1[1]), yFlat];
+          p2 = [projX(p2[0], p2[1]), yFlat];
+          conePath = `M ${transform.X(beam.from[0])},${transform.Y(beam.from[1])} L ${transform.X(p1[0])},${transform.Y(p1[1])} L ${transform.X(p2[0])},${transform.Y(p2[1])} Z`;
+        } else {
+          const rArc =
+            spec.detector.kind === "inner"
+              ? 0.8
+              : spec.detector.kind === "circle"
+                ? 1.08
+                : 1.04;
+          p1 = [
+            rArc * Math.cos((a1 * Math.PI) / 180),
+            rArc * Math.sin((a1 * Math.PI) / 180),
+          ];
+          p2 = [
+            rArc * Math.cos((a2 * Math.PI) / 180),
+            rArc * Math.sin((a2 * Math.PI) / 180),
+          ];
+          const large = Math.abs(a2 - a1) > 180 ? 1 : 0;
+          const sweep = a2 > a1 ? 0 : 1;
+          const rScaled = rArc * transform.scale;
+          conePath = `M ${transform.X(beam.from[0])},${transform.Y(beam.from[1])} L ${transform.X(p1[0])},${transform.Y(p1[1])} A ${rScaled} ${rScaled} 0 ${large} ${sweep} ${transform.X(p2[0])},${transform.Y(p2[1])} Z`;
+        }
         return (
           <g key={index}>
-            <polygon
-              points={`${transform.X(beam.from[0])},${transform.Y(beam.from[1])} ${transform.X(p1[0])},${transform.Y(p1[1])} ${transform.X(p2[0])},${transform.Y(p2[1])}`}
-              fill={beamColor}
-              opacity={0.12}
-            />
+            <path d={conePath} fill={beamColor} opacity={0.14} />
+            <path d={conePath} fill="url(#beam-hatch-std)" opacity={0.55} />
             <line
               x1={transform.X(beam.from[0])}
               y1={transform.Y(beam.from[1])}
               x2={transform.X(p1[0])}
               y2={transform.Y(p1[1])}
               stroke={beamColor}
-              strokeWidth={1.2}
-              strokeDasharray="3 3"
+              strokeWidth={1.3}
+              strokeDasharray="4 3"
             />
             <line
               x1={transform.X(beam.from[0])}
@@ -1354,8 +1487,8 @@ export function StandardFigureSvg({ figure, title }: { figure: string; title: st
               x2={transform.X(p2[0])}
               y2={transform.Y(p2[1])}
               stroke={beamColor}
-              strokeWidth={1.2}
-              strokeDasharray="3 3"
+              strokeWidth={1.3}
+              strokeDasharray="4 3"
             />
           </g>
         );

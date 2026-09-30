@@ -86,6 +86,44 @@ def test_clause_7_6_cap_rule(engine):
     assert v2["f_min_iso"] == pytest.approx(15.0 * 2.0 * (8.0 ** (2.0 / 3.0)))
     assert any("≥ 1.2×t (7.2 mm)" in w for w in res_large_cap["warnings"])
 
+    # Regression (user case): t=5.2, cap=2.0, d=3.0 (even if stale b_object=5.0 is passed)
+    # Total thickness t+cap = 7.2 mm >= 1.2*5.2 (6.24 mm) -> b_dist = 7.2, b_eff = 7.2, Ug uses b = 7.2
+    res_user_case = engine.calculate({
+        "geometry": "dwsi", "tech": "analog", "t": 5.2, "cap": 2.0, "d": 3.0,
+        "sfd": 600.0, "b_object": 5.0,
+    })
+    v3 = res_user_case["values"]
+    assert v3["b_dist"] == pytest.approx(7.2)
+    assert v3["b_eff"] == pytest.approx(7.2)
+    assert v3["b_rule_applied"] is False
+    assert v3["f_min_iso"] == pytest.approx(15.0 * 3.0 * (7.2 ** (2.0 / 3.0)))
+    assert v3["ug"] == pytest.approx(3.0 * 7.2 / (600.0 - 7.2))
+
+
+def test_swsi_panoramic_excludes_film_diagonal_coverage(engine):
+    # SWSI Panoramic (fig5): 80x300 mm film (df = 310.48 mm, 1.4*df = 434.68 mm)
+    # should NOT override SFD_min = f_min + b
+    res_pano = engine.calculate({
+        "geometry": "swsi", "std_figure": "fig5", "tech": "analog",
+        "od": 406.4, "t": 5.2, "cap": 2.0, "d": 3.0, "sfd": 203.2,
+        "film_width": 80.0, "film_height": 300.0,
+    })
+    vp = res_pano["values"]
+    assert vp["coverage_min"] == 0.0
+    assert vp["sfd_min"] == pytest.approx(vp["f_min"] + vp["b_dist"])
+    assert vp["sfd_min_provenance"]["active"] == "f_min_plus_b"
+
+    # SWSI Directional (fig2): 80x300 mm film -> 1.4*df (~434.7 mm) DOES govern
+    res_dir = engine.calculate({
+        "geometry": "swsi", "std_figure": "fig2", "tech": "analog",
+        "od": 406.4, "t": 5.2, "cap": 2.0, "d": 3.0, "sfd": 600.0,
+        "film_width": 80.0, "film_height": 300.0,
+    })
+    vd = res_dir["values"]
+    assert vd["coverage_min"] == pytest.approx(1.4 * ((80.0 ** 2 + 300.0 ** 2) ** 0.5))
+    assert vd["sfd_min"] == pytest.approx(vd["coverage_min"])
+    assert vd["sfd_min_provenance"]["active"] == "coverage"
+
 
 def test_dwdi_forced_to_dwsi_over_100mm(engine):
     result = engine.calculate({
@@ -257,3 +295,38 @@ def test_f_min_provenance_base_and_level3_reduction(engine):
     assert reduced["display"]["f_min"] == "118.9 mm"
     text = format_f_min_provenance(prov_r, Translation())
     assert "148.6" in text and "118.9" in text and "Level 3" in text
+
+
+def test_digital_exposure_methods_and_dda_frame_display(engine):
+    # 1. DDA Frame Integration method displays (N×t_frame) and provenance
+    res_dda = engine.calculate({
+        "tech": "digital", "detector_type": "dda_si", "source": "x_ray",
+        "chart_source": "dda_frame_method", "app_kv": 160.0, "output_val": 5.0,
+        "od": 114.3, "t": 6.02, "sfd": 600.0, "app_srb": 100.0,
+    }, {}, "tr")
+    assert res_dda["values"]["exposure_time_provenance"]["method"] == "dda_frame_method"
+    assert "×" in res_dda["display"]["calc_time"]
+    assert "ASTM E2698" in res_dda["values"]["exposure_time_provenance_text"]
+
+    # 2. CR IPS Chart (ISO 16371-1)
+    res_cr = engine.calculate({
+        "tech": "digital", "detector_type": "cr_standard", "source": "isotope_ir192",
+        "chart_source": "cr_ips_chart", "output_val": 40.0,
+        "od": 114.3, "t": 8.0, "sfd": 600.0, "app_srb": 100.0,
+    }, {}, "tr")
+    assert res_cr["values"]["exposure_time_provenance"]["method"] == "cr_ips_chart"
+    assert "[ISO 16371-1 CR IP]" in res_cr["display"]["calc_time"]
+    assert "ISO 16371-1" in res_cr["values"]["exposure_time_provenance_text"]
+
+    # 3. Finer SRb requires higher dose (longer exposure time)
+    res_srb_100 = engine.calculate({
+        "tech": "digital", "detector_type": "cr_standard", "source": "x_ray",
+        "chart_source": "model", "app_kv": 150.0, "output_val": 5.0,
+        "od": 114.3, "t": 6.02, "sfd": 600.0, "app_srb": 100.0,
+    })
+    res_srb_50 = engine.calculate({
+        "tech": "digital", "detector_type": "cr_standard", "source": "x_ray",
+        "chart_source": "model", "app_kv": 150.0, "output_val": 5.0,
+        "od": 114.3, "t": 6.02, "sfd": 600.0, "app_srb": 50.0,
+    })
+    assert res_srb_50["values"]["calc_time"] > res_srb_100["values"]["calc_time"]

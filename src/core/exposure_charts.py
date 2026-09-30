@@ -82,6 +82,80 @@ class ExposureChartDatabase:
 
     TYPE_X_KV_VALUES = [80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 350]
 
+    # ISO 16371-1 / EN 14784-1 CR Phosphor Imaging Plate R-Factor table
+    # (Reference detector dose in Roentgen for normalized SNR_N = 70 at native SR_b)
+    CR_IPS_TABLE = {
+        "cr_standard": {  # IPS-2 / IPS-3 Standard BaFBr:Eu plate (SR_b,ref = 100 µm)
+            "ips_class": "IPS-2 / Standart IP",
+            "srb_ref_um": 100.0,
+            "r_factors": {
+                "isotope_ir192": 0.18,
+                "isotope_se75": 0.11,
+                "isotope_co60": 0.07,
+                "isotope_yb169": 0.06,
+                "isotope_tm170": 0.04,
+            },
+        },
+        "cr_highres": {  # IPS-1 High-Resolution HD-IP plate (SR_b,ref = 50 µm)
+            "ips_class": "IPS-1 / HD Yüksek Çözünürlük IP",
+            "srb_ref_um": 50.0,
+            "r_factors": {
+                "isotope_ir192": 0.26,
+                "isotope_se75": 0.16,
+                "isotope_co60": 0.10,
+                "isotope_yb169": 0.09,
+                "isotope_tm170": 0.06,
+            },
+        },
+    }
+    CR_IPS_TABLE["cr_hires"] = CR_IPS_TABLE["cr_highres"]
+
+    # ASTM E2698 / E2736 DDA Flat Panel Detector Chart & Frame Integration Specs
+    DDA_PANEL_TABLE = {
+        "dda_si": {  # Amorphous Silicon (a-Si) + CsI:Tl Needle Scintillator
+            "panel_class": "a-Si + CsI:Tl Düz Panel",
+            "srb_ref_um": 130.0,
+            "frame_target_dose_ugy": 12.0,
+            "single_frame_snr_ref": 45.0,
+            "target_gray_pct": 65.0,
+            "r_factors": {
+                "isotope_ir192": 0.045,
+                "isotope_se75": 0.028,
+                "isotope_co60": 0.025,
+                "isotope_yb169": 0.016,
+                "isotope_tm170": 0.012,
+            },
+        },
+        "dda_se": {  # Amorphous Selenium (a-Se) Direct Conversion Photoconductor
+            "panel_class": "a-Se Doğrudan Dönüşüm Panel",
+            "srb_ref_um": 85.0,
+            "frame_target_dose_ugy": 18.0,
+            "single_frame_snr_ref": 42.0,
+            "target_gray_pct": 65.0,
+            "r_factors": {
+                "isotope_ir192": 0.085,
+                "isotope_se75": 0.042,
+                "isotope_co60": 0.055,
+                "isotope_yb169": 0.018,
+                "isotope_tm170": 0.011,
+            },
+        },
+        "dda_gdos": {  # Amorphous Silicon + Gd2O2S:Tb Scintillator
+            "panel_class": "Gd₂O₂S:Tb Sintilatör DDA Panel",
+            "srb_ref_um": 160.0,
+            "frame_target_dose_ugy": 16.0,
+            "single_frame_snr_ref": 40.0,
+            "target_gray_pct": 65.0,
+            "r_factors": {
+                "isotope_ir192": 0.052,
+                "isotope_se75": 0.032,
+                "isotope_co60": 0.028,
+                "isotope_yb169": 0.020,
+                "isotope_tm170": 0.015,
+            },
+        },
+    }
+
     def __init__(self, json_path=None):
         self.R_FACTOR_TABLE = {
             k: dict(v) for k, v in self.__class__.R_FACTOR_TABLE.items()
@@ -97,6 +171,43 @@ class ExposureChartDatabase:
         if film_key not in self.R_FACTOR_TABLE:
             return None
         return self.R_FACTOR_TABLE[film_key].get(source, None)
+
+    def lookup_digital_r_factor(self, detector_type, source):
+        """Returns (r_factor_ref, spec_dict) for CR IP or DDA flat panel."""
+        if detector_type in self.CR_IPS_TABLE:
+            spec = self.CR_IPS_TABLE[detector_type]
+            return spec["r_factors"].get(source, None), spec
+        if detector_type in self.DDA_PANEL_TABLE:
+            spec = self.DDA_PANEL_TABLE[detector_type]
+            return spec["r_factors"].get(source, None), spec
+        return None, None
+
+    def calculate_exposure_time_digital_rfactor(
+        self, sdd, w, source, activity, detector_type,
+        target_snr=70.0, srb_factor=1.0, ref_factor=1.0,
+    ):
+        """
+        Calculates digital CR / DDA exposure time (in minutes) using the
+        calibrated CR IPS (ISO 16371-1) or DDA Panel (ASTM E2698) R-Factor
+        table at reference SNR_N = 70, scaled by quantum statistics:
+            T[min] = 60 * [R_dig * (SNR_target / 70)^2 * k_SRb * (SDD/1000)^2 * 2^(w_eq/HVL)] / (A * Gamma)
+        """
+        r_dig, spec = self.lookup_digital_r_factor(detector_type, source)
+        if r_dig is None:
+            return None
+        hvl = self.HVL.get(source, 13.2)
+        gamma = self.GAMMA.get(source, 0.48)
+        if gamma <= 0 or activity <= 0:
+            return None
+        snr_val = max(10.0, float(target_snr if target_snr else 70.0))
+        snr_corr = (snr_val / 70.0) ** 2
+        sdd_m = float(sdd) / 1000.0
+        w_eq = float(w) * float(ref_factor if ref_factor and ref_factor > 0 else 1.0)
+        attenuation = 2.0 ** (w_eq / hvl)
+        k_srb = max(0.25, min(4.0, float(srb_factor if srb_factor else 1.0)))
+
+        t_hours = (r_dig * snr_corr * k_srb * (sdd_m ** 2) * attenuation) / (activity * gamma)
+        return t_hours * 60.0
 
     def get_available_films(self):
         return list(self.R_FACTOR_TABLE.keys())

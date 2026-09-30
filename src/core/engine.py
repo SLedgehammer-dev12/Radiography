@@ -161,35 +161,102 @@ def format_exposure_time_provenance(prov, trans):
                 f"R_eff={r_eff:.3f} (table R={r_raw:.2f}), HVL={hvl:.1f} mm, Γ={gamma:.3f} R·m²/(Ci·h), "
                 f"Target D={target_od:.1f} (k_OD={od_factor:.2f}×), SFD={sfd:.0f} mm, A={output_val:.1f} Ci"
             )
-    elif method == "type_x":
-        kv = prov.get("kv", 120.0) or 120.0
-        exp_chart = prov.get("exposure_mamin_chart", 0.0) or 0.0
-        sfd_ref = prov.get("sfd_ref", 700.0) or 700.0
-        rec_mod = prov.get("receptor_mod", 1.0) or 1.0
+    elif method in ("cr_ips_chart", "dda_panel_chart"):
+        det_lbl = prov.get("detector_class_label", prov.get("detector_type", "CR/DDA"))
+        r_dig = prov.get("r_factor_digital", 0.18) or 0.18
+        hvl = prov.get("hvl", 13.2) or 13.2
+        gamma = prov.get("gamma", 0.48) or 0.48
+        target_snr = prov.get("target_snr", 100.0) or 100.0
+        snr_factor = prov.get("snr_factor", 1.0) or 1.0
+        srb_factor = prov.get("srb_factor", 1.0) or 1.0
+        srb_ref = prov.get("srb_ref", 100.0) or 100.0
+        app_srb = prov.get("app_srb")
+        std_tag = "ISO 16371-1 CR IP R-Faktör Tablosu" if method == "cr_ips_chart" else "ASTM E2698 DDA Panel Doz-SNR Tablosu"
+        std_tag_en = "ISO 16371-1 CR IP R-Factor Chart" if method == "cr_ips_chart" else "ASTM E2698 DDA Panel Dose-SNR Chart"
+        srb_txt = (
+            f", k_SRb=({srb_ref:.0f}/{float(app_srb):.0f})²={srb_factor:.2f}×"
+            if (app_srb and abs(srb_factor - 1.0) > 1e-3) else ""
+        )
         if tr:
             parts.append(
-                f"Yöntem: Type X (X-Ray Poz Diyagramı, 2B Log-İnterpolasyon) | "
-                f"Formül: T[dk] = [E_tablo(kV, w_eq) × ({dist_lbl}/{sfd_ref:.0f})² × k_alıcı] / I"
+                f"Yöntem: {std_tag} ({det_lbl}) | "
+                f"Formül: T[dk] = 60 × [R_dig × (SNR_hedef/70)² × k_SRb × (SDD/1000)² × 2^(w_eq/HVL)] / (A × Γ)"
             )
             ref_txt = f", REF={ref_factor:.2f} → w_eq={w_eq:.2f} mm" if abs(ref_factor - 1.0) > 1e-3 else ""
             parts.append(
                 f"Parametreler: Malzeme={mat_label} (w_eff={w_eff:.2f} mm{ref_txt}), "
-                f"U={kv:.0f} kV → E_tablo={exp_chart:.3f} mA·dk (@700 mm, C5, D=2.0), "
-                f"k_alıcı={rec_mod:.2f}×, {dist_lbl}={sfd:.0f} mm, I={output_val:.1f} mA"
+                f"R_dig={r_dig:.3f} R (@SNR_N=70), HVL={hvl:.1f} mm, Γ={gamma:.3f} R·m²/(Ci·h), "
+                f"Hedef SNR_N={target_snr:.0f} (k_SNR={snr_factor:.2f}×{srb_txt}), SDD={sfd:.0f} mm, A={output_val:.1f} Ci"
             )
         else:
             parts.append(
-                f"Method: Type X (X-Ray Exposure Chart, 2D Log-Interpolation) | "
-                f"Formula: T[min] = [E_chart(kV, w_eq) × ({dist_lbl}/{sfd_ref:.0f})² × k_receptor] / I"
+                f"Method: {std_tag_en} ({det_lbl}) | "
+                f"Formula: T[min] = 60 × [R_dig × (SNR_target/70)² × k_SRb × (SDD/1000)² × 2^(w_eq/HVL)] / (A × Γ)"
             )
             ref_txt = f", REF={ref_factor:.2f} → w_eq={w_eq:.2f} mm" if abs(ref_factor - 1.0) > 1e-3 else ""
             parts.append(
                 f"Parameters: Material={mat_label} (w_eff={w_eff:.2f} mm{ref_txt}), "
-                f"U={kv:.0f} kV → E_chart={exp_chart:.3f} mA·min (@700 mm, C5, D=2.0), "
-                f"k_receptor={rec_mod:.2f}×, {dist_lbl}={sfd:.0f} mm, I={output_val:.1f} mA"
+                f"R_dig={r_dig:.3f} R (@SNR_N=70), HVL={hvl:.1f} mm, Γ={gamma:.3f} R·m²/(Ci·h), "
+                f"Target SNR_N={target_snr:.0f} (k_SNR={snr_factor:.2f}×{srb_txt}), SDD={sfd:.0f} mm, A={output_val:.1f} Ci"
             )
+    elif method in ("type_x", "digital_xray_chart"):
+        kv = prov.get("kv", 120.0) or 120.0
+        exp_chart = prov.get("exposure_mamin_chart", 0.0) or 0.0
+        sfd_ref = prov.get("sfd_ref", 700.0) or 700.0
+        rec_mod = prov.get("receptor_mod", 1.0) or 1.0
+        det_factor = prov.get("det_factor", 1.0) or 1.0
+        target_snr = prov.get("target_snr", 100.0) or 100.0
+        srb_factor = prov.get("srb_factor", 1.0) or 1.0
+        if tech == "digital":
+            if tr:
+                parts.append(
+                    f"Yöntem: Dijital X-Işını Pozlama Abağı (kV–mA·dk–SNR_N 2B Log-İnterpolasyon) | "
+                    f"Formül: T[dk] = [E_tablo(kV, w_eq) × (SDD/{sfd_ref:.0f})² × (SNR_hedef/70)² × k_SRb / η_DQE(E)] / I"
+                )
+                ref_txt = f", REF={ref_factor:.2f} → w_eq={w_eq:.2f} mm" if abs(ref_factor - 1.0) > 1e-3 else ""
+                parts.append(
+                    f"Parametreler: Malzeme={mat_label} (w_eff={w_eff:.2f} mm{ref_txt}), "
+                    f"U={kv:.0f} kV → E_tablo={exp_chart:.3f} mA·dk (@700 mm, SNR_N=70), "
+                    f"η_DQE(E)={det_factor:.2f}×, Hedef SNR_N={target_snr:.0f}, k_SRb={srb_factor:.2f}× → k_alıcı={rec_mod:.2f}×, "
+                    f"SDD={sfd:.0f} mm, I={output_val:.1f} mA"
+                )
+            else:
+                parts.append(
+                    f"Method: Digital X-Ray Exposure Chart (kV–mA·min–SNR_N 2D Log-Interpolation) | "
+                    f"Formula: T[min] = [E_chart(kV, w_eq) × (SDD/{sfd_ref:.0f})² × (SNR_target/70)² × k_SRb / η_DQE(E)] / I"
+                )
+                ref_txt = f", REF={ref_factor:.2f} → w_eq={w_eq:.2f} mm" if abs(ref_factor - 1.0) > 1e-3 else ""
+                parts.append(
+                    f"Parameters: Material={mat_label} (w_eff={w_eff:.2f} mm{ref_txt}), "
+                    f"U={kv:.0f} kV → E_chart={exp_chart:.3f} mA·min (@700 mm, SNR_N=70), "
+                    f"η_DQE(E)={det_factor:.2f}×, Target SNR_N={target_snr:.0f}, k_SRb={srb_factor:.2f}× → k_receptor={rec_mod:.2f}×, "
+                    f"SDD={sfd:.0f} mm, I={output_val:.1f} mA"
+                )
+        else:
+            if tr:
+                parts.append(
+                    f"Yöntem: Type X (X-Ray Poz Diyagramı, 2B Log-İnterpolasyon) | "
+                    f"Formül: T[dk] = [E_tablo(kV, w_eq) × ({dist_lbl}/{sfd_ref:.0f})² × k_alıcı] / I"
+                )
+                ref_txt = f", REF={ref_factor:.2f} → w_eq={w_eq:.2f} mm" if abs(ref_factor - 1.0) > 1e-3 else ""
+                parts.append(
+                    f"Parametreler: Malzeme={mat_label} (w_eff={w_eff:.2f} mm{ref_txt}), "
+                    f"U={kv:.0f} kV → E_tablo={exp_chart:.3f} mA·dk (@700 mm, C5, D=2.0), "
+                    f"k_alıcı={rec_mod:.2f}×, {dist_lbl}={sfd:.0f} mm, I={output_val:.1f} mA"
+                )
+            else:
+                parts.append(
+                    f"Method: Type X (X-Ray Exposure Chart, 2D Log-Interpolation) | "
+                    f"Formula: T[min] = [E_chart(kV, w_eq) × ({dist_lbl}/{sfd_ref:.0f})² × k_receptor] / I"
+                )
+                ref_txt = f", REF={ref_factor:.2f} → w_eq={w_eq:.2f} mm" if abs(ref_factor - 1.0) > 1e-3 else ""
+                parts.append(
+                    f"Parameters: Material={mat_label} (w_eff={w_eff:.2f} mm{ref_txt}), "
+                    f"U={kv:.0f} kV → E_chart={exp_chart:.3f} mA·min (@700 mm, C5, D=2.0), "
+                    f"k_receptor={rec_mod:.2f}×, {dist_lbl}={sfd:.0f} mm, I={output_val:.1f} mA"
+                )
     else:
-        # Physics model (Beer-Lambert + Inverse Square Law)
+        # Physics model (Beer-Lambert + Inverse Square Law) or ASTM E2698 DDA Frame Method
         base_e = prov.get("base_factor", 3.0) or 3.0
         mu_raw = prov.get("mu_raw", 0.035) or 0.035
         mu_eff = prov.get("mu_eff", mu_raw) or mu_raw
@@ -223,20 +290,39 @@ def format_exposure_time_provenance(prov, trans):
             det_factor = prov.get("det_factor", 1.0) or 1.0
             target_snr = prov.get("target_snr", 100.0) or 100.0
             snr_factor = prov.get("snr_factor", 1.0) or 1.0
-            if tr:
-                parts.append(
-                    f"Yöntem: Analitik Fizik Modeli (Beer-Lambert + Ters Kare + Kuantum DQE/SNR²) | "
-                    f"Formül: T[dk] = [E_baz × (SDD/1000)² × e^(μ_eff·w_eff) / P] × [(SNR_hedef/70)² / η_DQE]"
-                )
+            srb_factor = prov.get("srb_factor", 1.0) or 1.0
+            srb_ref = prov.get("srb_ref", 100.0) or 100.0
+            app_srb = prov.get("app_srb")
+            srb_str = (
+                f", k_SRb=({srb_ref:.0f}/{float(app_srb):.0f})²={srb_factor:.2f}×"
+                if (app_srb and abs(srb_factor - 1.0) > 1e-3) else ""
+            )
+            if method == "dda_frame_method":
+                if tr:
+                    parts.append(
+                        f"Yöntem: ASTM E2698 DDA Kare Entegrasyon & Doygunluk Yöntemi (T = N_kare × t_kare) | "
+                        f"Formül: t_kare = D_hedef(%65 ADC)/Ḋ_det, N_kare = ⌈(SNR_hedef / SNR_1kare)² × k_SRb⌉"
+                    )
+                else:
+                    parts.append(
+                        f"Method: ASTM E2698 DDA Frame Integration & Saturation Method (T = N_frames × t_frame) | "
+                        f"Formula: t_frame = D_target(65% ADC)/Ḋ_det, N_frames = ⌈(SNR_target / SNR_1frame)² × k_SRb⌉"
+                    )
             else:
-                parts.append(
-                    f"Method: Analytical Physics Model (Beer-Lambert + Inverse Square + Quantum DQE/SNR²) | "
-                    f"Formula: T[min] = [E_base × (SDD/1000)² × e^(μ_eff·w_eff) / P] × [(SNR_target/70)² / η_DQE]"
-                )
+                if tr:
+                    parts.append(
+                        f"Yöntem: ISO 17636-2 Analitik Kuantum DQE(E) & SNR Modeli | "
+                        f"Formül: T[dk] = [E_baz × (SDD/1000)² × e^(μ_eff·w_eff) / P] × [(SNR_hedef/70)² × k_SRb / η_DQE(E)]"
+                    )
+                else:
+                    parts.append(
+                        f"Method: ISO 17636-2 Analytical Quantum DQE(E) & SNR Model | "
+                        f"Formula: T[min] = [E_base × (SDD/1000)² × e^(μ_eff·w_eff) / P] × [(SNR_target/70)² × k_SRb / η_DQE(E)]"
+                    )
             qual_str = (
-                f"Dedektör={det_type} (η_DQE={det_factor:.2f}×), Hedef SNR_N={target_snr:.0f} → k_SNR=({target_snr:.0f}/70)²={snr_factor:.2f}×"
+                f"Dedektör={det_type} (η_DQE(E)={det_factor:.2f}×), Hedef SNR_N={target_snr:.0f} → k_SNR=({target_snr:.0f}/70)²={snr_factor:.2f}×{srb_str}"
                 if tr else
-                f"Detector={det_type} (η_DQE={det_factor:.2f}×), Target SNR_N={target_snr:.0f} → k_SNR=({target_snr:.0f}/70)²={snr_factor:.2f}×"
+                f"Detector={det_type} (η_DQE(E)={det_factor:.2f}×), Target SNR_N={target_snr:.0f} → k_SNR=({target_snr:.0f}/70)²={snr_factor:.2f}×{srb_str}"
             )
 
         if source == "x_ray":
@@ -261,6 +347,25 @@ def format_exposure_time_provenance(prov, trans):
             parts.append(
                 f"Parameters: Material={mat_label} (w_eff={w_eff:.2f} mm), {mu_str}, "
                 f"e^(μ·w)={atten:.2f}×, E_base={base_e:.2f} {e_unit}, {dist_lbl}={sfd:.0f} mm, P={output_val:.1f} {out_unit} | {qual_str}"
+            )
+
+    # DDA Frame Integration breakdown (when DDA flat panel is active)
+    dda_frame = prov.get("dda_frame")
+    if dda_frame and tech == "digital":
+        n_fr = dda_frame.get("n_frames", 1)
+        t_fr = dda_frame.get("t_frame_sec", 1.0)
+        gray_pct = dda_frame.get("target_gray_pct", 65.0)
+        adu = dda_frame.get("target_adu_16bit", 42600)
+        snr_1 = dda_frame.get("snr_1frame", 42.0)
+        if tr:
+            parts.append(
+                f"DDA Kare Entegrasyonu (ASTM E2698): Önerilen Tek Kare Süresi t_kare={t_fr:.2f} sn × "
+                f"Kare Ortalaması N_kare={n_fr} adet (SNR_1kare≈{snr_1:.0f}, Hedef Gri Seviye=%{gray_pct:.0f} ADC ≈ {adu} ADU)"
+            )
+        else:
+            parts.append(
+                f"DDA Frame Integration (ASTM E2698): Recommended Single Frame t_frame={t_fr:.2f} s × "
+                f"Frame Average N_frames={n_fr} (SNR_1frame≈{snr_1:.0f}, Target Gray Level={gray_pct:.0f}% ADC ≈ {adu} ADU)"
             )
 
     # Extra multipliers (Level 3 SFD compensation & Field factor F)
@@ -492,9 +597,12 @@ class CalculationEngine:
 
         f_min_star = None
         ci_factor = None
+        cap_for_b = cap if geometry in ("swsi", "dwsi") else 0.0
+        w_weld = t + cap_for_b
+        cap_exceeds_rule = w_weld >= 1.2 * t - 1e-9
         if geometry in ("dwdi_elliptic", "dwdi_super"):
             b_dist = b_override if (b_override is not None and b_override > 0.0) else od
-            f_min_iso_base = calc.calculate_f_min(d, b_dist, testing_class, t)
+            f_min_iso_base = calc.calculate_f_min(d, b_dist, testing_class, t, cap=0.0)
         elif is_planar:
             if b_override is not None and b_override > 0.0:
                 b_dist = b_override
@@ -510,12 +618,13 @@ class CalculationEngine:
             if f_min_star is not None:
                 f_min_iso_base = f_min_star
             else:
-                f_min_iso_base = calc.calculate_f_min(d, b_dist, testing_class, t)
+                f_min_iso_base = calc.calculate_f_min(d, b_dist, testing_class, t, cap=cap_for_b)
         else:
-            b_dist = b_override if (b_override is not None and b_override > 0.0) else (t + cap)
-            f_min_iso_base = calc.calculate_f_min(d, b_dist, testing_class, t)
-        b_eff, b_rule_applied = calc.get_effective_b(b_dist, t)
-        b_geom = b_eff if (not is_planar and b_rule_applied) else b_dist
+            b_raw = b_override if (b_override is not None and b_override > 0.0) else w_weld
+            b_dist = max(b_raw, w_weld) if cap_exceeds_rule else b_raw
+            f_min_iso_base = calc.calculate_f_min(d, b_dist, testing_class, t, cap=cap_for_b)
+        b_eff, b_rule_applied = calc.get_effective_b(b_dist, t, cap=cap_for_b)
+        b_geom = b_dist if is_planar else (b_eff if (b_rule_applied or b_eff > b_dist) else max(b_dist, b_eff if cap_exceeds_rule else b_dist))
 
         f_min_asme_base = None
         if standard == "asme":
@@ -533,14 +642,15 @@ class CalculationEngine:
             df = calc.calculate_diagonal(receptor_w, receptor_h)
             dd = None
         receptor_size = dd if is_digital else df
-        coverage_min = calc.calculate_coverage_min(receptor_size)
+        is_panoramic = calc.is_central_projection(geometry, std_figure)
+        coverage_min = 0.0 if is_panoramic else calc.calculate_coverage_min(receptor_size)
 
         dwsi_physical_min = 0.0
         if geometry == "dwsi" and od > 0.0:
             dwsi_physical_min = od + max(0.0, bgap)
 
         lvl3_dw = bool(lvl3.get("dw_reduction")) and calc.is_double_wall_technique(geometry)
-        lvl3_central = bool(lvl3.get("central_proj_reduction")) and calc.is_central_projection(geometry, std_figure)
+        lvl3_central = bool(lvl3.get("central_proj_reduction")) and is_panoramic
         l3_factor = (0.8 if lvl3_dw else 1.0) * (0.5 if lvl3_central else 1.0)
 
         f_min_iso = f_min_iso_base * l3_factor
@@ -563,18 +673,19 @@ class CalculationEngine:
             f_formula = "sfd_prov_formula_f13"
         else:
             f_formula = "sfd_prov_formula_f2"
-        provenance = {
-            "active": active_source,
-            "candidates": [
-                {
-                    "key": "f_min_plus_b",
-                    "value": sfd_min_iso_b,
-                    "f_min": f_min,
-                    "b": b_geom,
-                    "formula_key": f_formula,
-                    "l3_dw": lvl3_dw,
-                    "l3_central": lvl3_central,
-                },
+        candidates = [
+            {
+                "key": "f_min_plus_b",
+                "value": sfd_min_iso_b,
+                "f_min": f_min,
+                "b": b_geom,
+                "formula_key": f_formula,
+                "l3_dw": lvl3_dw,
+                "l3_central": lvl3_central,
+            },
+        ]
+        if not is_panoramic:
+            candidates.append(
                 {
                     "key": "coverage",
                     "value": coverage_min,
@@ -583,13 +694,19 @@ class CalculationEngine:
                     "factor": 1.4,
                     "formula_key": ("sfd_prov_formula_f7" if is_digital
                                     else "sfd_prov_formula_f4"),
-                },
-                {
-                    "key": "dwsi_floor",
-                    "value": dwsi_physical_min,
-                    "formula_key": "sfd_prov_formula_dwsi_floor",
-                },
-            ],
+                }
+            )
+        candidates.append(
+            {
+                "key": "dwsi_floor",
+                "value": dwsi_physical_min,
+                "formula_key": "sfd_prov_formula_dwsi_floor",
+            }
+        )
+        provenance = {
+            "active": active_source,
+            "is_panoramic": is_panoramic,
+            "candidates": candidates,
         }
 
         ug = calc.calculate_geometric_unsharpness_from_sfd(d, b_geom, sfd)
@@ -967,6 +1084,7 @@ class CalculationEngine:
             chart_db=self.chart_db,
             density=required_density,
             target_snr=target_snr_val if tech == "digital" else None,
+            app_srb=f.get("app_srb") if tech == "digital" else None,
         )
         min_calc = exp_details["minutes"]
         sec_calc = exp_details["seconds"]
@@ -998,6 +1116,21 @@ class CalculationEngine:
             raw_time = raw_time * base_multiplier
             min_calc = int(raw_time // 60)
             sec_calc = int(raw_time % 60)
+
+        # Keep DDA frame integration in sync if Level 3 SFD comp or Field Factor F scaled raw_time
+        if tech == "digital" and exposure_time_prov.get("dda_frame") and (sfd_comp_target is not None or base_multiplier != 1.0):
+            det_for_dda = detector_type if detector_type in ("dda_si", "dda_se", "dda_gdos") else "dda_si"
+            exposure_time_prov["dda_frame"] = calc.calculate_dda_frame_integration(
+                raw_time, sfd, w_eff, source, output_val,
+                det_for_dda, sfd_comp_target or target_snr_val, kv=input_kv,
+                material=material,
+                srb_factor=exposure_time_prov.get("srb_factor", 1.0),
+                dqe_factor=exposure_time_prov.get("det_factor", 3.5),
+            )
+            if chart_source == "dda_frame_method":
+                raw_time = min(864000.0, exposure_time_prov["dda_frame"]["total_acq_sec"])
+                min_calc = int(raw_time // 60)
+                sec_calc = int(raw_time % 60)
 
         exposure_time_prov["lvl3_sfd_comp"] = (sfd_comp_target is not None)
         exposure_time_prov["time_multiplier"] = time_multiplier
@@ -1062,14 +1195,15 @@ class CalculationEngine:
                 warnings.append(f"BİLGİ (Madde 7.6): b ({b_dist:.1f} mm) < 1.2×t ({1.2*t:.1f} mm) olduğundan b = t ({t:.1f} mm) kullanıldı.")
             else:
                 warnings.append(f"NOTE (Clause 7.6): b ({b_dist:.1f} mm) < 1.2×t ({1.2*t:.1f} mm), using b = t ({t:.1f} mm).")
-        elif (not geo["is_planar"]) and geometry in ("swsi", "dwsi") and b_dist >= 1.2 * t:
+        elif geometry in ("swsi", "dwsi") and ((not geo["is_planar"] and b_dist >= 1.2 * t) or (cap > 0.0 and (t + cap) >= 1.2 * t - 1e-9)):
+            w_weld_disp = t + cap
             if trans.language == "tr":
                 warnings.append(
-                    f"BİLGİ (Madde 7.6): Toplam kalınlık b = t + kep/kök ({b_dist:.1f} mm) ≥ 1.2×t ({1.2*t:.1f} mm) olduğundan b = t basitleştirmesi uygulanmadı; b = {b_eff:.1f} mm kullanıldı."
+                    f"BİLGİ (Madde 7.6): Toplam kalınlık b = t + kep/kök ({w_weld_disp:.1f} mm) ≥ 1.2×t ({1.2*t:.1f} mm) olduğundan b = t basitleştirmesi uygulanmadı; b = {b_dist:.1f} mm kullanıldı."
                 )
             else:
                 warnings.append(
-                    f"NOTE (Clause 7.6): Total thickness b = t + cap/root ({b_dist:.1f} mm) ≥ 1.2×t ({1.2*t:.1f} mm); b = t simplification not applied, using b = {b_eff:.1f} mm."
+                    f"NOTE (Clause 7.6): Total thickness b = t + cap/root ({w_weld_disp:.1f} mm) ≥ 1.2×t ({1.2*t:.1f} mm); b = t simplification not applied, using b = {b_dist:.1f} mm."
                 )
 
         if geo["bed_auto"]:
@@ -1088,7 +1222,16 @@ class CalculationEngine:
             else:
                 warnings.append(f"NOTE (Clause 7.6): Entered bed ({geo['bed_user']:.1f} mm) is smaller than the Formula (10) value ({geo['bed_auto_suggested']:.1f} mm) - please verify.")
 
-        if coverage_min > f_min + b_dist:
+        if calc.is_central_projection(geometry, std_figure):
+            if trans.language == "tr":
+                warnings.append(
+                    f"BİLGİ (Madde 7.6): SWSI panoramik (merkezi izdüşüm - Şekil 5) çekimde kaynak boru merkezinde (360° radyal) olduğundan düzlemsel köşegen kapsaması (1,4·df / Formül 4) uygulanmaz; SFD_min = f_min + b ({sfd_min:.1f} mm) geçerlidir."
+                )
+            else:
+                warnings.append(
+                    f"NOTE (Clause 7.6): In SWSI panoramic (central projection - Figure 5) exposure, the source is at the pipe centre (360° radial), so planar diagonal coverage (1.4*df / Formula 4) does not apply; SFD_min = f_min + b ({sfd_min:.1f} mm) governs."
+                )
+        elif coverage_min > f_min + b_dist:
             if is_digital:
                 if trans.language == "tr":
                     warnings.append(f"BİLGİ (Madde 7.6): Dedektör boyutu (dd={receptor_size:.0f} mm) SDD_min'i {coverage_min:.0f} mm'ye yükseltti.")
@@ -1298,9 +1441,21 @@ class CalculationEngine:
         filter_str = format_filter_recommendation(filter_recs, trans.language)
 
         # 15. Chart tag + display strings
+        dda_frame_info = exposure_time_prov.get("dda_frame") if tech == "digital" else None
+        dda_tag = (
+            f" ({dda_frame_info['n_frames']}×{dda_frame_info['t_frame_sec']:.2f}s)"
+            if dda_frame_info else ""
+        )
         chart_label = ""
         if chart_source != "model":
-            chart_label = " [Type X]" if chart_source == "type_x" else f" [{chart_source}]"
+            chart_tag_map = {
+                "type_x": "Type X",
+                "cr_ips_chart": "ISO 16371-1 CR IP",
+                "dda_frame_method": "ASTM E2698 N×t",
+                "dda_panel_chart": "DDA Panel Chart",
+                "digital_xray_chart": "Dijital X-Ray" if trans.language == "tr" else "Digital X-Ray",
+            }
+            chart_label = f" [{chart_tag_map.get(chart_source, chart_source)}]"
 
         display = {
             "w_nom": f"{w_nom:.2f} mm",
@@ -1316,7 +1471,7 @@ class CalculationEngine:
             "single_wire_iqi": wire_str,
             "duplex_iqi": duplex_str if tech == "digital" else "N/A",
             "quality_target": target_quality,
-            "calc_time": f"{min_calc} min {sec_calc} sec{chart_label}",
+            "calc_time": f"{min_calc} min {sec_calc} sec{dda_tag}{chart_label}",
             "detector_quality": detector_quality_str,
             "asme_iqi": asme_iqi_str,
             "barrier_distance": barrier_str,

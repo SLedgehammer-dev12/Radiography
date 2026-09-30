@@ -30,6 +30,7 @@ import {
   downloadCsv,
   downloadJson,
   formToDesktopState,
+  getActiveChartKeys,
   parseCsv,
 } from "./state/presets";
 import { useEngine } from "./state/useEngine";
@@ -79,7 +80,7 @@ const DETECTOR_TKEYS = [
   "detector_dda_se",
   "detector_dda_gdos",
 ];
-const CHART_OPTIONS = [
+const ANALOG_CHART_OPTIONS: { value: string; labelKey?: string; label?: string }[] = [
   { value: "model", labelKey: "chart_model" },
   { value: "AA400", label: "AA400 (C5)" },
   { value: "MX125", label: "MX125 (C3)" },
@@ -87,6 +88,17 @@ const CHART_OPTIONS = [
   { value: "HS800", label: "HS800 (C6)" },
   { value: "M100", label: "M100 (C2)" },
   { value: "type_x", labelKey: "chart_type_x" },
+];
+const DIGITAL_CR_CHART_OPTIONS: { value: string; labelKey?: string; label?: string }[] = [
+  { value: "model", labelKey: "chart_digital_model" },
+  { value: "cr_ips_chart", labelKey: "chart_cr_ips" },
+  { value: "digital_xray_chart", labelKey: "chart_digital_xray" },
+];
+const DIGITAL_DDA_CHART_OPTIONS: { value: string; labelKey?: string; label?: string }[] = [
+  { value: "model", labelKey: "chart_digital_model" },
+  { value: "dda_frame_method", labelKey: "chart_dda_frame" },
+  { value: "dda_panel_chart", labelKey: "chart_dda_panel" },
+  { value: "digital_xray_chart", labelKey: "chart_digital_xray" },
 ];
 const OUTPUT_KEYS = [
   "w_nom",
@@ -157,6 +169,29 @@ function loadPersisted(): PersistedState {
       ) {
         parsed.form.base_e =
           DEFAULT_BASE_E_BY_SOURCE[parsed.form.source] ?? 30.0;
+      }
+      if (parsed.form.tech === "analog") {
+        parsed.form.b_object = null;
+        parsed.form.f_source = null;
+      } else if (
+        parsed.form.b_object != null &&
+        parsed.form.b_object <= (parsed.form.t ?? 6.02) + (parsed.form.cap ?? 0)
+      ) {
+        parsed.form.b_object = null;
+      }
+      if (
+        parsed.form.geometry === "swsi" &&
+        parsed.form.std_figure &&
+        ["fig2", "fig2a", "fig2b"].includes(parsed.form.std_figure)
+      ) {
+        parsed.form.std_figure = null;
+      }
+      const validCharts = getActiveChartKeys(
+        parsed.form.tech ?? "analog",
+        parsed.form.detector_type ?? "cr_standard",
+      );
+      if (parsed.form.chart_source && !validCharts.includes(parsed.form.chart_source)) {
+        parsed.form.chart_source = "model";
       }
     }
     return parsed;
@@ -944,8 +979,16 @@ export default function App() {
                 ]}
                 onChange={(value) => {
                   const tech = value as FormState["tech"];
+                  const validCharts = getActiveChartKeys(tech, form.detector_type);
                   patch("tech", tech);
                   patch("app_quality", tech === "digital" ? 140 : 2.5);
+                  if (!validCharts.includes(form.chart_source)) {
+                    patch("chart_source", "model");
+                  }
+                  if (tech === "analog") {
+                    patch("f_source", null);
+                    patch("b_object", null);
+                  }
                 }}
               />
               <div className="field-row-2">
@@ -1147,6 +1190,17 @@ export default function App() {
                     max={5000}
                     placeholder={t("auto_calc")}
                     tooltip={t("tt_f_source")}
+                    action={
+                      form.f_source != null ? (
+                        <button
+                          type="button"
+                          className="sync-btn"
+                          onClick={() => patch("f_source", null)}
+                        >
+                          {lang === "tr" ? "↺ Otomatik" : "↺ Auto"}
+                        </button>
+                      ) : undefined
+                    }
                     onChange={(value) => patch("f_source", value)}
                   />
                   <LengthField
@@ -1156,6 +1210,17 @@ export default function App() {
                     max={5000}
                     placeholder={t("auto_calc")}
                     tooltip={t("tt_b_object")}
+                    action={
+                      form.b_object != null ? (
+                        <button
+                          type="button"
+                          className="sync-btn"
+                          onClick={() => patch("b_object", null)}
+                        >
+                          {lang === "tr" ? "↺ Otomatik" : "↺ Auto"}
+                        </button>
+                      ) : undefined
+                    }
                     onChange={(value) => patch("b_object", value)}
                   />
                 </div>
@@ -1306,7 +1371,10 @@ export default function App() {
                 min={0.0001}
                 max={2000}
                 tooltip={t("tt_base_factor")}
-                disabled={form.chart_source !== "model"}
+                disabled={
+                  form.chart_source !== "model" &&
+                  form.chart_source !== "dda_frame_method"
+                }
                 action={
                   form.base_e !==
                   (DEFAULT_BASE_E_BY_SOURCE[form.source] ?? 3.0) ? (
@@ -1382,9 +1450,15 @@ export default function App() {
                 />
               )}
               <SelectField
-                label={t("chart_source")}
+                label={t(digital ? "chart_source_digital" : "chart_source")}
                 value={form.chart_source}
-                options={CHART_OPTIONS.map((option) => ({
+                options={(
+                  digital
+                    ? form.detector_type.startsWith("dda_")
+                      ? DIGITAL_DDA_CHART_OPTIONS
+                      : DIGITAL_CR_CHART_OPTIONS
+                    : ANALOG_CHART_OPTIONS
+                ).map((option) => ({
                   value: option.value,
                   label: option.labelKey ? t(option.labelKey) : option.label!,
                 }))}
@@ -1444,7 +1518,13 @@ export default function App() {
                       value,
                       label: t(DETECTOR_TKEYS[index]),
                     }))}
-                    onChange={(value) => patch("detector_type", value)}
+                    onChange={(value) => {
+                      const validCharts = getActiveChartKeys(form.tech, value);
+                      patch("detector_type", value);
+                      if (!validCharts.includes(form.chart_source)) {
+                        patch("chart_source", "model");
+                      }
+                    }}
                   />
                   <div className="field-row-2">
                     <NumberField
@@ -1729,9 +1809,10 @@ export default function App() {
                   {result && (
                     <div className="hero-sub">
                       {`Ug = d·b / f (d = ${form.d} mm, b = ${(
-                        !result.values.is_planar && result.values.b_rule_applied
+                        result.values.f_min_provenance?.b ??
+                        (!result.values.is_planar && result.values.b_rule_applied
                           ? result.values.b_eff
-                          : result.values.b_dist
+                          : result.values.b_dist)
                       ).toFixed(1)} mm)`}
                       {isAsme
                         ? ` • ASME Limit ≤ ${result.values.ug_limit.toFixed(2)} mm`

@@ -114,6 +114,54 @@ class RTCalculator:
         "dda_gdos":    3.0,    # DDA with GdOS (Gadolinium Oxysulfide) scintillator
     }
 
+    # Native basic spatial resolution SR_b,ref (µm) per detector family
+    # (ISO 17636-2 Annex F / ISO 16371-1 / ASTM E2698)
+    DETECTOR_NATIVE_SRB = {
+        "cr_standard": 100.0,
+        "cr_highres":  50.0,
+        "cr_hires":    50.0,
+        "dda_si":      130.0,
+        "dda_se":      85.0,
+        "dda_gdos":    160.0,
+    }
+
+    # Energy-dependent relative DQE(kV) curves for X-Ray sources (normalized at 120 kV)
+    # Models Ba K-edge (37.4 keV) in CR, low-Z stopping drop in a-Se (Z=34) above 150 kV,
+    # and Gd K-edge (50.2 keV, Z=64) high-energy retention in Gd2O2S.
+    DETECTOR_XRAY_DQE_CURVES = {
+        "cr_standard": [(60, 1.18), (100, 1.06), (120, 1.00), (160, 0.94), (220, 0.88), (300, 0.82), (400, 0.76)],
+        "cr_highres":  [(60, 0.88), (100, 0.80), (120, 0.75), (160, 0.70), (220, 0.65), (300, 0.60), (400, 0.56)],
+        "dda_si":      [(60, 4.30), (100, 4.10), (120, 4.00), (160, 3.80), (220, 3.50), (300, 3.20), (400, 2.90)],
+        "dda_se":      [(60, 4.60), (100, 3.90), (120, 3.50), (150, 2.90), (200, 2.15), (300, 1.45), (400, 1.10)],
+        "dda_gdos":    [(60, 2.75), (100, 2.92), (120, 3.00), (160, 3.15), (220, 3.20), (300, 2.95), (400, 2.65)],
+    }
+    DETECTOR_XRAY_DQE_CURVES["cr_hires"] = DETECTOR_XRAY_DQE_CURVES["cr_highres"]
+
+    # Isotope-specific effective DQE factors by gamma photon energy
+    DETECTOR_ISOTOPE_DQE = {
+        "cr_standard": {
+            "isotope_tm170": 1.12, "isotope_yb169": 1.04,
+            "isotope_se75": 0.95,  "isotope_ir192": 0.86, "isotope_co60": 0.68,
+        },
+        "cr_highres": {
+            "isotope_tm170": 0.84, "isotope_yb169": 0.78,
+            "isotope_se75": 0.71,  "isotope_ir192": 0.64, "isotope_co60": 0.51,
+        },
+        "dda_si": {
+            "isotope_tm170": 4.15, "isotope_yb169": 3.95,
+            "isotope_se75": 3.65,  "isotope_ir192": 3.15, "isotope_co60": 2.25,
+        },
+        "dda_se": {
+            "isotope_tm170": 4.10, "isotope_yb169": 3.40,
+            "isotope_se75": 2.20,  "isotope_ir192": 1.40, "isotope_co60": 0.80,
+        },
+        "dda_gdos": {
+            "isotope_tm170": 2.85, "isotope_yb169": 3.05,
+            "isotope_se75": 3.25,  "isotope_ir192": 2.90, "isotope_co60": 2.10,
+        },
+    }
+    DETECTOR_ISOTOPE_DQE["cr_hires"] = DETECTOR_ISOTOPE_DQE["cr_highres"]
+
     # -----------------------------------------------------------------------
     # SNR_N Target Correction (Digital) — proportional to √(dose)
     # Class A: reference target 70        → factor 1.0
@@ -192,35 +240,42 @@ class RTCalculator:
             else:
                 return 40.0 * (w ** 0.64)
 
-    def calculate_f_min(self, d, b, testing_class, t=None):
+    def calculate_f_min(self, d, b, testing_class, t=None, cap=0.0):
         """
         Calculates minimum source-to-object distance (f_min) in mm (Step 6)
         Formula: f >= C * d * b^(2/3)
         Class A: C = 7.5
         Class B: C = 15
-        Per ISO 17636-2:2022 Clause 7.6: If b < 1.2t, b is replaced by t.
+        Per ISO 17636-1/2:2022 Clause 7.6:
+        - If total weld thickness (t + cap) >= 1.2 * t, the b = t simplification
+          does NOT apply and b_eff is at least (t + cap).
+        - Otherwise, if b < 1.2 * t, b is replaced by t.
         """
         if testing_class == "class_a":
             c = 7.5
         else:
             c = 15.0
 
-        b_eff = b
-        # Per Clause 7.6: if b < 1.2t, use b = t instead
-        if t is not None and b < 1.2 * t:
-            b_eff = t
-
+        b_eff, _ = self.get_effective_b(b, t, cap=cap)
         f_min = c * d * (b_eff ** (2/3))
         return f_min
 
-    def get_effective_b(self, b, t):
+    def get_effective_b(self, b, t, cap=0.0):
         """
-        Returns (b_eff, applied) per ISO 17636-2:2022 Clause 7.6.
-        If b < 1.2t, returns b_eff = t with applied = True.
-        Otherwise returns b_eff = b with applied = False.
+        Returns (b_eff, applied) per ISO 17636-1/2:2022 Clause 7.6.
+        - If t is provided and (t + cap) >= 1.2 * t:
+          The b = t simplification does NOT apply because total weld thickness
+          (t + cap) already meets or exceeds 1.2 * t; returns (max(b, t + cap), False).
+        - Otherwise, if t is provided and b < 1.2 * t:
+          Returns (t, True).
+        - Otherwise returns (b, False).
         """
-        if t is not None and b < 1.2 * t:
-            return t, True
+        if t is not None:
+            w_weld = t + max(0.0, float(cap or 0.0))
+            if w_weld >= 1.2 * t - 1e-9:
+                return max(b, w_weld), False
+            if b < 1.2 * t:
+                return t, True
         return b, False
 
     def calculate_geometric_unsharpness(self, d, b, f):
@@ -1466,13 +1521,123 @@ class RTCalculator:
             "is_sufficient": n_applied_i >= n_required,
         }
 
+    def get_detector_effective_dqe(self, detector_type, source="x_ray", kv=None):
+        """
+        Returns the effective relative Detective Quantum Efficiency factor η_DQE(E)
+        for the given digital detector type and radiation energy/source.
+        Normalized so X-Ray at 120 kV equals DETECTOR_TYPE_FACTORS[detector_type].
+        """
+        base_dqe = self.DETECTOR_TYPE_FACTORS.get(detector_type, 1.0)
+        if source == "x_ray":
+            if kv is None:
+                return base_dqe
+            kv_f = float(kv)
+            pts = self.DETECTOR_XRAY_DQE_CURVES.get(detector_type)
+            if not pts:
+                return base_dqe
+            if kv_f <= pts[0][0]:
+                return pts[0][1]
+            if kv_f >= pts[-1][0]:
+                return pts[-1][1]
+            for i in range(len(pts) - 1):
+                k1, d1 = pts[i]
+                k2, d2 = pts[i + 1]
+                if k1 <= kv_f <= k2:
+                    frac = (kv_f - k1) / (k2 - k1) if k2 != k1 else 0.0
+                    return d1 + frac * (d2 - d1)
+            return base_dqe
+        else:
+            iso_map = self.DETECTOR_ISOTOPE_DQE.get(detector_type)
+            if iso_map and source in iso_map:
+                return iso_map[source]
+            return base_dqe
+
+    def get_srb_dose_factor(self, detector_type, app_srb=None):
+        """
+        Calculates the spatial resolution quantum dose correction factor k_SRb
+        per ISO 17636-2 Annex F & Rose photon statistics:
+            k_SRb = clamp((SR_b,ref / SR_b,applied)^2, 0.25, 4.0)
+        When app_srb is None (not specified), returns (1.0, srb_ref).
+        """
+        srb_ref = self.DETECTOR_NATIVE_SRB.get(detector_type, 100.0)
+        if app_srb is None or float(app_srb) <= 0.0:
+            return 1.0, srb_ref
+        srb_val = max(10.0, float(app_srb))
+        k_srb = max(0.25, min(4.0, (srb_ref / srb_val) ** 2))
+        return k_srb, srb_ref
+
+    def calculate_dda_frame_integration(
+        self, base_time_sec, sdd, w_eff, source, output_val,
+        detector_type, target_snr, kv=None, material="steel",
+        srb_factor=1.0, dqe_factor=3.5,
+    ):
+        """
+        Computes DDA Flat Panel frame integration parameters (t_frame × N_frames)
+        per ASTM E2698 / ISO 17636-2 Clause 7.4 to prevent 14/16-bit ADC saturation
+        while achieving target normalized SNR_N by frame averaging (SNR_N ∝ √N_frames).
+        """
+        spec = (
+            ExposureChartDatabase.DDA_PANEL_TABLE.get(detector_type)
+            if ExposureChartDatabase is not None and detector_type in ExposureChartDatabase.DDA_PANEL_TABLE
+            else {
+                "panel_class": "DDA Düz Panel",
+                "srb_ref_um": self.DETECTOR_NATIVE_SRB.get(detector_type, 130.0),
+                "frame_target_dose_ugy": 15.0,
+                "single_frame_snr_ref": 42.0,
+                "target_gray_pct": 65.0,
+            }
+        )
+        frame_dose_target = spec.get("frame_target_dose_ugy", 15.0)
+        snr_1frame_ref = spec.get("single_frame_snr_ref", 42.0)
+        target_gray_pct = spec.get("target_gray_pct", 65.0)
+        target_adu_16bit = int(round(65535 * (target_gray_pct / 100.0)))
+
+        # Required number of frames from single-frame quantum SNR at 65% saturation
+        snr_req = max(20.0, float(target_snr if target_snr else 100.0))
+        dqe_norm = max(0.3, dqe_factor / 3.5)
+        snr_1frame_eff = snr_1frame_ref * math.sqrt(dqe_norm / max(0.25, srb_factor))
+        n_frames_snr = max(1, int(math.ceil((snr_req / max(5.0, snr_1frame_eff)) ** 2)))
+
+        # Derive single-frame integration time from total dose time & frame bounds [0.05s, 10.0s]
+        t_raw = max(0.05, float(base_time_sec))
+        t_frame_ideal = t_raw / float(n_frames_snr)
+        if t_frame_ideal < 0.05:
+            t_frame_sec = 0.05
+            n_frames = max(1, int(math.ceil(t_raw / t_frame_sec)))
+        elif t_frame_ideal > 10.0:
+            # Cap single frame at 10.0 s to avoid dark-current saturation
+            t_frame_sec = 10.0
+            n_frames = max(n_frames_snr, int(math.ceil(t_raw / t_frame_sec)))
+        else:
+            t_frame_sec = round(t_frame_ideal, 2)
+            if t_frame_sec <= 0.0:
+                t_frame_sec = 0.05
+            n_frames = n_frames_snr
+
+        total_acq_sec = float(n_frames) * float(t_frame_sec)
+        dose_rate_ugy_s = frame_dose_target / max(0.05, t_frame_sec)
+        total_dose_ugy = dose_rate_ugy_s * total_acq_sec
+
+        return {
+            "t_frame_sec": t_frame_sec,
+            "n_frames": n_frames,
+            "total_acq_sec": total_acq_sec,
+            "frame_target_dose_ugy": frame_dose_target,
+            "total_dose_ugy": total_dose_ugy,
+            "dose_rate_ugy_s": dose_rate_ugy_s,
+            "snr_1frame": snr_1frame_eff,
+            "target_gray_pct": target_gray_pct,
+            "target_adu_16bit": target_adu_16bit,
+            "panel_class": spec.get("panel_class", "DDA Düz Panel"),
+        }
+
     def calculate_exposure_time(self, sfd, w_eff, source, output_val, base_factor,
                                  tech, testing_class="class_b",
                                  film_class="C5", detector_type="cr_standard",
                                  kv=None, material="steel",
                                  chart_source=None, chart_db=None,
                                  film_model=None, density=None,
-                                 target_snr=None):
+                                 target_snr=None, app_srb=None):
         """
         Calculates exposure time in minutes and seconds (Step 10).
         Delegates to `calculate_exposure_time_details` and returns
@@ -1484,6 +1649,7 @@ class RTCalculator:
             film_class=film_class, detector_type=detector_type, kv=kv,
             material=material, chart_source=chart_source, chart_db=chart_db,
             film_model=film_model, density=density, target_snr=target_snr,
+            app_srb=app_srb,
         )
         return details["minutes"], details["seconds"], details["time_seconds"]
 
@@ -1493,7 +1659,7 @@ class RTCalculator:
                                         kv=None, material="steel",
                                         chart_source=None, chart_db=None,
                                         film_model=None, density=None,
-                                        target_snr=None):
+                                        target_snr=None, app_srb=None):
         """
         Full exposure-time calculation returning both timing values and a
         structured `provenance` dictionary explaining the active method,
@@ -1516,8 +1682,12 @@ class RTCalculator:
             testing_class, film_class, ref_density=2.0, target_density=target_od
         )
 
-        # Target SNR_N & detector DQE parameters (digital)
-        det_factor = self.DETECTOR_TYPE_FACTORS.get(detector_type, 1.0)
+        # Target SNR_N, energy-dependent DQE(E), and SR_b quantum dose parameters (digital)
+        det_factor_static = self.DETECTOR_TYPE_FACTORS.get(detector_type, 1.0)
+        det_factor = self.get_detector_effective_dqe(detector_type, source=source, kv=kv)
+        srb_factor, srb_ref = self.get_srb_dose_factor(detector_type, app_srb=app_srb)
+        is_dda = detector_type in ("dda_si", "dda_se", "dda_gdos")
+
         if target_snr is not None and float(target_snr) > 0.0:
             snr_target_used = float(target_snr)
             snr_factor = (snr_target_used / 70.0) ** 2
@@ -1540,14 +1710,148 @@ class RTCalculator:
                         chart_db = ExposureChartDatabase(json_path)
                     else:
                         chart_db = ExposureChartDatabase()
+                        chart_db.generate_type_x_chart(self)
                 else:
                     raise ImportError("ExposureChartDatabase not available; cannot use chart_source")
+            elif not getattr(chart_db, "TYPE_X_CHART", None):
+                chart_db.generate_type_x_chart(self)
 
-            resolved_film = self._resolve_chart_film(chart_source, film_model, film_class)
+            # If in digital mode and an analog film chart was passed, redirect to digital chart
+            eff_chart = chart_source
+            if tech == "digital" and chart_source in ("AA400", "MX125", "T200", "HS800", "M100", "rfactor"):
+                eff_chart = "dda_panel_chart" if is_dda else "cr_ips_chart"
 
-            # Type X chart path (X-ray)
-            if chart_source == "type_x":
+            # 1) Digital CR IPS (ISO 16371-1) or DDA Panel (ASTM E2698) Chart Path
+            if eff_chart in ("cr_ips_chart", "dda_panel_chart"):
+                det_for_chart = detector_type
+                if eff_chart == "cr_ips_chart" and is_dda:
+                    det_for_chart = "cr_standard"
+                elif eff_chart == "dda_panel_chart" and not is_dda:
+                    det_for_chart = "dda_si"
+
                 if source != "x_ray":
+                    t_min = chart_db.calculate_exposure_time_digital_rfactor(
+                        sdd=sfd, w=w_eff, source=source, activity=output_safe,
+                        detector_type=det_for_chart, target_snr=snr_target_used,
+                        srb_factor=srb_factor, ref_factor=ref_factor,
+                    )
+                    r_dig, spec = chart_db.lookup_digital_r_factor(det_for_chart, source)
+                    if t_min is not None and t_min > 0 and r_dig is not None:
+                        active_method = eff_chart
+                        hvl = chart_db.HVL.get(source, 13.2)
+                        gamma = chart_db.GAMMA.get(source, 0.48)
+                        attenuation = 2.0 ** (w_eq_steel / hvl)
+                        time_seconds = min(864000.0, t_min * 60.0)
+                        dda_frame = (
+                            self.calculate_dda_frame_integration(
+                                time_seconds, sfd, w_eff, source, output_safe,
+                                det_for_chart, snr_target_used, kv=kv,
+                                material=material, srb_factor=srb_factor, dqe_factor=det_factor,
+                            )
+                            if (is_dda or eff_chart == "dda_panel_chart") else None
+                        )
+                        minutes = int(time_seconds // 60)
+                        seconds = int(time_seconds % 60)
+                        prov = {
+                            "method": active_method,
+                            "requested_method": requested_method,
+                            "fallback_reason": None,
+                            "tech": tech,
+                            "source": source,
+                            "material": material,
+                            "ref_factor": ref_factor,
+                            "w_eff": w_eff,
+                            "w_eq_steel": w_eq_steel,
+                            "sfd": sfd,
+                            "output_val": output_safe,
+                            "detector_type": det_for_chart,
+                            "detector_class_label": spec.get("ips_class") or spec.get("panel_class", det_for_chart),
+                            "r_factor_digital": r_dig,
+                            "hvl": hvl,
+                            "gamma": gamma,
+                            "attenuation": attenuation,
+                            "det_factor": det_factor,
+                            "target_snr": snr_target_used,
+                            "snr_factor": snr_factor,
+                            "srb_factor": srb_factor,
+                            "srb_ref": srb_ref,
+                            "app_srb": app_srb,
+                            "dda_frame": dda_frame,
+                            "t_minutes_base": t_min,
+                            "time_seconds": time_seconds,
+                        }
+                        return {
+                            "minutes": minutes,
+                            "seconds": seconds,
+                            "time_seconds": time_seconds,
+                            "provenance": prov,
+                        }
+                else:
+                    # X-Ray source with CR IPS or DDA Panel chart -> use digital X-Ray table
+                    eff_chart = "digital_xray_chart"
+
+            # 2) Digital X-Ray Chart / Type X Chart Path
+            if eff_chart in ("type_x", "digital_xray_chart"):
+                if source != "x_ray":
+                    if tech == "digital":
+                        # Route isotope to CR/DDA digital R-factor table seamlessly
+                        alt_chart = "dda_panel_chart" if is_dda else "cr_ips_chart"
+                        t_min = chart_db.calculate_exposure_time_digital_rfactor(
+                            sdd=sfd, w=w_eff, source=source, activity=output_safe,
+                            detector_type=detector_type, target_snr=snr_target_used,
+                            srb_factor=srb_factor, ref_factor=ref_factor,
+                        )
+                        r_dig, spec = chart_db.lookup_digital_r_factor(detector_type, source)
+                        if t_min is not None and t_min > 0 and r_dig is not None:
+                            active_method = alt_chart
+                            hvl = chart_db.HVL.get(source, 13.2)
+                            gamma = chart_db.GAMMA.get(source, 0.48)
+                            attenuation = 2.0 ** (w_eq_steel / hvl)
+                            time_seconds = min(864000.0, t_min * 60.0)
+                            dda_frame = (
+                                self.calculate_dda_frame_integration(
+                                    time_seconds, sfd, w_eff, source, output_safe,
+                                    detector_type, snr_target_used, kv=kv,
+                                    material=material, srb_factor=srb_factor, dqe_factor=det_factor,
+                                )
+                                if is_dda else None
+                            )
+                            minutes = int(time_seconds // 60)
+                            seconds = int(time_seconds % 60)
+                            prov = {
+                                "method": active_method,
+                                "requested_method": requested_method,
+                                "fallback_reason": None,
+                                "tech": tech,
+                                "source": source,
+                                "material": material,
+                                "ref_factor": ref_factor,
+                                "w_eff": w_eff,
+                                "w_eq_steel": w_eq_steel,
+                                "sfd": sfd,
+                                "output_val": output_safe,
+                                "detector_type": detector_type,
+                                "detector_class_label": spec.get("ips_class") or spec.get("panel_class", detector_type),
+                                "r_factor_digital": r_dig,
+                                "hvl": hvl,
+                                "gamma": gamma,
+                                "attenuation": attenuation,
+                                "det_factor": det_factor,
+                                "target_snr": snr_target_used,
+                                "snr_factor": snr_factor,
+                                "srb_factor": srb_factor,
+                                "srb_ref": srb_ref,
+                                "app_srb": app_srb,
+                                "dda_frame": dda_frame,
+                                "t_minutes_base": t_min,
+                                "time_seconds": time_seconds,
+                            }
+                            return {
+                                "minutes": minutes,
+                                "seconds": seconds,
+                                "time_seconds": time_seconds,
+                                "provenance": prov,
+                            }
                     logger.warning("Type X chart is for X-ray only; falling back to physics model")
                     fallback_reason = "type_x_requires_xray"
                 else:
@@ -1559,15 +1863,23 @@ class RTCalculator:
                         if tech == "analog":
                             receptor_mod = od_factor * (16.0 / film_speed)
                         else:
-                            receptor_mod = snr_factor / det_factor
+                            receptor_mod = (snr_factor * srb_factor) / det_factor
                         t_min = (exposure_mamin * sfd_correction * receptor_mod) / output_safe
                         if t_min > 0:
-                            active_method = "type_x"
+                            active_method = "digital_xray_chart" if (tech == "digital" and chart_source == "digital_xray_chart") else "type_x"
                             time_seconds = min(864000.0, t_min * 60.0)
+                            dda_frame = (
+                                self.calculate_dda_frame_integration(
+                                    time_seconds, sfd, w_eff, source, output_safe,
+                                    detector_type, snr_target_used, kv=kv_eff,
+                                    material=material, srb_factor=srb_factor, dqe_factor=det_factor,
+                                )
+                                if (tech == "digital" and is_dda) else None
+                            )
                             minutes = int(time_seconds // 60)
                             seconds = int(time_seconds % 60)
                             prov = {
-                                "method": "type_x",
+                                "method": active_method,
                                 "requested_method": requested_method,
                                 "fallback_reason": None,
                                 "tech": tech,
@@ -1592,6 +1904,10 @@ class RTCalculator:
                                 "det_factor": det_factor if tech == "digital" else None,
                                 "target_snr": snr_target_used if tech == "digital" else None,
                                 "snr_factor": snr_factor if tech == "digital" else None,
+                                "srb_factor": srb_factor if tech == "digital" else None,
+                                "srb_ref": srb_ref if tech == "digital" else None,
+                                "app_srb": app_srb if tech == "digital" else None,
+                                "dda_frame": dda_frame,
                                 "t_minutes_base": t_min,
                                 "time_seconds": time_seconds,
                             }
@@ -1603,78 +1919,80 @@ class RTCalculator:
                             }
                     fallback_reason = "type_x_out_of_range"
 
-            # R-Factor (film / SCRATA slide rule) chart path
-            elif resolved_film is not None:
-                r_factor = chart_db.lookup_r_factor(resolved_film, source)
-                if r_factor is not None and source in chart_db.HVL:
-                    od_for_rfactor = float(density) if (density is not None and float(density) > 0.0) else (
-                        2.0 if density == 2.0 else target_od
-                    )
-                    result = self._calc_from_rfactor(
-                        chart_db, resolved_film, source, sfd, w_eff, output_safe,
-                        od_for_rfactor, ref_factor=ref_factor,
-                    )
-                    if result is not None and result > 0:
-                        active_method = "rfactor"
-                        hvl = chart_db.HVL.get(source, 13.2)
-                        gamma = chart_db.GAMMA.get(source, 0.48)
-                        rel_speed = chart_db.FILM_RELATIVE_SPEED.get(resolved_film, 1.0)
-                        r_aa400 = chart_db.lookup_r_factor("AA400", source)
-                        effective_r = (
-                            (r_aa400 / rel_speed)
-                            if (r_aa400 is not None and rel_speed > 0 and resolved_film != "AA400")
-                            else r_factor
+            # 3) Analog R-Factor (film / SCRATA slide rule) chart path
+            elif eff_chart not in ("dda_frame_method",):
+                resolved_film = self._resolve_chart_film(chart_source, film_model, film_class)
+                if resolved_film is not None:
+                    r_factor = chart_db.lookup_r_factor(resolved_film, source)
+                    if r_factor is not None and source in chart_db.HVL:
+                        od_for_rfactor = float(density) if (density is not None and float(density) > 0.0) else (
+                            2.0 if density == 2.0 else target_od
                         )
-                        attenuation = 2.0 ** (w_eq_steel / hvl)
-                        density_corr = 10.0 ** ((od_for_rfactor - 2.0) / 2.0)
-                        time_seconds = min(864000.0, result * 60.0)
-                        minutes = int(time_seconds // 60)
-                        seconds = int(time_seconds % 60)
-                        prov = {
-                            "method": "rfactor",
-                            "requested_method": requested_method,
-                            "fallback_reason": None,
-                            "tech": tech,
-                            "source": source,
-                            "material": material,
-                            "ref_factor": ref_factor,
-                            "w_eff": w_eff,
-                            "w_eq_steel": w_eq_steel,
-                            "sfd": sfd,
-                            "output_val": output_safe,
-                            "film_key": resolved_film,
-                            "film_class": film_class,
-                            "r_factor_raw": r_factor,
-                            "r_factor_eff": effective_r,
-                            "rel_speed": rel_speed,
-                            "hvl": hvl,
-                            "gamma": gamma,
-                            "attenuation": attenuation,
-                            "target_od": od_for_rfactor,
-                            "od_factor": density_corr,
-                            "t_minutes_base": result,
-                            "time_seconds": time_seconds,
-                        }
-                        return {
-                            "minutes": minutes,
-                            "seconds": seconds,
-                            "time_seconds": time_seconds,
-                            "provenance": prov,
-                        }
+                        result = self._calc_from_rfactor(
+                            chart_db, resolved_film, source, sfd, w_eff, output_safe,
+                            od_for_rfactor, ref_factor=ref_factor,
+                        )
+                        if result is not None and result > 0:
+                            active_method = "rfactor"
+                            hvl = chart_db.HVL.get(source, 13.2)
+                            gamma = chart_db.GAMMA.get(source, 0.48)
+                            rel_speed = chart_db.FILM_RELATIVE_SPEED.get(resolved_film, 1.0)
+                            r_aa400 = chart_db.lookup_r_factor("AA400", source)
+                            effective_r = (
+                                (r_aa400 / rel_speed)
+                                if (r_aa400 is not None and rel_speed > 0 and resolved_film != "AA400")
+                                else r_factor
+                            )
+                            attenuation = 2.0 ** (w_eq_steel / hvl)
+                            density_corr = 10.0 ** ((od_for_rfactor - 2.0) / 2.0)
+                            time_seconds = min(864000.0, result * 60.0)
+                            minutes = int(time_seconds // 60)
+                            seconds = int(time_seconds % 60)
+                            prov = {
+                                "method": "rfactor",
+                                "requested_method": requested_method,
+                                "fallback_reason": None,
+                                "tech": tech,
+                                "source": source,
+                                "material": material,
+                                "ref_factor": ref_factor,
+                                "w_eff": w_eff,
+                                "w_eq_steel": w_eq_steel,
+                                "sfd": sfd,
+                                "output_val": output_safe,
+                                "film_key": resolved_film,
+                                "film_class": film_class,
+                                "r_factor_raw": r_factor,
+                                "r_factor_eff": effective_r,
+                                "rel_speed": rel_speed,
+                                "hvl": hvl,
+                                "gamma": gamma,
+                                "attenuation": attenuation,
+                                "target_od": od_for_rfactor,
+                                "od_factor": density_corr,
+                                "t_minutes_base": result,
+                                "time_seconds": time_seconds,
+                            }
+                            return {
+                                "minutes": minutes,
+                                "seconds": seconds,
+                                "time_seconds": time_seconds,
+                                "provenance": prov,
+                            }
+                    else:
+                        logger.warning(
+                            "Film %s has no R-Factor data for source %s; falling back to physics model",
+                            resolved_film, source
+                        )
+                        fallback_reason = "rfactor_source_unavailable"
                 else:
                     logger.warning(
-                        "Film %s has no R-Factor data for source %s; falling back to physics model",
-                        resolved_film, source
+                        "chart_source=%s not recognized; falling back to physics model",
+                        chart_source
                     )
-                    fallback_reason = "rfactor_source_unavailable"
-            else:
-                logger.warning(
-                    "chart_source=%s not recognized; falling back to physics model",
-                    chart_source
-                )
-                fallback_reason = "chart_unrecognized"
+                    fallback_reason = "chart_unrecognized"
 
-        # ── Physics Model (Beer-Lambert + Inverse Square Law) ─────────────────
+        # ── Physics Model & ASTM E2698 DDA Frame Method ───────────────────────
         kv_eff = None
         mu_steel_base = None
         if source == "x_ray":
@@ -1710,7 +2028,7 @@ class RTCalculator:
         if tech == "analog":
             time_minutes = t_base * od_factor / film_speed
         else:  # digital
-            time_minutes = t_base * snr_factor / det_factor
+            time_minutes = t_base * (snr_factor * srb_factor) / det_factor
 
         # ── kVp⁵ sanity check (X-ray only) ──────────────────────────────────
         if source == "x_ray" and kv_eff is not None and time_minutes > 0:
@@ -1718,6 +2036,22 @@ class RTCalculator:
 
         # ── Convert to seconds and cap at 10 days
         time_seconds = min(864000.0, time_minutes * 60.0)
+
+        # ── DDA Frame Integration (ASTM E2698: N_frames × t_frame) ──────────
+        dda_frame = None
+        if tech == "digital" and (is_dda or requested_method == "dda_frame_method"):
+            det_for_dda = detector_type if is_dda else "dda_si"
+            dda_frame = self.calculate_dda_frame_integration(
+                time_seconds, sfd, w_eff, source, output_safe,
+                det_for_dda, snr_target_used, kv=kv_eff,
+                material=material, srb_factor=srb_factor, dqe_factor=det_factor,
+            )
+            if requested_method == "dda_frame_method":
+                active_method = "dda_frame_method"
+                fallback_reason = None
+                time_seconds = min(864000.0, dda_frame["total_acq_sec"])
+                time_minutes = time_seconds / 60.0
+
         minutes = int(time_seconds // 60)
         seconds = int(time_seconds % 60)
 
@@ -1750,9 +2084,14 @@ class RTCalculator:
             "od_factor": od_factor if tech == "analog" else None,
             "detector_type": detector_type if tech == "digital" else None,
             "det_factor": det_factor if tech == "digital" else None,
+            "det_factor_static": det_factor_static if tech == "digital" else None,
             "target_snr": snr_target_used if tech == "digital" else None,
             "snr_factor": snr_factor if tech == "digital" else None,
             "snr_is_dynamic": snr_is_dynamic if tech == "digital" else None,
+            "srb_factor": srb_factor if tech == "digital" else None,
+            "srb_ref": srb_ref if tech == "digital" else None,
+            "app_srb": app_srb if tech == "digital" else None,
+            "dda_frame": dda_frame,
             "t_minutes_base": time_minutes,
             "time_seconds": time_seconds,
         }

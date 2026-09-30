@@ -91,6 +91,7 @@ export function WeldSetup3D({
 
   // Interactive 3D inspection controls
   const [cutaway, setCutaway] = useState<boolean>(true);
+  const [pipeOpacity, setPipeOpacity] = useState<number>(0.62);
   const [showAllStations, setShowAllStations] = useState<boolean>(false);
   const [activeStation, setActiveStation] = useState<number>(0);
   const [playing, setPlaying] = useState<boolean>(false);
@@ -371,41 +372,120 @@ export function WeldSetup3D({
 
         quads.push({
           pts: [p00, p10, p11, p01],
-          fill: `rgba(${baseR}, ${baseG}, ${baseB}, 0.62)`,
-          stroke: isDark ? "rgba(148, 184, 232, 0.16)" : "rgba(51, 85, 130, 0.18)",
+          fill: `rgba(${baseR}, ${baseG}, ${baseB}, ${pipeOpacity.toFixed(2)})`,
+          stroke: isDark
+            ? `rgba(148, 184, 232, ${(0.22 * pipeOpacity).toFixed(2)})`
+            : `rgba(51, 85, 130, ${(0.24 * pipeOpacity).toFixed(2)})`,
           lineWidth: 0.6,
           avgDepth: (p00.depth + p10.depth + p11.depth + p01.depth) / 4,
         });
 
-        // Inner cylinder quad (visible through cutaway or pipe ends)
+        // Inner cylinder quad (darker gunmetal steel so wall thickness contrasts strongly)
         const i00 = project({ x: Ri * Math.cos(r0), y: Ri * Math.sin(r0), z: z0 });
         const i10 = project({ x: Ri * Math.cos(r1), y: Ri * Math.sin(r1), z: z0 });
         const i11 = project({ x: Ri * Math.cos(r1), y: Ri * Math.sin(r1), z: z1 });
         const i01 = project({ x: Ri * Math.cos(r0), y: Ri * Math.sin(r0), z: z1 });
 
+        const innerAlpha = Math.min(0.95, pipeOpacity * 1.18).toFixed(2);
         quads.push({
           pts: [i00, i10, i11, i01],
-          fill: isDark ? "rgba(28, 40, 58, 0.58)" : "rgba(110, 130, 158, 0.45)",
-          stroke: isDark ? "rgba(100, 140, 190, 0.12)" : "rgba(40, 70, 110, 0.12)",
+          fill: isDark
+            ? `rgba(12, 18, 30, ${innerAlpha})`
+            : `rgba(45, 58, 78, ${innerAlpha})`,
+          stroke: isDark ? "rgba(71, 85, 105, 0.22)" : "rgba(30, 41, 59, 0.22)",
           lineWidth: 0.5,
           avgDepth: (i00.depth + i10.depth + i11.depth + i01.depth) / 4 - 0.1,
         });
       }
     }
 
-    // 3. 3D Girth Weld Crown & Root Pass at Z = 0
+    // 2b. Dark Pipe End Wall-Thickness Annulus Quads (at z = -halfLen and z = +halfLen, plus cutaway z = 0 transverse wall face)
+    const wallFaceAlpha = Math.max(0.82, pipeOpacity).toFixed(2);
+    const wallFaceFill = isDark
+      ? `rgba(15, 23, 38, ${wallFaceAlpha})`
+      : `rgba(30, 41, 59, ${wallFaceAlpha})`;
+    const wallFaceStroke = isDark ? "rgba(100, 116, 139, 0.55)" : "rgba(15, 23, 42, 0.65)";
+
+    for (const zEnd of [-halfLen, halfLen]) {
+      for (let it = 0; it < nSegTheta; it += 1) {
+        const deg0 = (it / nSegTheta) * 360;
+        const deg1 = ((it + 1) / nSegTheta) * 360;
+        const degMid = (deg0 + deg1) / 2;
+        if (zEnd > 0 && isCutawayAngle(degMid)) continue;
+        const r0 = (deg0 * Math.PI) / 180;
+        const r1 = (deg1 * Math.PI) / 180;
+        const e0 = project({ x: R * Math.cos(r0), y: R * Math.sin(r0), z: zEnd });
+        const e1 = project({ x: R * Math.cos(r1), y: R * Math.sin(r1), z: zEnd });
+        const e2 = project({ x: Ri * Math.cos(r1), y: Ri * Math.sin(r1), z: zEnd });
+        const e3 = project({ x: Ri * Math.cos(r0), y: Ri * Math.sin(r0), z: zEnd });
+        quads.push({
+          pts: [e0, e1, e2, e3],
+          fill: wallFaceFill,
+          stroke: wallFaceStroke,
+          lineWidth: 0.6,
+          avgDepth: (e0.depth + e1.depth + e2.depth + e3.depth) / 4 + 0.05,
+        });
+      }
+    }
+
+    // Transverse cutaway wall thickness face at z = 0 for the cutout angular sector
+    if (cutaway) {
+      for (let it = 0; it < nSegTheta; it += 1) {
+        const deg0 = (it / nSegTheta) * 360;
+        const deg1 = ((it + 1) / nSegTheta) * 360;
+        const degMid = (deg0 + deg1) / 2;
+        if (!isCutawayAngle(degMid)) continue;
+        const r0 = (deg0 * Math.PI) / 180;
+        const r1 = (deg1 * Math.PI) / 180;
+        const e0 = project({ x: R * Math.cos(r0), y: R * Math.sin(r0), z: 0 });
+        const e1 = project({ x: R * Math.cos(r1), y: R * Math.sin(r1), z: 0 });
+        const e2 = project({ x: Ri * Math.cos(r1), y: Ri * Math.sin(r1), z: 0 });
+        const e3 = project({ x: Ri * Math.cos(r0), y: Ri * Math.sin(r0), z: 0 });
+        quads.push({
+          pts: [e0, e1, e2, e3],
+          fill: wallFaceFill,
+          stroke: wallFaceStroke,
+          lineWidth: 0.7,
+          avgDepth: (e0.depth + e1.depth + e2.depth + e3.depth) / 4 + 0.15,
+        });
+      }
+    }
+
+    // 3. 3D Girth Weld Crown & Root Pass at Z = 0 + Circumferential Measuring Tape (Şerit Metre)
     const rWeldCrown = R + wCap;
     const rWeldRoot = Math.max(Ri - wCap * 0.6, Ri * 0.85);
+    const rTape = R + Math.max(R * 0.018, 0.8);
+    const tapeGap = Math.max(wHalf * 0.35, R * 0.04);
+    const tapeWidth = Math.max(wHalf * 0.95, R * 0.13);
+    const zTape0 = -wHalf - tapeGap - tapeWidth;
+    const zTape1 = -wHalf - tapeGap;
 
     for (let it = 0; it < nSegTheta; it += 1) {
       const deg0 = (it / nSegTheta) * 360;
       const deg1 = ((it + 1) / nSegTheta) * 360;
       const degMid = (deg0 + deg1) / 2;
-      if (isCutawayAngle(degMid)) continue;
 
       const r0 = (deg0 * Math.PI) / 180;
       const r1 = (deg1 * Math.PI) / 180;
       const shade = 0.65 + 0.35 * Math.sin(((degMid + 35) * Math.PI) / 180);
+
+      // Circumferential Measuring Tape (Şerit Metre) wrapped right beside the girth weld (z < 0 side)
+      const tp00 = project({ x: rTape * Math.cos(r0), y: rTape * Math.sin(r0), z: zTape0 });
+      const tp10 = project({ x: rTape * Math.cos(r1), y: rTape * Math.sin(r1), z: zTape0 });
+      const tp11 = project({ x: rTape * Math.cos(r1), y: rTape * Math.sin(r1), z: zTape1 });
+      const tp01 = project({ x: rTape * Math.cos(r0), y: rTape * Math.sin(r0), z: zTape1 });
+      const trR = Math.round(250 * (0.72 + 0.28 * shade));
+      const trG = Math.round(204 * (0.72 + 0.28 * shade));
+      const trB = Math.round(21 * (0.72 + 0.28 * shade));
+      quads.push({
+        pts: [tp00, tp10, tp11, tp01],
+        fill: `rgba(${trR}, ${trG}, ${trB}, ${Math.min(0.95, pipeOpacity + 0.25).toFixed(2)})`,
+        stroke: "rgba(113, 63, 18, 0.55)",
+        lineWidth: 0.6,
+        avgDepth: (tp00.depth + tp10.depth + tp11.depth + tp01.depth) / 4 + 0.18,
+      });
+
+      if (isCutawayAngle(degMid)) continue;
 
       // Outer weld cap band
       const w00 = project({ x: rWeldCrown * Math.cos(r0), y: rWeldCrown * Math.sin(r0), z: -wHalf });
@@ -437,7 +517,7 @@ export function WeldSetup3D({
       });
     }
 
-    // Sort and draw pipe + weld quads back-to-front
+    // Sort and draw pipe + weld + tape quads back-to-front
     quads.sort((a, b) => a.avgDepth - b.avgDepth);
     for (const q of quads) {
       ctx.beginPath();
@@ -453,6 +533,61 @@ export function WeldSetup3D({
         ctx.lineWidth = q.lineWidth ?? 0.6;
         ctx.stroke();
       }
+    }
+
+    // 3b. Draw 3D Graduation Ticks & Centimeter Numbers on Circumferential Measuring Tape (Şerit Metre)
+    const circumCm = Math.max(5, (Math.PI * od) / 10);
+    const zTapeMid = (zTape0 + zTape1) / 2;
+    for (let deg = 0; deg < 360; deg += 5) {
+      const rad = (deg * Math.PI) / 180;
+      const nx = Math.cos(rad);
+      const ny = Math.sin(rad);
+      // Camera-space Z normal check so ticks/numbers are drawn only on camera-facing half of the pipe
+      const nz1 = -nx * sinY;
+      const nzCam = ny * sinP + nz1 * cosP;
+      if (nzCam < -0.05) continue;
+
+      const isMajor = deg % 30 === 0;
+      const zTickEnd = isMajor ? zTape0 + tapeWidth * 0.15 : zTape1 - tapeWidth * 0.45;
+      const tStart = project({ x: (rTape + 0.2) * nx, y: (rTape + 0.2) * ny, z: zTape1 });
+      const tEnd = project({ x: (rTape + 0.2) * nx, y: (rTape + 0.2) * ny, z: zTickEnd });
+      ctx.beginPath();
+      ctx.moveTo(tStart.x, tStart.y);
+      ctx.lineTo(tEnd.x, tEnd.y);
+      ctx.strokeStyle = isMajor ? "#1c1917" : "rgba(28, 25, 23, 0.7)";
+      ctx.lineWidth = isMajor ? 1.4 : 0.8;
+      ctx.stroke();
+
+      if (isMajor && nzCam > 0.12) {
+        // Clockwise from 12 o'clock (90 deg) in cm
+        const clockwiseDeg = ((90 - deg) % 360 + 360) % 360;
+        const cmVal = Math.round((clockwiseDeg / 360) * circumCm);
+        const numPt = project({
+          x: (rTape + 0.4) * nx,
+          y: (rTape + 0.4) * ny,
+          z: zTapeMid - tapeWidth * 0.12,
+        });
+        ctx.fillStyle = "#1c1917";
+        ctx.font = "800 8px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(`${cmVal}`, numPt.x, numPt.y);
+      }
+    }
+    if (showDimensions) {
+      const tapeCalloutPt = project({
+        x: -rTape * Math.cos((35 * Math.PI) / 180),
+        y: rTape * Math.sin((35 * Math.PI) / 180),
+        z: zTape0,
+      });
+      ctx.font = "600 9px system-ui, sans-serif";
+      ctx.fillStyle = isDark ? "#fde047" : "#854d0e";
+      ctx.textAlign = "right";
+      ctx.fillText(
+        lang === "tr" ? "Şerit Metre (cm)" : "Measuring Tape (cm)",
+        tapeCalloutPt.x - 6,
+        tapeCalloutPt.y - 4,
+      );
     }
 
     // Draw pipe end rings (at z = -halfLen and z = +halfLen)
@@ -484,16 +619,14 @@ export function WeldSetup3D({
               ? "#6ea8fe"
               : "#1d4ed8"
             : isDark
-              ? "rgba(110,168,254,0.55)"
-              : "rgba(29,78,216,0.55)";
-        ctx.lineWidth = radius === R ? 1.8 : 1.1;
-        if (radius === Ri) ctx.setLineDash([4, 3]);
+              ? "#475569"
+              : "#1e293b";
+        ctx.lineWidth = radius === R ? 1.8 : 1.3;
         ctx.stroke();
-        ctx.setLineDash([]);
       }
     }
 
-    // If cutaway is active, highlight the exposed longitudinal wall thickness faces at z >= 0
+    // If cutaway is active, highlight the exposed longitudinal wall thickness faces at z >= 0 with dark gunmetal steel + cross-hatching
     if (cutaway) {
       for (const cutDeg of [315, 45]) {
         const rad = (cutDeg * Math.PI) / 180;
@@ -507,11 +640,26 @@ export function WeldSetup3D({
         ctx.lineTo(c2.x, c2.y);
         ctx.lineTo(c3.x, c3.y);
         ctx.closePath();
-        ctx.fillStyle = isDark ? "rgba(125, 211, 252, 0.35)" : "rgba(2, 132, 199, 0.32)";
-        ctx.strokeStyle = isDark ? "#7dd3fc" : "#0284c7";
-        ctx.lineWidth = 1.3;
+        ctx.fillStyle = isDark ? "rgba(15, 23, 42, 0.92)" : "rgba(30, 41, 59, 0.88)";
+        ctx.strokeStyle = isDark ? "#94a3b8" : "#0f172a";
+        ctx.lineWidth = 1.4;
         ctx.fill();
         ctx.stroke();
+
+        // Metallographic section hatch lines across the wall thickness face
+        const nHatch = 8;
+        ctx.strokeStyle = isDark ? "rgba(148, 163, 184, 0.45)" : "rgba(203, 213, 225, 0.55)";
+        ctx.lineWidth = 0.9;
+        for (let ih = 1; ih < nHatch; ih += 1) {
+          const zH0 = ((ih - 0.35) / nHatch) * halfLen;
+          const zH1 = ((ih + 0.35) / nHatch) * halfLen;
+          const hIn = project({ x: Ri * Math.cos(rad), y: Ri * Math.sin(rad), z: zH0 });
+          const hOut = project({ x: R * Math.cos(rad), y: R * Math.sin(rad), z: zH1 });
+          ctx.beginPath();
+          ctx.moveTo(hIn.x, hIn.y);
+          ctx.lineTo(hOut.x, hOut.y);
+          ctx.stroke();
+        }
       }
     }
 
@@ -962,28 +1110,131 @@ export function WeldSetup3D({
       }
     }
 
-    // 7. 3D IQI Placement Marker (Source-side vs Film-side)
+    // 7. Realistic 3D IQI Model (ISO 19232-1 Wire Pouch / ISO 19232-2 Step-Hole Plaque)
     const iqiYLocal = filmSide
-      ? -R - Math.max(bgap * 0.25, R * 0.03) // Film side: between outer bottom wall and detector
+      ? -R - wCap - Math.max(bgap * 0.22, R * 0.025) // Film side: outer bottom wall over weld
       : activeGeo === "swsi"
-        ? -Ri + R * 0.04 // SWSI source side: inner bottom surface
-        : R + wCap + R * 0.04; // DWSI/DWDI source side: top outer wall facing source
-    const iqiProj = project(
-      rotZ({ x: R * 0.18, y: iqiYLocal, z: wHalf * 1.4 }, activeAngle),
-    );
+        ? -Ri + Math.max(0.8, R * 0.03) // SWSI source side: inner bottom surface over weld
+        : R + wCap + Math.max(0.8, R * 0.03); // DWSI/DWDI source side: top outer wall over weld
+    const iqiCenterX = R * 0.22;
+    const iqiHalfW = Math.max(wHalf * 1.15, R * 0.16); // Circumferential half-width (across 6 wires)
+    const iqiHalfZ = Math.max(wHalf * 1.65, R * 0.22); // Longitudinal half-length (wires crossing weld)
     const iqiWarn = activeGeo === "dwsi" && !filmSide;
-    ctx.fillStyle = iqiWarn ? "#ef4444" : "#38bdf8";
-    ctx.strokeStyle = isDark ? "#0f172a" : "#ffffff";
-    ctx.lineWidth = 1.5;
+    const isStepHoleIqi = /hole|step|kademe|delik|\bH\d/i.test(wireStr);
+
+    const iqiPt = (dx: number, dz: number) => {
+      // Follow pipe curvature slightly along x
+      const xClamped = Math.max(-R * 0.85, Math.min(R * 0.85, iqiCenterX + dx));
+      const ySign = iqiYLocal >= 0 ? 1 : -1;
+      const rLocal = Math.abs(iqiYLocal);
+      const yCurved =
+        ySign * Math.sqrt(Math.max(rLocal * rLocal - xClamped * xClamped, rLocal * rLocal * 0.25));
+      return project(rotZ({ x: xClamped, y: yCurved, z: dz }, activeAngle));
+    };
+
+    // Draw outer transparent protective PVC pouch / plaque base
+    const pTL = iqiPt(-iqiHalfW, -iqiHalfZ);
+    const pTR = iqiPt(iqiHalfW, -iqiHalfZ);
+    const pBR = iqiPt(iqiHalfW, iqiHalfZ);
+    const pBL = iqiPt(-iqiHalfW, iqiHalfZ);
+
     ctx.beginPath();
-    ctx.roundRect(iqiProj.x - 18, iqiProj.y - 8, 36, 16, 4);
+    ctx.moveTo(pTL.x, pTL.y);
+    ctx.lineTo(pTR.x, pTR.y);
+    ctx.lineTo(pBR.x, pBR.y);
+    ctx.lineTo(pBL.x, pBL.y);
+    ctx.closePath();
+    ctx.fillStyle = iqiWarn
+      ? "rgba(239, 68, 68, 0.28)"
+      : isStepHoleIqi
+        ? "rgba(148, 163, 184, 0.65)"
+        : "rgba(56, 189, 248, 0.24)";
+    ctx.fill();
+    ctx.strokeStyle = iqiWarn ? "#ef4444" : "#38bdf8";
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+
+    if (!isStepHoleIqi) {
+      // Top & bottom lead identification strips inside the IQI pouch
+      const drawLeadStrip = (zStart: number, zEnd: number) => {
+        const s1 = iqiPt(-iqiHalfW * 0.88, zStart);
+        const s2 = iqiPt(iqiHalfW * 0.88, zStart);
+        const s3 = iqiPt(iqiHalfW * 0.88, zEnd);
+        const s4 = iqiPt(-iqiHalfW * 0.88, zEnd);
+        ctx.beginPath();
+        ctx.moveTo(s1.x, s1.y);
+        ctx.lineTo(s2.x, s2.y);
+        ctx.lineTo(s3.x, s3.y);
+        ctx.lineTo(s4.x, s4.y);
+        ctx.closePath();
+        ctx.fillStyle = "rgba(15, 23, 42, 0.86)";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(250, 204, 21, 0.75)";
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+      };
+      drawLeadStrip(-iqiHalfZ * 0.92, -iqiHalfZ * 0.72);
+      drawLeadStrip(iqiHalfZ * 0.72, iqiHalfZ * 0.92);
+
+      // 6 parallel graded metallic wires straddling the girth weld (thick -> thin)
+      for (let wIdx = 0; wIdx < 6; wIdx++) {
+        const frac = -0.74 + (wIdx / 5) * 1.48;
+        const wStart = iqiPt(iqiHalfW * frac, -iqiHalfZ * 0.7);
+        const wEnd = iqiPt(iqiHalfW * frac, iqiHalfZ * 0.7);
+        // Dark contrast halo under each wire
+        ctx.beginPath();
+        ctx.moveTo(wStart.x, wStart.y);
+        ctx.lineTo(wEnd.x, wEnd.y);
+        ctx.strokeStyle = "rgba(15, 23, 42, 0.75)";
+        ctx.lineWidth = Math.max(1.2, 3.0 - wIdx * 0.34);
+        ctx.stroke();
+        // Metallic wire core
+        ctx.beginPath();
+        ctx.moveTo(wStart.x, wStart.y);
+        ctx.lineTo(wEnd.x, wEnd.y);
+        ctx.strokeStyle = iqiWarn ? "#fecaca" : "#f8fafc";
+        ctx.lineWidth = Math.max(0.65, 2.2 - wIdx * 0.3);
+        ctx.stroke();
+      }
+    } else {
+      // Step-Hole IQI: 6 stepped pads with micro-holes
+      for (let sIdx = 0; sIdx < 6; sIdx++) {
+        const z0 = -iqiHalfZ * 0.85 + (sIdx / 6) * (iqiHalfZ * 1.7);
+        const z1 = z0 + (iqiHalfZ * 1.7) / 6;
+        const holeCenter = iqiPt(0, (z0 + z1) * 0.5);
+        ctx.beginPath();
+        ctx.arc(holeCenter.x, holeCenter.y, Math.max(1.2, 2.6 - sIdx * 0.25), 0, Math.PI * 2);
+        ctx.fillStyle = "#0f172a";
+        ctx.fill();
+      }
+    }
+
+    // Floating IQI designation tag with leader line to the 3D IQI pouch
+    const iqiAnchor = iqiPt(iqiHalfW, 0);
+    const iqiLabelX = iqiAnchor.x + 22;
+    const iqiLabelY = iqiAnchor.y - 10;
+    const iqiShortCode = wireStr.split(" ")[0] || "IQI";
+    const iqiTagText = `IQI (${iqiShortCode})`;
+    ctx.beginPath();
+    ctx.moveTo(iqiAnchor.x, iqiAnchor.y);
+    ctx.lineTo(iqiLabelX - 4, iqiLabelY);
+    ctx.strokeStyle = iqiWarn ? "#ef4444" : "#38bdf8";
+    ctx.lineWidth = 1.3;
+    ctx.stroke();
+
+    ctx.font = "700 9.5px system-ui, sans-serif";
+    const iqiTagW = Math.max(46, ctx.measureText(iqiTagText).width + 12);
+    ctx.fillStyle = iqiWarn ? "#ef4444" : "#0284c7";
+    ctx.strokeStyle = isDark ? "#0f172a" : "#ffffff";
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.roundRect(iqiLabelX - 4, iqiLabelY - 9, iqiTagW, 18, 4);
     ctx.fill();
     ctx.stroke();
     ctx.fillStyle = "#ffffff";
-    ctx.font = "700 9px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("IQI", iqiProj.x, iqiProj.y);
+    ctx.fillText(iqiTagText, iqiLabelX - 4 + iqiTagW / 2, iqiLabelY);
 
     // 8. Draw Glowing 3D Radiation Source Sphere + Focal Spot Ring
     const srcGlow = ctx.createRadialGradient(
@@ -1033,7 +1284,7 @@ export function WeldSetup3D({
                 : " • Z=0 (Perpendicular / Superimposed)"
               : "";
       ctx.fillText(
-        `S (d=${d.toFixed(1)} mm)${srcOffsetNote}`,
+        `S (d=${Number(d || 0).toFixed(1)} mm)${srcOffsetNote}`,
         srcProj.x + 12,
         srcProj.y - 6,
       );
@@ -1043,7 +1294,9 @@ export function WeldSetup3D({
         x: (srcProj.x + detCenterProj.x) / 2,
         y: (srcProj.y + detCenterProj.y) / 2,
       };
-      const sfdTag = `${isDigital ? "SDD" : "SFD"} = ${sfd.toFixed(0)} mm${fMin > 0 ? ` (f_min=${fMin.toFixed(0)})` : ""}`;
+      const sfdSafe = Number(sfd || 0);
+      const fMinSafe = Number(fMin || 0);
+      const sfdTag = `${isDigital ? "SDD" : "SFD"} = ${sfdSafe.toFixed(0)} mm${fMinSafe > 0 ? ` (f_min=${fMinSafe.toFixed(0)})` : ""}`;
       ctx.fillStyle = isDark ? "rgba(15, 23, 42, 0.82)" : "rgba(255, 255, 255, 0.88)";
       const tagW = ctx.measureText(sfdTag).width + 12;
       ctx.beginPath();
@@ -1072,9 +1325,10 @@ export function WeldSetup3D({
               : lang === "tr"
                 ? "Tek Cidar Tek Görüntü (Alt Kaynak)"
                 : "Single Wall Single Image";
+      const bSafe = Number(bDist || 0);
       const detTag = isDigital
-        ? `${isPlanar ? "DDA Panel" : "Esnek CR"} • b=${bDist.toFixed(1)} mm • ${projModeTag}`
-        : `Film • b=${bDist.toFixed(1)} mm • ${projModeTag}`;
+        ? `${isPlanar ? "DDA Panel" : "Esnek CR"} • b=${bSafe.toFixed(1)} mm • ${projModeTag}`
+        : `Film • b=${bSafe.toFixed(1)} mm • ${projModeTag}`;
       ctx.fillStyle = isDark ? "#6ee7b7" : "#047857";
       ctx.textAlign = "center";
       ctx.fillText(detTag, detCenterProj.x, detCenterProj.y + 22);
@@ -1084,7 +1338,7 @@ export function WeldSetup3D({
       ctx.textAlign = "left";
       ctx.fillStyle = isDark ? "#93c5fd" : "#1e40af";
       ctx.fillText(
-        `Ø${od.toFixed(1)} × ${t.toFixed(2)} mm`,
+        `Ø${Number(od || 0).toFixed(1)} × ${Number(t || 0).toFixed(2)} mm`,
         Math.max(12, pipeEndProj.x - 20),
         Math.max(24, pipeEndProj.y - 14),
       );
@@ -1124,7 +1378,7 @@ export function WeldSetup3D({
     // 11. Top-Right HUD Summary Pill (Technique, Ug, IQI, Safety)
     const hudLines = [
       `${activeGeo.toUpperCase()} • N=${nApplied > 0 ? `${nApplied}/${nRequired}` : nRequired} Poz`,
-      `Ug = ${ug.toFixed(3)} mm • IQI: ${wireStr.split(" ")[0] || wireStr}${isDigital && duplexStr !== "N/A" ? ` / ${duplexStr.split(" ")[0]}` : ""} (${filmSide ? (lang === "tr" ? "Film Tarafı" : "Film Side") : lang === "tr" ? "Kaynak Tarafı" : "Source Side"})`,
+      `Ug = ${Number(ug || 0).toFixed(3)} mm • IQI: ${wireStr.split(" ")[0] || wireStr}${isDigital && duplexStr !== "N/A" ? ` / ${duplexStr.split(" ")[0]}` : ""} (${filmSide ? (lang === "tr" ? "Film Tarafı" : "Film Side") : lang === "tr" ? "Kaynak Tarafı" : "Source Side"})`,
     ];
     if (safetyRadiusM && safetyRadiusM > 0) {
       hudLines.push(
@@ -1186,6 +1440,7 @@ export function WeldSetup3D({
     panX,
     panY,
     cutaway,
+    pipeOpacity,
     showAllStations,
     safeStation,
     stationStepRad,
@@ -1339,6 +1594,28 @@ export function WeldSetup3D({
 
       <div className="sketch-3d-footer">
         <div className="sketch-station-bar">
+          <label
+            className="sketch-station-label"
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, marginRight: 8 }}
+            title={
+              tr
+                ? "Boru dış yüzeyinin saydamlık (opaklık) oranını ayarlar; et kalınlığı kesitleri koyu kalır"
+                : "Adjusts pipe outer surface opacity while keeping wall thickness sections dark"
+            }
+          >
+            <span>{tr ? "Boru Opaklığı:" : "Pipe Opacity:"}</span>
+            <input
+              type="range"
+              min={0.15}
+              max={1.0}
+              step={0.05}
+              value={pipeOpacity}
+              onChange={(event) => setPipeOpacity(Number(event.target.value))}
+              style={{ width: 76 }}
+              aria-label={tr ? "Boru Opaklığı" : "Pipe Opacity"}
+            />
+            <span style={{ minWidth: 32 }}>{Math.round(pipeOpacity * 100)}%</span>
+          </label>
           <button
             type="button"
             className={`sketch-mini-btn ${showAllStations ? "active" : ""}`}

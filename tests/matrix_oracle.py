@@ -307,7 +307,8 @@ def expected_geometry(sc, planar):
     f_asme = expected_asme_f_min(d, b, t) if sc["standard"] == "asme" else None
     f_gov = f_asme if f_asme is not None else f_iso
     floor = od + sc["bgap"] if geometry == "dwsi" else 0.0
-    sfd_min = max(f_gov + b, 1.4 * dd, floor)
+    coverage = 0.0 if central else 1.4 * dd
+    sfd_min = max(f_gov + b, coverage, floor)
     f = sc["sfd"] - b
     ug = d * b / f if f > 0 else math.inf
     return {"b_dist": b, "f_min_iso": f_iso, "f_min_asme": f_asme,

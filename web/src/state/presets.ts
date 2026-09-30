@@ -13,7 +13,20 @@ const CLASSES = ["class_b", "class_a"];
 const GEOMETRIES = ["dwsi", "swsi", "dwdi_elliptic", "dwdi_super"];
 const STANDARDS = ["iso", "asme"];
 const DETECTORS = ["cr_standard", "cr_highres", "dda_si", "dda_se", "dda_gdos"];
-const CHARTS = ["model", "AA400", "MX125", "T200", "HS800", "M100", "type_x"];
+const ANALOG_CHARTS = ["model", "AA400", "MX125", "T200", "HS800", "M100", "type_x"];
+const DIGITAL_CR_CHARTS = ["model", "cr_ips_chart", "digital_xray_chart"];
+const DIGITAL_DDA_CHARTS = [
+  "model",
+  "dda_frame_method",
+  "dda_panel_chart",
+  "digital_xray_chart",
+];
+
+export function getActiveChartKeys(tech: string, detectorType: string): string[] {
+  if (tech !== "digital") return ANALOG_CHARTS;
+  return detectorType.startsWith("dda_") ? DIGITAL_DDA_CHARTS : DIGITAL_CR_CHARTS;
+}
+
 const COLLIMATORS = [0, 1, 2, 4];
 const FILM_SIZES: Record<string, [number, number]> = {
   "80x300": [80, 300],
@@ -144,7 +157,10 @@ export function formToDesktopState(
     cmb_geometry: indexOf(GEOMETRIES, form.geometry),
     cmb_film_class_used: indexOf(["C1", "C2", "C3", "C4", "C5", "C6"], form.film_class_used),
     cmb_detector_type: indexOf(DETECTORS, form.detector_type),
-    cmb_chart_source: indexOf(CHARTS, form.chart_source),
+    cmb_chart_source: indexOf(
+      getActiveChartKeys(form.tech, form.detector_type),
+      form.chart_source,
+    ),
     cmb_standard: indexOf(STANDARDS, form.standard),
     cmb_collimator: indexOf(COLLIMATORS, form.collimator_hvl),
     cmb_iqi_type: indexOf(["wire", "step_hole"], form.iqi_type),
@@ -230,7 +246,16 @@ export function desktopStateToForm(
     form.detector_type = DETECTORS[asNumber(combo("cmb_detector_type"), 0)] ?? "cr_standard";
   }
   if (combo("cmb_chart_source") !== undefined) {
-    form.chart_source = CHARTS[asNumber(combo("cmb_chart_source"), 0)] ?? "model";
+    const rawChart = combo("cmb_chart_source");
+    const activeCharts = getActiveChartKeys(
+      form.tech ?? "analog",
+      form.detector_type ?? "cr_standard",
+    );
+    if (typeof rawChart === "string" && isNaN(Number(rawChart))) {
+      form.chart_source = activeCharts.includes(rawChart) ? rawChart : "model";
+    } else {
+      form.chart_source = activeCharts[asNumber(rawChart, 0)] ?? "model";
+    }
   }
   if (combo("cmb_collimator") !== undefined) {
     form.collimator_hvl = COLLIMATORS[asNumber(combo("cmb_collimator"), 0)] ?? 0;

@@ -11,7 +11,7 @@ function post(message: unknown) {
   (self as unknown as Worker).postMessage(message);
 }
 
-// Base URL injected by Vite (e.g. "/" locally, "/Radiography/" on Pages).
+// Base URL injected by Vite (e.g. "/" locally, "/Radiography/" on Pages) - SWSI panoramic sync.
 const BASE = import.meta.env.BASE_URL;
 
 async function boot() {
@@ -21,10 +21,12 @@ async function boot() {
   });
 
   post({ type: "status", stage: "loading-core" });
-  const files = (await (await fetch(`${BASE}python/files.json`)).json()) as string[];
+  const files = (await (
+    await fetch(`${BASE}python/files.json`, { cache: "no-store" })
+  ).json()) as string[];
   pyodide.FS.mkdirTree("/python");
   for (const file of files) {
-    const response = await fetch(`${BASE}python/${file}`);
+    const response = await fetch(`${BASE}python/${file}`, { cache: "no-store" });
     if (!response.ok) {
       throw new Error(`Failed to fetch ${BASE}python/${file}: ${response.status}`);
     }

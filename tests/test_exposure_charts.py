@@ -334,3 +334,52 @@ class TestRTCalculatorWithCharts(unittest.TestCase):
         self.assertAlmostEqual(digital_corr["total_ratio"], 4.0, places=3)
         self.assertAlmostEqual(digital_corr["t2_sec"], 200.0, places=2)
 
+    def test_digital_cr_ips_and_dda_panel_rfactor_lookup(self):
+        r_cr_std, _ = self.db.lookup_digital_r_factor("cr_standard", "isotope_ir192")
+        r_cr_hi, _ = self.db.lookup_digital_r_factor("cr_highres", "isotope_ir192")
+        r_dda_si, _ = self.db.lookup_digital_r_factor("dda_si", "isotope_ir192")
+        r_dda_se, _ = self.db.lookup_digital_r_factor("dda_se", "isotope_ir192")
+        self.assertIsNotNone(r_cr_std)
+        self.assertIsNotNone(r_cr_hi)
+        self.assertIsNotNone(r_dda_si)
+        self.assertIsNotNone(r_dda_se)
+        # High-res CR (IPS-1) requires more dose than standard CR (IPS-2/3), so larger R-factor (Ci·min/m²)
+        self.assertGreater(r_cr_hi, r_cr_std)
+        # DDA panels require less dose (faster) than CR plates, so smaller R-factor (Ci·min/m²)
+        self.assertLess(r_dda_si, r_cr_std)
+
+    def test_digital_chart_methods_in_calculator(self):
+        # CR IPS Chart (ISO 16371-1)
+        res_cr = self.calc.calculate_exposure_time_details(
+            600.0, 15.0, "isotope_ir192", 40.0, 30.0, "digital",
+            detector_type="cr_standard", chart_source="cr_ips_chart",
+            chart_db=self.db, app_srb=100.0
+        )
+        self.assertEqual(res_cr["provenance"]["method"], "cr_ips_chart")
+        self.assertGreater(res_cr["time_seconds"], 0.0)
+
+        # DDA Frame Integration Method (ASTM E2698)
+        res_dda_frame = self.calc.calculate_exposure_time_details(
+            600.0, 15.0, "x_ray", 5.0, 3.0, "digital",
+            detector_type="dda_si", kv=160.0, chart_source="dda_frame_method",
+            chart_db=self.db, app_srb=100.0
+        )
+        self.assertEqual(res_dda_frame["provenance"]["method"], "dda_frame_method")
+        self.assertIsNotNone(res_dda_frame["provenance"]["dda_frame"])
+        self.assertGreaterEqual(res_dda_frame["provenance"]["dda_frame"]["n_frames"], 1)
+        self.assertGreater(res_dda_frame["provenance"]["dda_frame"]["t_frame_sec"], 0.0)
+        self.assertGreater(res_dda_frame["time_seconds"], 0.0)
+
+        # Digital X-Ray Chart
+        res_dx = self.calc.calculate_exposure_time_details(
+            600.0, 15.0, "x_ray", 5.0, 3.0, "digital",
+            detector_type="cr_highres", kv=160.0, chart_source="digital_xray_chart",
+            chart_db=self.db, app_srb=63.0
+        )
+        self.assertEqual(res_dx["provenance"]["method"], "digital_xray_chart")
+        self.assertGreater(res_dx["time_seconds"], 0.0)
+
+
+if __name__ == "__main__":
+    unittest.main()
+
