@@ -55,13 +55,36 @@ def test_sfd_min_is_governing_max(engine):
 
 
 def test_ug_uses_sfd_minus_b(engine):
-    # Analog film model: b = t for SWSI, so Ug = d·t/(SFD - t)
+    # Analog film model (flush weld cap=0): b = t for SWSI, so Ug = d·t/(SFD - t)
     result = engine.calculate({
-        "geometry": "swsi", "tech": "analog", "t": 6.02, "d": 2.0, "sfd": 600.0,
+        "geometry": "swsi", "tech": "analog", "t": 6.02, "cap": 0.0, "d": 2.0, "sfd": 600.0,
     })
     values = result["values"]
     assert values["b_dist"] == pytest.approx(6.02)
     assert values["ug"] == pytest.approx(2.0 * 6.02 / (600.0 - 6.02))
+
+
+def test_clause_7_6_cap_rule(engine):
+    # When t=6.0 and cap=1.0 -> total thickness b=7.0 < 1.2*t (7.2) -> b_eff = t = 6.0
+    res_small_cap = engine.calculate({
+        "geometry": "swsi", "tech": "analog", "t": 6.0, "cap": 1.0, "d": 2.0, "sfd": 600.0,
+    })
+    v1 = res_small_cap["values"]
+    assert v1["b_dist"] == pytest.approx(7.0)
+    assert v1["b_eff"] == pytest.approx(6.0)
+    assert v1["b_rule_applied"] is True
+    assert any("b (7.0 mm) < 1.2×t (7.2 mm)" in w for w in res_small_cap["warnings"])
+
+    # When t=6.0 and cap=2.0 -> total thickness b=8.0 >= 1.2*t (7.2) -> b_eff = 8.0 (rule NOT applied)
+    res_large_cap = engine.calculate({
+        "geometry": "swsi", "tech": "analog", "t": 6.0, "cap": 2.0, "d": 2.0, "sfd": 600.0,
+    })
+    v2 = res_large_cap["values"]
+    assert v2["b_dist"] == pytest.approx(8.0)
+    assert v2["b_eff"] == pytest.approx(8.0)
+    assert v2["b_rule_applied"] is False
+    assert v2["f_min_iso"] == pytest.approx(15.0 * 2.0 * (8.0 ** (2.0 / 3.0)))
+    assert any("≥ 1.2×t (7.2 mm)" in w for w in res_large_cap["warnings"])
 
 
 def test_dwdi_forced_to_dwsi_over_100mm(engine):
@@ -157,7 +180,7 @@ def test_sfd_min_provenance_analog_uses_film_formula(engine):
 
 def test_exposures_provenance_dwsi_user_case(engine):
     result = engine.calculate({
-        "od": 114.3, "t": 6.0, "tech": "analog", "testing_class": "class_b",
+        "od": 114.3, "t": 6.0, "cap": 0.0, "tech": "analog", "testing_class": "class_b",
         "geometry": "dwsi", "std_figure": "fig13", "sfd": 155.0, "d": 3.0,
         "film_width": 80.0, "film_height": 50.0, "film_class_used": "C3",
     })
@@ -176,7 +199,7 @@ def test_exposures_provenance_dwsi_user_case(engine):
 def test_exposures_provenance_swsi_fig2_uses_annex_a1(engine):
     result = engine.calculate({
         "geometry": "swsi", "std_figure": "fig2", "tech": "analog",
-        "od": 114.3, "t": 6.0, "sfd": 600.0,
+        "od": 114.3, "t": 6.0, "cap": 0.0, "sfd": 600.0,
     })
     prov = result["values"]["exposures_provenance"]
     assert prov["method"] == "annex_a"
@@ -201,7 +224,7 @@ def test_exposures_provenance_text_mentions_next_boundary(engine):
     from src.core.translation import Translation
 
     result = engine.calculate({
-        "od": 114.3, "t": 6.0, "tech": "analog", "testing_class": "class_b",
+        "od": 114.3, "t": 6.0, "cap": 0.0, "tech": "analog", "testing_class": "class_b",
         "geometry": "dwsi", "std_figure": "fig13", "sfd": 155.0, "d": 3.0,
     })
     text = format_exposures_provenance(
@@ -216,7 +239,7 @@ def test_f_min_provenance_base_and_level3_reduction(engine):
     from src.core.translation import Translation
 
     form = {
-        "od": 114.3, "t": 6.0, "tech": "analog", "testing_class": "class_b",
+        "od": 114.3, "t": 6.0, "cap": 0.0, "tech": "analog", "testing_class": "class_b",
         "geometry": "dwsi", "std_figure": "fig13", "sfd": 155.0, "d": 3.0,
     }
     base = engine.calculate(form, {}, "tr")

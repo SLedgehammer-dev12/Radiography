@@ -11,6 +11,27 @@ import {
 export const UnitContext = createContext<{ inch: boolean }>({ inch: false });
 
 /**
+ * Accessible instant tooltip badge (?) that works on both hover and touch/focus.
+ * Uses data-tip + CSS ::before/::after so element.textContent stays clean.
+ */
+export function InfoTip({ text }: { text?: string }) {
+  if (!text) return null;
+  return (
+    <span
+      className="info-tip"
+      tabIndex={0}
+      role="note"
+      aria-label={text}
+      data-tip={text}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
+    />
+  );
+}
+
+/**
  * Always-visible, draggable vertical scrollbar for the document.
  * Independent of the OS overlay-scrollbar setting (macOS "when scrolling").
  */
@@ -101,6 +122,7 @@ interface NumberFieldProps {
   tooltip?: string;
   placeholder?: string;
   disabled?: boolean;
+  action?: ReactNode;
 }
 
 export function NumberField({
@@ -113,18 +135,26 @@ export function NumberField({
   tooltip,
   placeholder,
   disabled,
+  action,
 }: NumberFieldProps) {
   const invalid =
     value === null ||
     (value !== null && min !== undefined && value < min) ||
     (value !== null && max !== undefined && value > max);
   return (
-    <label className="field" title={tooltip}>
-      <span className="field-label">{label}</span>
+    <div className="field" title={tooltip}>
+      <div className="field-head">
+        <span className="field-label">
+          {label}
+          <InfoTip text={tooltip} />
+        </span>
+        {action}
+      </div>
       <input
         className={invalid ? "field-input invalid" : "field-input"}
         type="number"
         inputMode="decimal"
+        aria-label={label}
         value={value === null || Number.isNaN(value) ? "" : value}
         min={min}
         max={max}
@@ -141,7 +171,7 @@ export function NumberField({
           onChange(Number.isFinite(parsed) ? parsed : null);
         }}
       />
-    </label>
+    </div>
   );
 }
 
@@ -176,6 +206,7 @@ interface SliderFieldProps {
   sliderMax?: number;
   tooltip?: string;
   disabled?: boolean;
+  action?: ReactNode;
 }
 
 /** Numeric field with a synchronized range slider (mobile-style control). */
@@ -190,6 +221,7 @@ export function SliderField({
   sliderMax,
   tooltip,
   disabled,
+  action,
 }: SliderFieldProps) {
   const sliderLo = sliderMin ?? min;
   const sliderHi = sliderMax ?? max;
@@ -198,26 +230,33 @@ export function SliderField({
   return (
     <div className="field slider-field" title={tooltip}>
       <div className="slider-head">
-        <span className="field-label">{label}</span>
-        <input
-          className="field-input slider-number"
-          type="number"
-          inputMode="decimal"
-          value={value === null || Number.isNaN(value) ? "" : value}
-          min={min}
-          max={max}
-          step={step}
-          disabled={disabled}
-          onChange={(event) => {
-            const raw = event.target.value;
-            if (raw === "") {
-              onChange(null);
-              return;
-            }
-            const parsed = Number(raw.replace(",", "."));
-            onChange(Number.isFinite(parsed) ? parsed : null);
-          }}
-        />
+        <span className="field-label">
+          {label}
+          <InfoTip text={tooltip} />
+        </span>
+        <div className="slider-head-controls">
+          {action}
+          <input
+            className="field-input slider-number"
+            type="number"
+            inputMode="decimal"
+            aria-label={label}
+            value={value === null || Number.isNaN(value) ? "" : value}
+            min={min}
+            max={max}
+            step={step}
+            disabled={disabled}
+            onChange={(event) => {
+              const raw = event.target.value;
+              if (raw === "") {
+                onChange(null);
+                return;
+              }
+              const parsed = Number(raw.replace(",", "."));
+              onChange(Number.isFinite(parsed) ? parsed : null);
+            }}
+          />
+        </div>
       </div>
       <input
         className="slider"
@@ -229,6 +268,107 @@ export function SliderField({
         disabled={disabled}
         onChange={(event) => onChange(Number(event.target.value))}
       />
+    </div>
+  );
+}
+
+/**
+ * Exposure duration field supporting both total seconds AND combined min + sec entry.
+ */
+export function DurationSliderField({
+  label,
+  value,
+  onChange,
+  tooltip,
+  action,
+  lang = "tr",
+}: {
+  label: string;
+  value: number | null;
+  onChange: (value: number | null) => void;
+  tooltip?: string;
+  action?: ReactNode;
+  lang?: string;
+}) {
+  const totalSec = Math.max(0, value ?? 0);
+  const mins = Math.floor(totalSec / 60);
+  const secs = Number((totalSec - mins * 60).toFixed(1));
+  const sliderVal = Math.min(1800, Math.max(5, totalSec));
+  const tr = lang === "tr";
+
+  return (
+    <div className="field slider-field" title={tooltip}>
+      <div className="slider-head">
+        <span className="field-label">
+          {label}
+          <InfoTip text={tooltip} />
+        </span>
+        <div className="slider-head-controls">
+          {action}
+          <input
+            className="field-input slider-number"
+            type="number"
+            inputMode="decimal"
+            aria-label={label}
+            value={value === null || Number.isNaN(value) ? "" : Number(value.toFixed(1))}
+            min={0.1}
+            max={100000}
+            step={1}
+            onChange={(event) => {
+              const raw = event.target.value;
+              if (raw === "") {
+                onChange(null);
+                return;
+              }
+              const parsed = Number(raw.replace(",", "."));
+              onChange(Number.isFinite(parsed) ? parsed : null);
+            }}
+          />
+        </div>
+      </div>
+      <div className="duration-split-row">
+        <div className="duration-unit-box">
+          <input
+            className="field-input duration-input"
+            type="number"
+            min={0}
+            max={1600}
+            step={1}
+            value={mins}
+            aria-label={tr ? "Dakika" : "Minutes"}
+            onChange={(event) => {
+              const newMins = Math.max(0, Math.floor(Number(event.target.value) || 0));
+              onChange(Math.max(0.1, newMins * 60 + secs));
+            }}
+          />
+          <span className="duration-unit-label">{tr ? "dk" : "min"}</span>
+        </div>
+        <div className="duration-unit-box">
+          <input
+            className="field-input duration-input"
+            type="number"
+            min={0}
+            max={59.9}
+            step={1}
+            value={secs}
+            aria-label={tr ? "Saniye" : "Seconds"}
+            onChange={(event) => {
+              const newSecs = Math.max(0, Number(event.target.value) || 0);
+              onChange(Math.max(0.1, mins * 60 + newSecs));
+            }}
+          />
+          <span className="duration-unit-label">{tr ? "sn" : "sec"}</span>
+        </div>
+        <input
+          className="slider"
+          type="range"
+          min={5}
+          max={1800}
+          step={5}
+          value={sliderVal}
+          onChange={(event) => onChange(Number(event.target.value))}
+        />
+      </div>
     </div>
   );
 }
@@ -276,6 +416,7 @@ interface SelectFieldProps {
   onChange: (value: string) => void;
   tooltip?: string;
   disabled?: boolean;
+  action?: ReactNode;
 }
 
 export function SelectField({
@@ -285,12 +426,20 @@ export function SelectField({
   onChange,
   tooltip,
   disabled,
+  action,
 }: SelectFieldProps) {
   return (
-    <label className="field" title={tooltip}>
-      <span className="field-label">{label}</span>
+    <div className="field" title={tooltip}>
+      <div className="field-head">
+        <span className="field-label">
+          {label}
+          <InfoTip text={tooltip} />
+        </span>
+        {action}
+      </div>
       <select
         className="field-input"
+        aria-label={label}
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
@@ -301,7 +450,7 @@ export function SelectField({
           </option>
         ))}
       </select>
-    </label>
+    </div>
   );
 }
 
@@ -322,7 +471,10 @@ export function RadioGroup({
 }: RadioGroupProps) {
   return (
     <div className="field" title={tooltip}>
-      <span className="field-label">{label}</span>
+      <span className="field-label">
+        {label}
+        <InfoTip text={tooltip} />
+      </span>
       <div className="radio-row">
         {options.map((option) => (
           <label key={option.value} className="radio-option">
@@ -354,7 +506,10 @@ export function CheckField({ label, checked, onChange, tooltip }: CheckFieldProp
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
       />
-      <span>{label}</span>
+      <span>
+        {label}
+        <InfoTip text={tooltip} />
+      </span>
     </label>
   );
 }
@@ -366,6 +521,7 @@ interface GroupProps {
   id?: string;
   collapsible?: boolean;
   open?: boolean;
+  headerAction?: ReactNode;
 }
 
 export function Group({
@@ -375,6 +531,7 @@ export function Group({
   id,
   collapsible = true,
   open = true,
+  headerAction,
 }: GroupProps) {
   const classes = className ? `group ${className}` : "group";
   if (!collapsible) {
@@ -387,7 +544,20 @@ export function Group({
   }
   return (
     <details id={id} className={classes} open={open}>
-      <summary className="group-title">{title}</summary>
+      <summary className="group-title">
+        <span>{title}</span>
+        {headerAction && (
+          <span
+            className="group-header-action"
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+          >
+            {headerAction}
+          </span>
+        )}
+      </summary>
       <div className="group-body">{children}</div>
     </details>
   );
@@ -403,7 +573,10 @@ interface OutputRowProps {
 export function OutputRow({ label, value, tooltip, testId }: OutputRowProps) {
   return (
     <div className="output-row" title={tooltip} data-testid={testId}>
-      <span className="output-label">{label}</span>
+      <span className="output-label">
+        {label}
+        <InfoTip text={tooltip} />
+      </span>
       <span className="output-value">{value}</span>
     </div>
   );

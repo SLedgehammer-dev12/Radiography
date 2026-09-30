@@ -29,12 +29,14 @@ jobs:
       - name: Resolve version and release decision
         id: resolve
         env:
+          EVENT_NAME: ${{ github.event_name }}
           REF_TYPE: ${{ github.ref_type }}
           REF_NAME: ${{ github.ref_name }}
         run: |
           python3 - <<'EOF'
           import os, re, subprocess
 
+          event_name = os.environ.get("EVENT_NAME", "")
           ref_type = os.environ.get("REF_TYPE", "")
           ref_name = os.environ.get("REF_NAME", "")
 
@@ -52,16 +54,14 @@ jobs:
                   return tuple(int(x) if x.isdigit() else 0
                                for x in v.lstrip("vV").split("."))
 
-              head_tags = subprocess.run(["git", "tag", "--points-at", "HEAD"],
-                                         capture_output=True, text=True).stdout.split()
               all_tags = subprocess.run(["git", "tag", "--list", "v*"],
                                         capture_output=True, text=True).stdout.split()
-              if tag_name in head_tags:
-                  # Tag points at this commit -> release.
-                  should_release = "true"
+              if event_name == "workflow_dispatch":
+                  should_release = "true" if version else "false"
               elif tag_name in all_tags:
-                  # The tag already exists (e.g. a docs push after a tagged
-                  # release) -> do not rebuild and re-publish the release.
+                  # Tag already exists (either pushed alongside main, which triggers
+                  # the dedicated tag workflow, or from a previous release) -> skip
+                  # duplicate release build on the branch push.
                   should_release = "false"
               else:
                   latest = max((t for t in all_tags if t != tag_name),
@@ -305,7 +305,8 @@ jobs:
       always() &&
       !cancelled() &&
       needs.build-windows.result == 'success' &&
-      needs.build-macos.result == 'success'
+      needs.build-macos.result == 'success' &&
+      needs.build-web-launcher.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write

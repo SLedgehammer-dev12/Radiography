@@ -41,7 +41,7 @@ def win(qapp):
 
 
 def _configure_analog(win, geometry="dwsi", od=219.1, t=6.02, cls_index=0,
-                      sfd=600.0, planar=None):
+                      sfd=600.0, planar=None, cap=0.0):
     if planar is not None:
         win.rad_detector_flat.setChecked(planar)
         win.rad_detector_curved.setChecked(not planar)
@@ -50,6 +50,7 @@ def _configure_analog(win, geometry="dwsi", od=219.1, t=6.02, cls_index=0,
     win.cmb_class.setCurrentIndex(cls_index)
     win.txt_custom_od.setText(str(od))
     win.txt_custom_t.setText(str(t))
+    win.txt_cap.setText(str(cap))
     win.txt_app_sfd.setText(str(sfd))
     win.update_calculations()
 

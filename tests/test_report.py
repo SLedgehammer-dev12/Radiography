@@ -321,6 +321,7 @@ class TestReportProvenance(unittest.TestCase):
             "f_min_provenance_text": self.fmin_text,
             "sfd_min_provenance_text": self.sfd_text,
             "exposures_provenance_text": self.exp_text,
+            "exposure_time_provenance_text": self.result["calculated"]["exposure_time_provenance_text"],
         }
         self.assertTrue(self.gen.generate_report(
             filepath, inputs, outputs, [], None, False, None, self.trans))
@@ -331,6 +332,8 @@ class TestReportProvenance(unittest.TestCase):
         self.assertIn("Annex A Figure A2", flat)
         self.assertIn("N=5", flat)
         self.assertIn("158.3", flat)
+        self.assertIn("Exposure Time (T) Calculation Method & Formula Breakdown", flat)
+        self.assertIn("Beer-Lambert", flat)
 
     def test_pdf_works_without_provenance_keys(self):
         filepath = os.path.join(self.tmpdir, "no_provenance.pdf")

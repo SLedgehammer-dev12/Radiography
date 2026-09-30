@@ -526,6 +526,57 @@ class PDFReportGenerator:
                 provenance_style))
             story.append(Spacer(1, 8))
 
+        # Exposure Time Formula & Parameter Breakdown Box
+        exp_time_prov_text = outputs.get("exposure_time_provenance_text")
+        if exp_time_prov_text:
+            exp_header_lbl = (
+                "Poz Süresi (T) Hesaplama Yöntemi ve Formül Açıklaması"
+                if lang_code == "tr"
+                else "Exposure Time (T) Calculation Method & Formula Breakdown"
+            )
+            exp_box_header_style = ParagraphStyle(
+                name='ExpBoxHeader',
+                fontName=self._resolve_font('Arial-Bold'),
+                fontSize=8.5,
+                leading=11,
+                textColor=colors.HexColor('#0d47a1'),
+            )
+            exp_box_body_style = ParagraphStyle(
+                name='ExpBoxBody',
+                fontName=self._resolve_font('Arial'),
+                fontSize=8,
+                leading=11.5,
+                textColor=colors.HexColor('#263238'),
+            )
+            formatted_exp_lines = []
+            for raw_line in str(exp_time_prov_text).splitlines():
+                raw_line = raw_line.strip()
+                if not raw_line:
+                    continue
+                if ":" in raw_line:
+                    head, tail = raw_line.split(":", 1)
+                    formatted_exp_lines.append(f"• <b>{_esc(head)}:</b> {_esc(tail.strip())}")
+                else:
+                    formatted_exp_lines.append(f"• {_esc(raw_line)}")
+            exp_table = Table(
+                [
+                    [Paragraph(exp_header_lbl, exp_box_header_style)],
+                    [Paragraph("<br/>".join(formatted_exp_lines), exp_box_body_style)],
+                ],
+                colWidths=[500],
+            )
+            exp_table.setStyle(TableStyle([
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#90caf9')),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e3f2fd')),
+                ('BACKGROUND', (0, 1), (-1, 1), colors.HexColor('#f8fbff')),
+                ('TOPPADDING', (0, 0), (-1, -1), 5),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+                ('LEFTPADDING', (0, 0), (-1, -1), 8),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+            ]))
+            story.append(exp_table)
+            story.append(Spacer(1, 10))
+
         # Field Correction Factor (F) context note (only when it deviates from 1.0)
         if outputs.get("base_multiplier", 1.0) != 1.0:
             note_style = ParagraphStyle(
@@ -696,7 +747,15 @@ class PDFReportGenerator:
             ref_rows.append([Paragraph("Film Overlap", ref_style), Paragraph("ISO 17636-1:2022 Clause 6.6 (overlap of films verified by a high-density marker)", ref_style)])
             
         ref_rows.append([Paragraph("Filter / Screen Recommendation", ref_style), Paragraph("ISO 17636-1:2022 Clause 7.5.1 (metal screens/filters); ASME Sec V Art 2", ref_style)])
-            
+        ref_rows.append([
+            Paragraph("Calculated Exposure Time (T)", ref_style),
+            Paragraph(
+                "Inverse Square Law (SFD/SFD₀)² × Beer-Lambert Broad-Beam Attenuation exp(μ_eff·w_eff) / Carestream R-Factor / Type X Exposure Chart, "
+                "scaled by Radiographic Equivalence Factor (REF per ASTM E94) &amp; ISO 11699-1 (10^((D−2.0)/Ḡ)) or ISO 17636-2 ((SNR_N/70)²)",
+                ref_style
+            )
+        ])
+
         ref_table = Table(ref_rows, colWidths=[180, 320])
         ref_table.setStyle(TableStyle([
             ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cfd8dc')),

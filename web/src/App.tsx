@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   CheckField,
+  DurationSliderField,
   Group,
   LengthField,
   LengthSliderField,
@@ -13,10 +14,17 @@ import {
   SliderField,
   UnitContext,
 } from "./components";
-import { StandardFigureSvg, WeldSetupSvg } from "./components/SketchView";
+import {
+  AnnexAChartSvg,
+  DefectStripSvg,
+  StandardFigureSvg,
+  WeldSetupSvg,
+} from "./components/SketchView";
+import { WeldSetup3D } from "./components/WeldSetup3D";
 import { makeTranslator } from "./i18n";
 import { pyClient } from "./pyodide/client";
 import {
+  DEFAULT_BASE_E_BY_SOURCE,
   NAMED_PRESETS,
   desktopStateToForm,
   downloadCsv,
@@ -63,7 +71,7 @@ const SOURCES = [
   "isotope_tm170",
 ];
 const GEOMETRIES = ["dwsi", "swsi", "dwdi_elliptic", "dwdi_super"];
-const DETECTOR_KEYS = ["cr_standard", "cr_hires", "dda_si", "dda_se", "dda_gdos"];
+const DETECTOR_KEYS = ["cr_standard", "cr_highres", "dda_si", "dda_se", "dda_gdos"];
 const DETECTOR_TKEYS = [
   "detector_cr_std",
   "detector_cr_hires",
@@ -136,7 +144,22 @@ interface PersistedState {
 function loadPersisted(): PersistedState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as PersistedState) : {};
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as PersistedState;
+    if (parsed.form) {
+      if (parsed.form.detector_type === "cr_hires") {
+        parsed.form.detector_type = "cr_highres";
+      }
+      if (
+        parsed.form.source &&
+        parsed.form.source !== "x_ray" &&
+        parsed.form.base_e === 3.0
+      ) {
+        parsed.form.base_e =
+          DEFAULT_BASE_E_BY_SOURCE[parsed.form.source] ?? 30.0;
+      }
+    }
+    return parsed;
   } catch {
     return {};
   }
@@ -152,6 +175,8 @@ export default function App() {
   const [lang, setLang] = useState<string>(persisted.lang ?? "tr");
   const [theme, setTheme] = useState<"dark" | "light">(persisted.theme ?? "dark");
   const [unitInch, setUnitInch] = useState(false);
+  const [pipeStd, setPipeStd] = useState<"b36_10" | "b36_19">("b36_10");
+  const [activityUnit, setActivityUnit] = useState<"Ci" | "GBq">("Ci");
   const [strings, setStrings] = useState<Record<string, string>>({});
   const [pipeData, setPipeData] = useState<PipeData | null>(null);
   const [figures, setFigures] = useState<string[]>([]);
@@ -164,7 +189,9 @@ export default function App() {
   );
   const [showLvl3, setShowLvl3] = useState(false);
   const [bootError, setBootError] = useState<string | null>(null);
-  const [sketchTab, setSketchTab] = useState<"dynamic" | "figure">("dynamic");
+  const [sketchTab, setSketchTab] = useState<
+    "3d" | "dynamic" | "figure" | "annex_a"
+  >("3d");
   const [filmSizeMode, setFilmSizeMode] = useState<string>("100x400");
   const [defect, setDefect] = useState<DefectInput>({
     standard: "api1104",
@@ -177,6 +204,7 @@ export default function App() {
     mode: "UW-51",
   });
   const [defectResult, setDefectResult] = useState<DefectResult | null>(null);
+  const [defectActive, setDefectActive] = useState(false);
   const [showDecay, setShowDecay] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -267,6 +295,19 @@ export default function App() {
     );
     if (match) setFilmSizeMode(match[0]);
   }, [form.film_width, form.film_height]);
+
+  // Reactive defect evaluation once defect module is activated by user
+  useEffect(() => {
+    if (!ready || !defectActive) return;
+    const timer = setTimeout(() => {
+      pyClient
+        .request<DefectResult>("defect", { form, defect, lang })
+        .then(setDefectResult)
+        .catch(() => undefined);
+    }, 150);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, defectActive, form.t, defect, lang]);
 
   const digital = form.tech === "digital";
   const analog = !digital;
@@ -362,6 +403,7 @@ export default function App() {
         next_distance_mm?: number | null;
         next_op?: "le" | "ge";
         l3_dw?: boolean;
+        boundaries?: [number, number][];
       }
     | undefined;
   const fMinProvenance = result?.values?.f_min_provenance as
@@ -418,27 +460,58 @@ export default function App() {
     return t("exp_prov_fallback", prov.n);
   })();
 
+  const exposureTimeProvenanceText =
+    (result?.values?.exposure_time_provenance_text as string | undefined) ?? "";
+  const exposureTimeProvenanceLines = exposureTimeProvenanceText
+    ? exposureTimeProvenanceText.split("\n").filter((line) => line.trim())
+    : [];
+
   const materialOptions = MATERIALS.map((value) => ({
     value,
     label: t(value),
   }));
   const sourceOptions = SOURCES.map((value) => ({ value, label: t(value) }));
+  const activePipeTable = useMemo(() => {
+    if (!pipeData) return null;
+    return pipeStd === "b36_19" && pipeData.b36_19
+      ? pipeData.b36_19
+      : pipeData.b36_10;
+  }, [pipeData, pipeStd]);
+
+  const currentOdKey = useMemo(
+    () => selectedOdKey(form.od, activePipeTable),
+    [form.od, activePipeTable],
+  );
+
   const odOptions = useMemo(() => {
-    if (!pipeData) return [{ value: "114.3", label: '4" (NPS 4) — 114.3 mm' }];
-    return Object.entries(pipeData.b36_10).map(([key, entry]) => ({
+    if (!activePipeTable) {
+      return [{ value: "114.3", label: '4" (NPS 4) — 114.3 mm' }];
+    }
+    const items = Object.entries(activePipeTable).map(([key, entry]) => ({
       value: key,
       label: `${key} — ${entry.od} mm`,
     }));
-  }, [pipeData]);
+    if (currentOdKey === "__custom__") {
+      items.unshift({
+        value: "__custom__",
+        label:
+          lang === "tr"
+            ? `Özel Çap (${form.od} mm)`
+            : `Custom OD (${form.od} mm)`,
+      });
+    }
+    return items;
+  }, [activePipeTable, currentOdKey, form.od, lang]);
+
   const scheduleOptions = useMemo(() => {
-    if (!pipeData) return [];
-    const entry = pipeData.b36_10[selectedOdKey(form.od, pipeData)];
+    if (!activePipeTable || currentOdKey === "__custom__") return [];
+    const entry = activePipeTable[currentOdKey];
     if (!entry) return [];
     return entry.schedules.map(([wall, label]) => ({
       value: String(wall),
       label: `${label} — ${wall} mm`,
     }));
-  }, [pipeData, form.od]);
+  }, [activePipeTable, currentOdKey]);
 
   const patchReport = (key: string, value: string) =>
     setReportInfo((previous) => ({ ...previous, [key]: value }));
@@ -450,6 +523,32 @@ export default function App() {
     );
     setForm((previous) => ({ ...previous, ...partial }));
     setReportInfo((previous) => ({ ...previous, ...info }));
+  };
+
+  const syncAllCalculated = () => {
+    if (!result) return;
+    const v = result.values;
+    setForm((prev) => ({
+      ...prev,
+      sfd: Math.max(prev.sfd, Math.ceil(v.sfd_min ?? prev.sfd)),
+      app_time: Math.max(1, Math.round(v.calc_time ?? prev.app_time)),
+      app_exposures: v.n_required ?? prev.app_exposures,
+      app_wire: (v.wire_no as number | undefined) ?? prev.app_wire,
+      app_duplex: (v.duplex_no as number | undefined) ?? prev.app_duplex,
+      app_kv:
+        prev.source === "x_ray" && v.u_max && prev.app_kv > v.u_max
+          ? Math.floor(v.u_max * 0.85)
+          : prev.app_kv,
+      app_srb:
+        prev.tech === "digital" && (v.max_srb as number | undefined)
+          ? Number(v.max_srb)
+          : prev.app_srb,
+    }));
+    setNotice(
+      lang === "tr"
+        ? "Hesaplanan hedef değerler uygulanan pozlama alanlarına aktarıldı."
+        : "Calculated target values synced to applied exposure fields.",
+    );
   };
 
   const exportPreset = () =>
@@ -482,6 +581,7 @@ export default function App() {
   };
 
   const runDefect = async () => {
+    setDefectActive(true);
     try {
       const evaluated = await pyClient.request<DefectResult>("defect", {
         form,
@@ -574,6 +674,12 @@ export default function App() {
     );
   }
 
+  const baseEUnit = xray ? "mA·min/m²" : "Ci·min/m²";
+  const activityFactor = activityUnit === "GBq" ? 37 : 1;
+  const bedSuggested = result?.values?.bed_auto_suggested as number | undefined;
+  const wireTargetNo = result?.values?.wire_no as number | undefined;
+  const duplexTargetNo = result?.values?.duplex_no as number | undefined;
+
   return (
     <UnitContext.Provider value={{ inch: unitInch }}>
       <div className="app">
@@ -613,7 +719,19 @@ export default function App() {
             value=""
             onChange={(event) => {
               const preset = NAMED_PRESETS[event.target.value];
-              if (preset) setForm((previous) => ({ ...previous, ...preset }));
+              if (preset) {
+                setForm((previous) => {
+                  const nextSource = preset.source ?? previous.source;
+                  return {
+                    ...previous,
+                    ...preset,
+                    base_e:
+                      preset.base_e ??
+                      DEFAULT_BASE_E_BY_SOURCE[nextSource] ??
+                      previous.base_e,
+                  };
+                });
+              }
               event.target.value = "";
             }}
           >
@@ -732,53 +850,91 @@ export default function App() {
               />
               <SelectField
                 label={t("std_pipe_od")}
-                value={selectedOdKey(form.od, pipeData)}
+                value={currentOdKey}
                 options={odOptions}
+                action={
+                  <button
+                    type="button"
+                    className="sync-btn"
+                    onClick={() =>
+                      setPipeStd((prev) =>
+                        prev === "b36_10" ? "b36_19" : "b36_10",
+                      )
+                    }
+                    title={
+                      lang === "tr"
+                        ? "ASME B36.10 (Karbon Çelik) / B36.19 (Paslanmaz Çelik) tablosunu değiştir"
+                        : "Toggle ASME B36.10 (Carbon) / B36.19 (Stainless) pipe schedule table"
+                    }
+                  >
+                    {pipeStd === "b36_10" ? "ASME B36.10" : "ASME B36.19"}
+                  </button>
+                }
                 onChange={(value) => {
-                  const entry = pipeData?.b36_10[value];
-                  if (entry) patch("od", entry.od);
+                  const entry = activePipeTable?.[value];
+                  if (entry) {
+                    setForm((prev) => ({
+                      ...prev,
+                      od: entry.od,
+                      t: entry.schedules[0]?.[0] ?? prev.t,
+                    }));
+                  }
                 }}
               />
-              <LengthField
-                label={t("custom_pipe_od")}
-                value={form.od}
-                min={1}
-                max={5000}
-                onChange={(value) => patch("od", value ?? form.od)}
-              />
+              <div className="field-row-2">
+                <LengthField
+                  label={t("custom_pipe_od")}
+                  value={form.od}
+                  min={1}
+                  max={5000}
+                  onChange={(value) => patch("od", value ?? form.od)}
+                />
+                <LengthField
+                  label={t("custom_nominal_t")}
+                  value={form.t}
+                  min={0.1}
+                  max={500}
+                  onChange={(value) => patch("t", value ?? form.t)}
+                />
+              </div>
               <SelectField
                 label={t("std_nominal_t")}
                 value={String(form.t)}
                 options={
                   scheduleOptions.length
                     ? scheduleOptions
-                    : [{ value: String(form.t), label: `${form.t} mm` }]
+                    : [
+                        {
+                          value: String(form.t),
+                          label: `${form.t} mm (${lang === "tr" ? "Özel" : "Custom"})`,
+                        },
+                      ]
                 }
                 onChange={(value) => patch("t", Number(value))}
               />
-              <LengthField
-                label={t("custom_nominal_t")}
-                value={form.t}
-                min={0.1}
-                max={500}
-                onChange={(value) => patch("t", value ?? form.t)}
-              />
-              <LengthField
-                label={t("cap_height")}
-                value={form.cap}
-                min={0}
-                max={50}
-                onChange={(value) => patch("cap", value ?? 0)}
-              />
-              {dwdi && (
+              <div className={dwdi ? "field-row-2" : undefined}>
                 <LengthField
-                  label={t("weld_width")}
-                  value={form.weld_width}
+                  label={t("cap_height")}
+                  value={form.cap}
                   min={0}
-                  max={500}
-                  onChange={(value) => patch("weld_width", value ?? 0)}
+                  max={50}
+                  onChange={(value) => patch("cap", value ?? 0)}
                 />
-              )}
+                {dwdi && (
+                  <LengthField
+                    label={t("weld_width")}
+                    value={form.weld_width}
+                    min={0}
+                    max={500}
+                    tooltip={
+                      lang === "tr"
+                        ? `Eliptik çekimde kaynak genişliği ≤ De/4 (${(form.od / 4).toFixed(1)} mm) olmalıdır.`
+                        : `In elliptical DWDI, weld width should be ≤ De/4 (${(form.od / 4).toFixed(1)} mm).`
+                    }
+                    onChange={(value) => patch("weld_width", value ?? 0)}
+                  />
+                )}
+              </div>
               <RadioGroup
                 label={t("rt_tech")}
                 value={form.tech}
@@ -792,19 +948,34 @@ export default function App() {
                   patch("app_quality", tech === "digital" ? 140 : 2.5);
                 }}
               />
-              <SelectField
-                label={t("rad_source")}
-                value={form.source}
-                options={sourceOptions}
-                onChange={(value) => patch("source", value)}
-              />
-              <LengthField
-                label={xray ? t("focal_size") : t("source_size_d")}
-                value={form.d}
-                min={0.01}
-                max={20}
-                onChange={(value) => patch("d", value ?? 2)}
-              />
+              <div className="field-row-2">
+                <SelectField
+                  label={t("rad_source")}
+                  value={form.source}
+                  options={sourceOptions}
+                  onChange={(value) => {
+                    setForm((previous) => ({
+                      ...previous,
+                      source: value,
+                      base_e:
+                        DEFAULT_BASE_E_BY_SOURCE[value] ?? previous.base_e,
+                      output_val:
+                        value === "x_ray"
+                          ? previous.source === "x_ray"
+                            ? previous.output_val
+                            : 5.0
+                          : previous.app_activity || 40.0,
+                    }));
+                  }}
+                />
+                <LengthField
+                  label={xray ? t("focal_size") : t("source_size_d")}
+                  value={form.d}
+                  min={0.01}
+                  max={20}
+                  onChange={(value) => patch("d", value ?? 2)}
+                />
+              </div>
               {analog && (
                 <>
                   <SelectField
@@ -827,7 +998,7 @@ export default function App() {
                     }}
                   />
                   {filmSizeMode === "custom" && (
-                    <>
+                    <div className="field-row-2">
                       <LengthField
                         label={t("film_width")}
                         value={form.film_width}
@@ -846,32 +1017,34 @@ export default function App() {
                           patch("film_height", value ?? form.film_height)
                         }
                       />
-                    </>
+                    </div>
                   )}
                 </>
               )}
-              <SelectField
-                label={t("testing_class")}
-                value={form.testing_class}
-                options={[
-                  { value: "class_b", label: t("class_b") },
-                  { value: "class_a", label: t("class_a") },
-                ]}
-                onChange={(value) =>
-                  patch("testing_class", value as FormState["testing_class"])
-                }
-              />
-              <SelectField
-                label={t("standard")}
-                value={form.standard}
-                options={[
-                  { value: "iso", label: t("standard_iso") },
-                  { value: "asme", label: t("standard_asme") },
-                ]}
-                onChange={(value) =>
-                  patch("standard", value as FormState["standard"])
-                }
-              />
+              <div className="field-row-2">
+                <SelectField
+                  label={t("testing_class")}
+                  value={form.testing_class}
+                  options={[
+                    { value: "class_b", label: t("class_b") },
+                    { value: "class_a", label: t("class_a") },
+                  ]}
+                  onChange={(value) =>
+                    patch("testing_class", value as FormState["testing_class"])
+                  }
+                />
+                <SelectField
+                  label={t("standard")}
+                  value={form.standard}
+                  options={[
+                    { value: "iso", label: t("standard_iso") },
+                    { value: "asme", label: t("standard_asme") },
+                  ]}
+                  onChange={(value) =>
+                    patch("standard", value as FormState["standard"])
+                  }
+                />
+              </div>
               <SelectField
                 label={t("geometry")}
                 value={form.geometry}
@@ -883,6 +1056,35 @@ export default function App() {
                   patch("geometry", value as FormState["geometry"])
                 }
               />
+              {dwdi && form.od > 100 && (
+                <div className="inline-alert" role="status">
+                  <span>
+                    {lang === "tr"
+                      ? `⚠ ISO 17636 gereği DWDI (Eliptik / Süperpoze) yalnızca OD ≤ 100 mm borularda uygulanır (mevcut OD = ${form.od} mm). Hesaplama motoru otomatik olarak DWSI kullanıyor.`
+                      : `⚠ Per ISO 17636, DWDI is only valid for OD ≤ 100 mm (current OD = ${form.od} mm). Engine automatically calculates as DWSI.`}
+                  </span>
+                  <div className="inline-alert-actions">
+                    <button
+                      type="button"
+                      className="sync-btn"
+                      onClick={() => {
+                        setForm((prev) => ({ ...prev, od: 88.9, t: 5.49 }));
+                      }}
+                    >
+                      {lang === "tr"
+                        ? '3" Boru Yap (88.9 mm)'
+                        : 'Set 3" Pipe (88.9 mm)'}
+                    </button>
+                    <button
+                      type="button"
+                      className="sync-btn"
+                      onClick={() => patch("geometry", "dwsi")}
+                    >
+                      {lang === "tr" ? "DWSI Seç" : "Switch to DWSI"}
+                    </button>
+                  </div>
+                </div>
+              )}
               <SelectField
                 label={t("standard_fig")}
                 value={form.std_figure ?? ""}
@@ -904,12 +1106,26 @@ export default function App() {
                 />
               )}
               {planar && (
-                <>
+                <div className="field-row-2">
                   <LengthField
                     label={t("bed")}
                     value={form.bed}
                     min={0}
                     max={500}
+                    tooltip={t("tt_bed")}
+                    action={
+                      bedSuggested != null && bedSuggested > 0 ? (
+                        <button
+                          type="button"
+                          className="sync-btn"
+                          onClick={() =>
+                            patch("bed", Number(bedSuggested.toFixed(1)))
+                          }
+                        >
+                          ← {bedSuggested.toFixed(1)}
+                        </button>
+                      ) : undefined
+                    }
                     onChange={(value) => patch("bed", value ?? 0)}
                   />
                   <LengthField
@@ -917,18 +1133,20 @@ export default function App() {
                     value={form.bgap}
                     min={0}
                     max={100}
+                    tooltip={t("tt_bgap")}
                     onChange={(value) => patch("bgap", value ?? 0)}
                   />
-                </>
+                </div>
               )}
               {digital && (
-                <>
+                <div className="field-row-2">
                   <LengthField
                     label={t("source_dist")}
                     value={form.f_source}
                     min={1}
                     max={5000}
                     placeholder={t("auto_calc")}
+                    tooltip={t("tt_f_source")}
                     onChange={(value) => patch("f_source", value)}
                   />
                   <LengthField
@@ -937,9 +1155,10 @@ export default function App() {
                     min={0}
                     max={5000}
                     placeholder={t("auto_calc")}
+                    tooltip={t("tt_b_object")}
                     onChange={(value) => patch("b_object", value)}
                   />
-                </>
+                </div>
               )}
               <CheckField
                 label={t("source_side_iqi")}
@@ -960,7 +1179,23 @@ export default function App() {
               />
             </Group>
 
-            <Group title={t("applied_exposure_section")}>
+            <Group
+              title={t("applied_exposure_section")}
+              headerAction={
+                <button
+                  type="button"
+                  className="sync-btn"
+                  onClick={syncAllCalculated}
+                  title={
+                    lang === "tr"
+                      ? "Hesaplanan SFD_min, Poz Süresi, Poz Sayısı ve IQI hedeflerini tek tıkla uygula"
+                      : "Sync calculated SFD_min, exposure time, exposure count, and IQI targets"
+                  }
+                >
+                  {lang === "tr" ? "⚡ Hesaplananları Aktar" : "⚡ Sync Calculated"}
+                </button>
+              }
+            >
               <LengthSliderField
                 label={t(digital ? "applied_sdd" : "applied_sfd")}
                 value={form.sfd}
@@ -969,6 +1204,19 @@ export default function App() {
                 step={5}
                 sliderMin={100}
                 sliderMax={3000}
+                action={
+                  result?.values.sfd_min ? (
+                    <button
+                      type="button"
+                      className="sync-btn"
+                      onClick={() =>
+                        patch("sfd", Math.ceil(result.values.sfd_min))
+                      }
+                    >
+                      ← Min {Math.ceil(result.values.sfd_min)} mm
+                    </button>
+                  ) : undefined
+                }
                 onChange={(value) => patch("sfd", value ?? 600)}
               />
               <SliderField
@@ -1005,54 +1253,106 @@ export default function App() {
                     step={1}
                     sliderMin={20}
                     sliderMax={400}
+                    action={
+                      result?.values.u_max ? (
+                        <button
+                          type="button"
+                          className="sync-btn"
+                          onClick={() =>
+                            patch(
+                              "app_kv",
+                              Math.floor(result.values.u_max * 0.85),
+                            )
+                          }
+                        >
+                          ← ≤{Math.floor(result.values.u_max)} kV
+                        </button>
+                      ) : undefined
+                    }
                     onChange={(value) => patch("app_kv", value ?? 120)}
                   />
                 </>
               ) : (
                 <SliderField
-                  label={t("activity")}
-                  value={form.output_val}
+                  label={`${t("activity")} (${activityUnit})`}
+                  value={Number((form.output_val * activityFactor).toFixed(2))}
                   min={0.01}
-                  max={1000}
-                  step={1}
-                  sliderMin={1}
-                  sliderMax={150}
+                  max={37000}
+                  step={activityUnit === "GBq" ? 10 : 1}
+                  sliderMin={activityUnit === "GBq" ? 37 : 1}
+                  sliderMax={activityUnit === "GBq" ? 5550 : 150}
+                  action={
+                    <button
+                      type="button"
+                      className="sync-btn"
+                      onClick={() =>
+                        setActivityUnit((u) => (u === "Ci" ? "GBq" : "Ci"))
+                      }
+                      title="1 Ci = 37 GBq"
+                    >
+                      {activityUnit === "Ci" ? "Ci → GBq" : "GBq → Ci"}
+                    </button>
+                  }
                   onChange={(value) => {
-                    patch("output_val", value ?? 40);
-                    patch("app_activity", value ?? 40);
+                    const ciVal = (value ?? 40 * activityFactor) / activityFactor;
+                    patch("output_val", ciVal);
+                    patch("app_activity", ciVal);
                   }}
                 />
               )}
-              {xray && (
-                <NumberField
-                  label={t("base_factor")}
-                  value={form.base_e}
-                  min={0.0001}
-                  max={2000}
-                  disabled={form.chart_source !== "model"}
-                  onChange={(value) => patch("base_e", value ?? 3)}
-                />
-              )}
+              <NumberField
+                label={`${t("base_factor")} (${baseEUnit})`}
+                value={form.base_e}
+                min={0.0001}
+                max={2000}
+                tooltip={t("tt_base_factor")}
+                disabled={form.chart_source !== "model"}
+                action={
+                  form.base_e !==
+                  (DEFAULT_BASE_E_BY_SOURCE[form.source] ?? 3.0) ? (
+                    <button
+                      type="button"
+                      className="sync-btn"
+                      onClick={() =>
+                        patch(
+                          "base_e",
+                          DEFAULT_BASE_E_BY_SOURCE[form.source] ?? 3.0,
+                        )
+                      }
+                    >
+                      ← {DEFAULT_BASE_E_BY_SOURCE[form.source] ?? 3.0}
+                    </button>
+                  ) : undefined
+                }
+                onChange={(value) =>
+                  patch(
+                    "base_e",
+                    value ?? (DEFAULT_BASE_E_BY_SOURCE[form.source] ?? 3),
+                  )
+                }
+              />
               {!xray && (
                 <>
-                  <SelectField
-                    label={t("collimator")}
-                    value={String(form.collimator_hvl)}
-                    options={[
-                      { value: "0", label: t("collimator_none") },
-                      { value: "1", label: "1 HVL" },
-                      { value: "2", label: "2 HVL" },
-                      { value: "4", label: "4 HVL" },
-                    ]}
-                    onChange={(value) => patch("collimator_hvl", Number(value))}
-                  />
-                  <NumberField
-                    label={t("barrier_limit_label")}
-                    value={form.barrier_limit_usvh}
-                    min={0.1}
-                    max={1000}
-                    onChange={(value) => patch("barrier_limit_usvh", value ?? 20)}
-                  />
+                  <div className="field-row-2">
+                    <SelectField
+                      label={t("collimator")}
+                      value={String(form.collimator_hvl)}
+                      options={[
+                        { value: "0", label: t("collimator_none") },
+                        { value: "1", label: "1 HVL" },
+                        { value: "2", label: "2 HVL" },
+                        { value: "4", label: "4 HVL" },
+                      ]}
+                      onChange={(value) => patch("collimator_hvl", Number(value))}
+                    />
+                    <NumberField
+                      label={t("barrier_limit_label")}
+                      value={form.barrier_limit_usvh}
+                      min={0.1}
+                      max={1000}
+                      onChange={(value) => patch("barrier_limit_usvh", value ?? 20)}
+                    />
+                  </div>
                   <SelectField
                     label={t("gamma_convention")}
                     value={form.gamma_convention}
@@ -1091,7 +1391,7 @@ export default function App() {
                 onChange={(value) => patch("chart_source", value)}
               />
               {analog && (
-                <>
+                <div className="field-row-2">
                   <SelectField
                     label={t("film_class_used")}
                     value={form.film_class_used}
@@ -1111,16 +1411,28 @@ export default function App() {
                       patch("app_overlap_warn", value ?? 10);
                     }}
                   />
-                </>
+                </div>
               )}
-              <SliderField
+              <DurationSliderField
                 label={t("applied_time")}
                 value={form.app_time}
-                min={0.1}
-                max={100000}
-                step={5}
-                sliderMin={5}
-                sliderMax={1800}
+                lang={lang}
+                action={
+                  result?.values.calc_time ? (
+                    <button
+                      type="button"
+                      className="sync-btn"
+                      onClick={() =>
+                        patch(
+                          "app_time",
+                          Math.max(1, Math.round(result.values.calc_time)),
+                        )
+                      }
+                    >
+                      ← {result.display.calc_time}
+                    </button>
+                  ) : undefined
+                }
                 onChange={(value) => patch("app_time", value ?? 120)}
               />
               {digital && (
@@ -1134,31 +1446,57 @@ export default function App() {
                     }))}
                     onChange={(value) => patch("detector_type", value)}
                   />
-                  <NumberField
-                    label={t("applied_srb")}
-                    value={form.app_srb}
-                    min={1}
-                    max={1000}
-                    onChange={(value) => patch("app_srb", value ?? 80)}
-                  />
-                  <SelectField
-                    label={t("snr_location")}
-                    value={form.snr_location}
-                    options={[
-                      { value: "weld", label: t("snr_location_weld") },
-                      { value: "adjacent", label: t("snr_location_adjacent") },
-                    ]}
-                    onChange={(value) =>
-                      patch("snr_location", value as FormState["snr_location"])
-                    }
-                  />
+                  <div className="field-row-2">
+                    <NumberField
+                      label={t("applied_srb")}
+                      value={form.app_srb}
+                      min={1}
+                      max={1000}
+                      action={
+                        result?.values.max_srb ? (
+                          <button
+                            type="button"
+                            className="sync-btn"
+                            onClick={() =>
+                              patch("app_srb", Number(result.values.max_srb))
+                            }
+                          >
+                            ← ≤{String(result.values.max_srb)}
+                          </button>
+                        ) : undefined
+                      }
+                      onChange={(value) => patch("app_srb", value ?? 80)}
+                    />
+                    <SelectField
+                      label={t("snr_location")}
+                      value={form.snr_location}
+                      options={[
+                        { value: "weld", label: t("snr_location_weld") },
+                        { value: "adjacent", label: t("snr_location_adjacent") },
+                      ]}
+                      onChange={(value) =>
+                        patch("snr_location", value as FormState["snr_location"])
+                      }
+                    />
+                  </div>
                   <SelectField
                     label={t("applied_duplex")}
                     value={String(form.app_duplex)}
                     options={Array.from({ length: 13 }, (_, index) => ({
                       value: String(index + 1),
-                      label: String(index + 1),
+                      label: `D${index + 1}`,
                     }))}
+                    action={
+                      duplexTargetNo ? (
+                        <button
+                          type="button"
+                          className="sync-btn"
+                          onClick={() => patch("app_duplex", duplexTargetNo)}
+                        >
+                          ← D{duplexTargetNo}
+                        </button>
+                      ) : undefined
+                    }
                     onChange={(value) => patch("app_duplex", Number(value))}
                   />
                 </>
@@ -1176,6 +1514,18 @@ export default function App() {
                     value: number,
                     label: `${form.iqi_type === "step_hole" ? "H" : "W"} ${number} (${diameter.toFixed(3)} mm)`,
                   }))}
+                action={
+                  wireTargetNo ? (
+                    <button
+                      type="button"
+                      className="sync-btn"
+                      onClick={() => patch("app_wire", wireTargetNo)}
+                    >
+                      ← {form.iqi_type === "step_hole" ? "H" : "W"}
+                      {wireTargetNo}
+                    </button>
+                  ) : undefined
+                }
                 onChange={(value) => patch("app_wire", Number(value))}
               />
               <SliderField
@@ -1196,24 +1546,39 @@ export default function App() {
                 min={0}
                 max={100}
                 step={1}
+                action={
+                  result?.values.n_required ? (
+                    <button
+                      type="button"
+                      className="sync-btn"
+                      onClick={() =>
+                        patch("app_exposures", result.values.n_required)
+                      }
+                    >
+                      ← Min {result.values.n_required}
+                    </button>
+                  ) : undefined
+                }
                 onChange={(value) => patch("app_exposures", Math.round(value ?? 0))}
               />
               {digital && (
                 <>
-                  <LengthField
-                    label={t("panel_width")}
-                    value={form.panel_width}
-                    min={10}
-                    max={2000}
-                    onChange={(value) => patch("panel_width", value ?? 200)}
-                  />
-                  <LengthField
-                    label={t("panel_height")}
-                    value={form.panel_height}
-                    min={10}
-                    max={2000}
-                    onChange={(value) => patch("panel_height", value ?? 200)}
-                  />
+                  <div className="field-row-2">
+                    <LengthField
+                      label={t("panel_width")}
+                      value={form.panel_width}
+                      min={10}
+                      max={2000}
+                      onChange={(value) => patch("panel_width", value ?? 200)}
+                    />
+                    <LengthField
+                      label={t("panel_height")}
+                      value={form.panel_height}
+                      min={10}
+                      max={2000}
+                      onChange={(value) => patch("panel_height", value ?? 200)}
+                    />
+                  </div>
                   <NumberField
                     label={t("panel_overlap")}
                     value={form.panel_overlap}
@@ -1225,63 +1590,194 @@ export default function App() {
               )}
             </Group>
 
-            <Group title={t("report_info_section")}>
-              {REPORT_FIELDS.map(([key, labelKey]) => (
-                <label className="field" key={key}>
-                  <span className="field-label">{t(labelKey)}</span>
-                  <input
-                    className="field-input"
-                    type="text"
-                    value={reportInfo[key] ?? ""}
-                    onChange={(event) => patchReport(key, event.target.value)}
-                  />
-                </label>
-              ))}
+            <Group title={t("report_info_section")} open={false}>
+              <div className="field-row-2">
+                {REPORT_FIELDS.map(([key, labelKey]) => (
+                  <label className="field" key={key}>
+                    <span className="field-label">{t(labelKey)}</span>
+                    <input
+                      className="field-input"
+                      type="text"
+                      value={reportInfo[key] ?? ""}
+                      onChange={(event) => patchReport(key, event.target.value)}
+                    />
+                  </label>
+                ))}
+              </div>
             </Group>
           </div>
 
           <div className="column outputs">
             <div className="hero-grid">
               <div className="hero-card">
-                <div className="hero-label">{t("calc_time")}</div>
-                <div className="hero-value">
-                  {result?.display.calc_time ?? "-"}
-                </div>
-              </div>
-              <div className="hero-card">
-                <div className="hero-label">
-                  {t(digital ? "sfd_min" : "sfd_min_analog")}
-                </div>
-                <div className="hero-value">
-                  {result?.display.sfd_min ?? "-"}
-                </div>
-                {provenanceSummary && (
-                  <div className="hero-sub" title={provenanceText}>
-                    {provenanceSummary}
+                <div className="hero-main">
+                  <div className="hero-label">
+                    {t("calc_time").replace(/:\s*$/, "")}
                   </div>
-                )}
-              </div>
-              <div className="hero-card">
-                <div className="hero-label">{t("f_min")}</div>
-                <div className="hero-value">
-                  {result?.display.f_min ?? "-"}
+                  {exposureTimeProvenanceLines.length > 0 ? (
+                    <div
+                      className="hero-formula-list"
+                      title={exposureTimeProvenanceText}
+                    >
+                      {exposureTimeProvenanceLines.map((line, idx) => {
+                        const colonIdx = line.indexOf(":");
+                        if (colonIdx > 0) {
+                          const head = line.slice(0, colonIdx);
+                          const tail = line.slice(colonIdx + 1).trim();
+                          const isFormula =
+                            head === "Formül" || head === "Formula";
+                          return (
+                            <div key={idx} className="hero-formula-line">
+                              <strong>{head}:</strong>{" "}
+                              {isFormula ? (
+                                <span className="hero-formula-eq">{tail}</span>
+                              ) : (
+                                tail
+                              )}
+                            </div>
+                          );
+                        }
+                        return (
+                          <div key={idx} className="hero-formula-line">
+                            {line}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    result && (
+                      <div className="hero-sub">
+                        {`w_eff = ${result.display.w_eff} • ${digital ? "SDD" : "SFD"} = ${form.sfd} mm • F = ${form.base_multiplier}×`}
+                      </div>
+                    )
+                  )}
                 </div>
-                {fMinProvenanceText && (
-                  <div className="hero-sub">{fMinProvenanceText}</div>
-                )}
-              </div>
-              <div className="hero-card">
-                <div className="hero-label">{t("ug")}</div>
-                <div className="hero-value">{result?.display.ug ?? "-"}</div>
-              </div>
-              <div className="hero-card">
-                <div className="hero-label">{t("req_exposures")}</div>
-                <div className="hero-value">
-                  {result?.display.req_exposures ?? "-"}
+                <div className="hero-right">
+                  <div className="hero-value">
+                    {result?.display.calc_time ?? "-"}
+                  </div>
+                  {result && (
+                    <span
+                      className={`hero-status ${
+                        form.app_time >= Math.floor(result.values.calc_time)
+                          ? "ok"
+                          : "warn"
+                      }`}
+                    >
+                      {lang === "tr" ? "Uygulanan" : "Applied"}:{" "}
+                      {Math.floor(form.app_time / 60)}m{" "}
+                      {Math.round(form.app_time % 60)}s
+                    </span>
+                  )}
                 </div>
-                {exposuresProvenanceText && (
-                  <div className="hero-sub">{exposuresProvenanceText}</div>
-                )}
+              </div>
+              <div className="hero-card">
+                <div className="hero-main">
+                  <div className="hero-label">
+                    {t(digital ? "sfd_min" : "sfd_min_analog").replace(
+                      /:\s*$/,
+                      "",
+                    )}
+                  </div>
+                  {provenanceSummary && (
+                    <div className="hero-sub" title={provenanceText}>
+                      {provenanceSummary}
+                    </div>
+                  )}
+                </div>
+                <div className="hero-right">
+                  <div className="hero-value">
+                    {result?.display.sfd_min ?? "-"}
+                  </div>
+                  {result && (
+                    <span
+                      className={`hero-status ${
+                        form.sfd >= result.values.sfd_min ? "ok" : "warn"
+                      }`}
+                    >
+                      {lang === "tr" ? "Uygulanan" : "Applied"}: {form.sfd} mm{" "}
+                      {form.sfd >= result.values.sfd_min ? "✓" : "⚠"}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="hero-card">
+                <div className="hero-main">
+                  <div className="hero-label">
+                    {t("f_min").replace(/:\s*$/, "")}
+                  </div>
+                  {fMinProvenanceText && (
+                    <div className="hero-sub">
+                      {fMinProvenanceText}
+                      {result
+                        ? ` • b = ${result.values.b_dist.toFixed(1)} mm (b_eff = ${result.values.b_eff.toFixed(1)} mm)`
+                        : ""}
+                    </div>
+                  )}
+                </div>
+                <div className="hero-right">
+                  <div className="hero-value">
+                    {result?.display.f_min ?? "-"}
+                  </div>
+                </div>
+              </div>
+              <div className="hero-card">
+                <div className="hero-main">
+                  <div className="hero-label">
+                    {t("ug").replace(/:\s*$/, "")}
+                  </div>
+                  {result && (
+                    <div className="hero-sub">
+                      {`Ug = d·b / f (d = ${form.d} mm, b = ${(
+                        !result.values.is_planar && result.values.b_rule_applied
+                          ? result.values.b_eff
+                          : result.values.b_dist
+                      ).toFixed(1)} mm)`}
+                      {isAsme
+                        ? ` • ASME Limit ≤ ${result.values.ug_limit.toFixed(2)} mm`
+                        : ""}
+                    </div>
+                  )}
+                </div>
+                <div className="hero-right">
+                  <div className="hero-value">{result?.display.ug ?? "-"}</div>
+                  {result && isAsme && (
+                    <span
+                      className={`hero-status ${
+                        result.values.ug_ok ? "ok" : "warn"
+                      }`}
+                    >
+                      {result.values.ug_ok ? "ASME ✓" : "ASME ⚠"}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="hero-card">
+                <div className="hero-main">
+                  <div className="hero-label">
+                    {t("req_exposures").replace(/:\s*$/, "")}
+                  </div>
+                  {exposuresProvenanceText && (
+                    <div className="hero-sub">{exposuresProvenanceText}</div>
+                  )}
+                </div>
+                <div className="hero-right">
+                  <div className="hero-value">
+                    {result?.display.req_exposures ?? "-"}
+                  </div>
+                  {result && (
+                    <span
+                      className={`hero-status ${
+                        form.app_exposures === 0 ||
+                        Boolean(result.values.exposures_ok)
+                          ? "ok"
+                          : "warn"
+                      }`}
+                    >
+                      {result.display.exposures_check}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
             <Group title={t("outputs")}>
@@ -1297,8 +1793,10 @@ export default function App() {
                       : key === "f_min" && fMinProvenanceText
                         ? `${strings[`tt_${key}`] ?? ""} ${fMinProvenanceText}`.trim()
                         : key === "req_exposures" && exposuresProvenanceText
-                        ? `${strings[`tt_${key}`] ?? ""} ${exposuresProvenanceText}`.trim()
-                        : strings[`tt_${key}`]
+                          ? `${strings[`tt_${key}`] ?? ""} ${exposuresProvenanceText}`.trim()
+                          : key === "calc_time" && exposureTimeProvenanceText
+                            ? `${strings[`tt_${key}`] ?? ""}\n${exposureTimeProvenanceText}`.trim()
+                            : strings[`tt_${key}`]
                   }
                 />
               ))}
@@ -1327,6 +1825,184 @@ export default function App() {
           </div>
 
           <div className="column warnings">
+            <div className="tabs">
+              <button
+                type="button"
+                className={sketchTab === "3d" ? "tab active" : "tab"}
+                onClick={() => setSketchTab("3d")}
+              >
+                {lang === "tr" ? "3D Kurulum" : "3D Setup"}
+              </button>
+              <button
+                type="button"
+                className={sketchTab === "dynamic" ? "tab active" : "tab"}
+                onClick={() => setSketchTab("dynamic")}
+              >
+                {lang === "tr" ? "2D Kesit" : "2D Sketch"}
+              </button>
+              <button
+                type="button"
+                className={sketchTab === "figure" ? "tab active" : "tab"}
+                onClick={() => setSketchTab("figure")}
+              >
+                {lang === "tr" ? "ISO Figürü" : "ISO Figure"}
+              </button>
+              <button
+                type="button"
+                className={sketchTab === "annex_a" ? "tab active" : "tab"}
+                onClick={() => setSketchTab("annex_a")}
+              >
+                Annex A
+              </button>
+            </div>
+
+            {sketchTab === "3d" && (
+              <Group
+                title={
+                  lang === "tr"
+                    ? "3D Çekim Geometrisi ve İzdüşüm Sahnesi"
+                    : "3D Shooting Geometry & Projection Scene"
+                }
+              >
+                {result ? (
+                  <WeldSetup3D
+                    od={result.values.od}
+                    t={result.values.t}
+                    cap={result.values.cap}
+                    weldWidth={form.weld_width}
+                    d={form.d}
+                    geometry={result.values.geometry}
+                    userGeometry={form.geometry}
+                    geometryForced={Boolean(result.values.geometry_forced)}
+                    sfd={result.values.sfd}
+                    fMin={result.values.f_min}
+                    bDist={result.values.b_dist}
+                    bed={Number(result.values.bed ?? 0)}
+                    bgap={form.bgap}
+                    ug={result.values.ug}
+                    isPlanar={Boolean(result.values.is_planar)}
+                    isDigital={digital}
+                    filmSide={form.film_side}
+                    panelWidth={form.panel_width}
+                    panelHeight={form.panel_height}
+                    filmWidth={form.film_width}
+                    filmHeight={form.film_height}
+                    overlapPct={
+                      digital ? result.values.panel_overlap : form.app_overlap
+                    }
+                    nRequired={result.values.n_required}
+                    nApplied={form.app_exposures}
+                    wireStr={String(result.values.wire_str ?? "W10")}
+                    duplexStr={String(result.values.duplex_str ?? "D6")}
+                    safetyRadiusM={result.values.safety_radius_m}
+                    supervisedRadiusM={
+                      (result.values.r_supervised as number | undefined) ?? null
+                    }
+                    theme={theme}
+                    lang={lang}
+                  />
+                ) : (
+                  <p className="muted">…</p>
+                )}
+              </Group>
+            )}
+
+            <div style={{ display: sketchTab === "dynamic" ? "block" : "none" }}>
+              <Group title={t("sketch_title")}>
+                {result ? (
+                  <div id="dynamic-sketch">
+                    <WeldSetupSvg
+                      od={result.values.od}
+                      t={result.values.t}
+                      cap={result.values.cap}
+                      geometry={
+                        result.values.geometry_forced
+                          ? form.geometry
+                          : result.values.geometry
+                      }
+                      sfd={result.values.sfd}
+                      fMin={result.values.f_min}
+                      bDist={result.values.b_dist}
+                      bed={Number(result.values.bed ?? 0)}
+                      bgap={form.bgap}
+                      ug={result.values.ug}
+                      filmSide={form.film_side}
+                      isPlanar={Boolean(result.values.is_planar)}
+                      nRequired={result.values.n_required}
+                      nApplied={form.app_exposures}
+                      panelWidth={
+                        form.tech === "digital" ? result.values.panel_width : null
+                      }
+                      overlapPct={result.values.panel_overlap}
+                      safetyRadiusM={result.values.safety_radius_m}
+                      supervisedRadiusM={
+                        (result.values.r_supervised as number | undefined) ?? null
+                      }
+                      labels={{
+                        pipe: t("pipe_wall"),
+                        source: t("source"),
+                        detector: t("detector"),
+                        dda: t("dda_label"),
+                        overlap: t("overlap_short"),
+                        safety: t("safety_ring"),
+                        sourceOffset: t("source_offset"),
+                        beamAngle: t("beam_angle"),
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <p className="muted">…</p>
+                )}
+              </Group>
+            </div>
+
+            <div style={{ display: sketchTab === "figure" ? "block" : "none" }}>
+              <Group title={t("standard_fig")}>
+                {form.std_figure ? (
+                  <div id="standard-sketch">
+                    <StandardFigureSvg
+                      figure={form.std_figure}
+                      title={t(`${form.std_figure}_title`)}
+                    />
+                  </div>
+                ) : (
+                  <p className="muted">-</p>
+                )}
+              </Group>
+            </div>
+
+            {sketchTab === "annex_a" && (
+              <Group
+                title={
+                  lang === "tr"
+                    ? "ISO 17636 Annex A Çalışma Noktası Grafiği"
+                    : "ISO 17636 Annex A Operating Point Chart"
+                }
+              >
+                {exposuresProvenance && exposuresProvenance.method === "annex_a" ? (
+                  <AnnexAChartSvg
+                    figure={exposuresProvenance.figure}
+                    tOverDe={exposuresProvenance.t_over_de}
+                    ratioName={exposuresProvenance.ratio_name}
+                    ratio={exposuresProvenance.ratio}
+                    n={exposuresProvenance.n}
+                    nextN={exposuresProvenance.next_n}
+                    nextRatio={exposuresProvenance.next_ratio}
+                    nextDistanceMm={exposuresProvenance.next_distance_mm}
+                    boundaries={exposuresProvenance.boundaries}
+                    lang={lang}
+                  />
+                ) : (
+                  <p className="muted">
+                    {exposuresProvenanceText ||
+                      (lang === "tr"
+                        ? "Mevcut teknik (Panoramik / DWDI) Annex A eğrisi yerine doğrudan kural kullanıyor."
+                        : "Current technique (Panoramic / DWDI) uses direct rule instead of Annex A curve.")}
+                  </p>
+                )}
+              </Group>
+            )}
+
             <Group title={t("warnings")}>
               {result?.warnings.length ? (
                 <ul className="warning-list">
@@ -1338,90 +2014,37 @@ export default function App() {
                 <p className="muted">No active warnings.</p>
               )}
             </Group>
-            <div className="tabs">
-              <button
-                className={sketchTab === "dynamic" ? "tab active" : "tab"}
-                onClick={() => setSketchTab("dynamic")}
-              >
-                {lang === "tr" ? "Çekim Şeması" : "Setup Sketch"}
-              </button>
-              <button
-                className={sketchTab === "figure" ? "tab active" : "tab"}
-                onClick={() => setSketchTab("figure")}
-              >
-                {lang === "tr" ? "ISO Figürü" : "ISO Figure"}
-              </button>
-            </div>
-            <div style={{ display: sketchTab === "dynamic" ? "block" : "none" }}>
-            <Group title={t("sketch_title")}>
-              {result ? (
-                <div id="dynamic-sketch">
-                <WeldSetupSvg
-                  od={result.values.od}
-                  t={result.values.t}
-                  cap={result.values.cap}
-                  geometry={result.values.geometry}
-                  sfd={result.values.sfd}
-                  panelWidth={form.tech === "digital" ? result.values.panel_width : null}
-                  overlapPct={result.values.panel_overlap}
-                  safetyRadiusM={result.values.safety_radius_m}
-                  labels={{
-                    pipe: t("pipe_wall"),
-                    source: t("source"),
-                    detector: t("detector"),
-                    dda: t("dda_label"),
-                    overlap: t("overlap_short"),
-                    safety: t("safety_ring"),
-                    sourceOffset: t("source_offset"),
-                    beamAngle: t("beam_angle"),
+
+            <Group title={t("defect_section")}>
+              <div className="field-row-2">
+                <SelectField
+                  label={t("defect_standard")}
+                  value={defect.standard}
+                  options={DEFECT_STANDARDS.map((option) => ({
+                    value: option.value,
+                    label: t(option.labelKey),
+                  }))}
+                  onChange={(value) => {
+                    setDefectActive(true);
+                    setDefect((previous) => ({
+                      ...previous,
+                      standard: value as DefectInput["standard"],
+                    }));
                   }}
                 />
-                </div>
-              ) : (
-                <p className="muted">…</p>
-              )}
-            </Group>
-            </div>
-            <div style={{ display: sketchTab === "figure" ? "block" : "none" }}>
-            <Group title={t("standard_fig")}>
-              {form.std_figure ? (
-                <div id="standard-sketch">
-                  <StandardFigureSvg
-                    figure={form.std_figure}
-                    title={t(`${form.std_figure}_title`)}
-                  />
-                </div>
-              ) : (
-                <p className="muted">-</p>
-              )}
-            </Group>
-            </div>
-            <Group title={t("defect_section")}>
-              <SelectField
-                label={t("defect_standard")}
-                value={defect.standard}
-                options={DEFECT_STANDARDS.map((option) => ({
-                  value: option.value,
-                  label: t(option.labelKey),
-                }))}
-                onChange={(value) =>
-                  setDefect((previous) => ({
-                    ...previous,
-                    standard: value as DefectInput["standard"],
-                  }))
-                }
-              />
-              <SelectField
-                label={t("defect_type")}
-                value={defect.type}
-                options={DEFECT_TYPES.map((value) => ({
-                  value,
-                  label: t(value),
-                }))}
-                onChange={(value) =>
-                  setDefect((previous) => ({ ...previous, type: value }))
-                }
-              />
+                <SelectField
+                  label={t("defect_type")}
+                  value={defect.type}
+                  options={DEFECT_TYPES.map((value) => ({
+                    value,
+                    label: t(value),
+                  }))}
+                  onChange={(value) => {
+                    setDefectActive(true);
+                    setDefect((previous) => ({ ...previous, type: value }));
+                  }}
+                />
+              </div>
               {defect.standard === "iso5817" && (
                 <SelectField
                   label={t("quality_level")}
@@ -1431,9 +2054,10 @@ export default function App() {
                     { value: "C", label: "C" },
                     { value: "D", label: "D" },
                   ]}
-                  onChange={(value) =>
-                    setDefect((previous) => ({ ...previous, level: value }))
-                  }
+                  onChange={(value) => {
+                    setDefectActive(true);
+                    setDefect((previous) => ({ ...previous, level: value }));
+                  }}
                 />
               )}
               {defect.standard === "b31_3" && (
@@ -1444,9 +2068,10 @@ export default function App() {
                     { value: "normal", label: t("service_normal") },
                     { value: "severe", label: t("service_severe") },
                   ]}
-                  onChange={(value) =>
-                    setDefect((previous) => ({ ...previous, service: value }))
-                  }
+                  onChange={(value) => {
+                    setDefectActive(true);
+                    setDefect((previous) => ({ ...previous, service: value }));
+                  }}
                 />
               )}
               {defect.standard === "viii" && (
@@ -1457,40 +2082,55 @@ export default function App() {
                     { value: "UW-51", label: t("mode_uw51") },
                     { value: "UW-52", label: t("mode_uw52") },
                   ]}
-                  onChange={(value) =>
-                    setDefect((previous) => ({ ...previous, mode: value }))
-                  }
+                  onChange={(value) => {
+                    setDefectActive(true);
+                    setDefect((previous) => ({ ...previous, mode: value }));
+                  }}
                 />
               )}
-              <LengthField
-                label={t("defect_length") || "Length (mm)"}
-                value={defect.length}
-                min={0}
-                max={1000}
-                onChange={(value) =>
-                  setDefect((previous) => ({ ...previous, length: value ?? 0 }))
-                }
-              />
-              <LengthField
-                label={t("defect_width") || "Width/Depth (mm)"}
-                value={defect.width}
-                min={0}
-                max={100}
-                onChange={(value) =>
-                  setDefect((previous) => ({ ...previous, width: value ?? 0 }))
-                }
-              />
+              <div className="field-row-2">
+                <LengthField
+                  label={t("defect_length") || "Length (mm)"}
+                  value={defect.length}
+                  min={0}
+                  max={1000}
+                  onChange={(value) => {
+                    setDefectActive(true);
+                    setDefect((previous) => ({ ...previous, length: value ?? 0 }));
+                  }}
+                />
+                <LengthField
+                  label={t("defect_width") || "Width/Depth (mm)"}
+                  value={defect.width}
+                  min={0}
+                  max={100}
+                  onChange={(value) => {
+                    setDefectActive(true);
+                    setDefect((previous) => ({ ...previous, width: value ?? 0 }));
+                  }}
+                />
+              </div>
               <LengthField
                 label={t("accumulated_12in")}
                 value={defect.accumulated}
                 min={0}
                 max={300}
-                onChange={(value) =>
+                onChange={(value) => {
+                  setDefectActive(true);
                   setDefect((previous) => ({
                     ...previous,
                     accumulated: value ?? 0,
-                  }))
-                }
+                  }));
+                }}
+              />
+              <DefectStripSvg
+                defectType={defect.type}
+                lengthMm={defect.length}
+                widthMm={defect.width}
+                accumulatedMm={defect.accumulated}
+                wallT={form.t}
+                accepted={defectResult ? defectResult.status : null}
+                lang={lang}
               />
               <button type="button" className="primary" onClick={runDefect}>
                 {t("evaluate_defect") || "Evaluate"}
@@ -1677,18 +2317,17 @@ function DecayDialog({ t, source, onApply, onClose }: DecayDialogProps) {
   );
 }
 
-function selectedOdKey(od: number, pipeData: PipeData | null): string {
-  if (!pipeData) return "4\" (NPS 4)";
-  let best = "";
-  let bestDelta = Infinity;
-  for (const [key, entry] of Object.entries(pipeData.b36_10)) {
-    const delta = Math.abs(entry.od - od);
-    if (delta < bestDelta) {
-      bestDelta = delta;
-      best = key;
+function selectedOdKey(
+  od: number,
+  pipeTable: Record<string, { od: number; schedules: [number, string][] }> | null,
+): string {
+  if (!pipeTable) return '4" (NPS 4)';
+  for (const [key, entry] of Object.entries(pipeTable)) {
+    if (Math.abs(entry.od - od) < 0.15) {
+      return key;
     }
   }
-  return best;
+  return "__custom__";
 }
 
 interface Lvl3DialogProps {

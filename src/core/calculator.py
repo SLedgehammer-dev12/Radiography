@@ -108,6 +108,7 @@ class RTCalculator:
     DETECTOR_TYPE_FACTORS = {
         "cr_standard": 1.0,    # CR standard phosphor plate (Class A/B baseline)
         "cr_highres":  0.75,   # CR high-resolution plate (slower, finer)
+        "cr_hires":    0.75,   # Web legacy alias for cr_highres
         "dda_si":      4.0,    # Flat Panel amorphous silicon (a-Si)
         "dda_se":      3.5,    # Flat Panel amorphous selenium (a-Se)
         "dda_gdos":    3.0,    # DDA with GdOS (Gadolinium Oxysulfide) scintillator
@@ -1009,9 +1010,10 @@ class RTCalculator:
         d_str = f"{d_val} ({dia:.3f} mm) [{table_name}, {thickness_desc}]"
         return d_str, d_num
 
-    def _density_correction_factor(self, testing_class, film_class=None, ref_density=2.0):
-        target_density = 2.3 if testing_class == "class_b" else 2.0
-        if target_density == ref_density:
+    def _density_correction_factor(self, testing_class, film_class=None, ref_density=2.0, target_density=None):
+        if target_density is None or target_density <= 0.0:
+            target_density = 2.3 if testing_class == "class_b" else 2.0
+        if abs(target_density - ref_density) < 1e-9:
             return 1.0
         gradient = self.FILM_GRADIENT.get(film_class, 3.0)
         return 10.0 ** ((target_density - ref_density) / gradient)
@@ -1469,80 +1471,68 @@ class RTCalculator:
                                  film_class="C5", detector_type="cr_standard",
                                  kv=None, material="steel",
                                  chart_source=None, chart_db=None,
-                                 film_model=None, density=2.0):
+                                 film_model=None, density=None,
+                                 target_snr=None):
         """
         Calculates exposure time in minutes and seconds (Step 10).
-
-        ── CHART-BASED ROUTING ────────────────────────────────────────────────
-        When chart_source is specified, calculation routes through manufacturer
-        exposure chart data instead of the physics model:
-
-          chart_source = "AA400" (or other film key)
-              → SCRATA slide rule formula using Carestream R-Factor tables:
-                t = 60 × R × 10^((D-2)/2) × (SFD/1000)² × 2^(w/HVL) / (A × Γ)
-
-          chart_source = "type_x"
-              → Type X exposure chart data (from physics model or real chart)
-
-          chart_source = None (default)
-              → Physics model (backward compatible)
-
-        ── PHYSICS MODEL ──────────────────────────────────────────────────────
-        Base formula (Inverse Square Law + material attenuation):
-
-            H_required [mA·min/m²  or  Ci·min/m²]
-                = base_factor × exp(mu × w_eff)
-
-            t [min] = H_required × (SFD_m)² / output_val
-
-        where:
-          base_factor   — source-specific exposure chart constant
-                          (calibrated to SNR_N=70 with CR Standard or OD=2.0 with C6 film, at 1 m)
-                          X-Ray: 3.0 mA·min/m²  |  Ir-192: 30.0 Ci·min/m²
-                          Se-75: 40.0 Ci·min/m² |  Co-60:  20.0 Ci·min/m²
-          mu            — linear attenuation coefficient [mm⁻¹], source/material dependent
-          SFD_m         — source-to-detector distance in metres  (sfd / 1000)
-          output_val    — tube current [mA] for X-ray; source activity [Ci] for isotopes
-
-        ── ANALOG FILM CORRECTION ─────────────────────────────────────────────
-        t_analog = t_base × OD_correction / film_speed_factor
-
-          film_speed_factor  — from FILM_SPEED_FACTORS[film_class]  (ISO 11699-1)
-                               C1 = 1.0 (slowest), C2 = 2.0, C3 = 4.0,
-                               C4 = 8.0, C5 = 16.0, C6 = 32.0 (fastest)
-          OD_correction      — from _density_correction_factor(testing_class, film_class)
-                               (film-class-aware gradient; see FILM_GRADIENT)
-                               Class A (OD ≥ 2.0) = 1.00
-                               Class B (OD ≥ 2.3) = 10^((2.3-2.0)/G̅)
-
-        ── DIGITAL DETECTOR CORRECTION ────────────────────────────────────────
-        t_digital = t_base × SNR_correction / detector_type_factor
-
-          detector_type_factor — from DETECTOR_TYPE_FACTORS[detector_type]  (ISO 17636-2 + DQE)
-                                 CR Standard  (DQE ~20%) = 1.0 (baseline)
-                                 CR High-Res  (DQE ~15%) = 0.75
-                                 DDA a-Si     (DQE ~60%) = 4.0
-                                 DDA a-Se     (DQE ~50%) = 3.5
-                                 DDA GdOS     (DQE ~45%) = 3.0
-          SNR_correction       — from SNR_CORRECTION[testing_class]
-                                 Class A (SNR_N ≥ 70)  = 1.00
-                                 Class B (SNR_N ≥ 130) = 3.45  (∝ (130/70)²)
-
-        ── kVp⁵ SANITY CHECK (X-ray only) ─────────────────────────────────────
-        When kv is specified with source="x_ray", the result is compared against
-        the kVp⁵ rule: t_ratio ≈ (kV_ref / kV_new)⁵. A warning is logged if
-        the deviation exceeds 30%.
-
-        ── REFERENCES ─────────────────────────────────────────────────────────
-          ISO 17636-1:2022 Clause 7    (Recommended techniques — analog film)
-          ISO 17636-2:2022 Clause 7    (Recommended techniques — digital)
-          ISO 11699-1:2008             (Film classification & speed)
-          ISO 17636-2:2022 Clause 7.3  (Detector systems / DQE literature)
-          ASTM E94-17                  (Exposure chart methodology)
-          SCRATA Slide Rule            (R-Factor + gamma constants)
+        Delegates to `calculate_exposure_time_details` and returns
+        `(minutes, seconds, time_seconds)`.
         """
+        details = self.calculate_exposure_time_details(
+            sfd=sfd, w_eff=w_eff, source=source, output_val=output_val,
+            base_factor=base_factor, tech=tech, testing_class=testing_class,
+            film_class=film_class, detector_type=detector_type, kv=kv,
+            material=material, chart_source=chart_source, chart_db=chart_db,
+            film_model=film_model, density=density, target_snr=target_snr,
+        )
+        return details["minutes"], details["seconds"], details["time_seconds"]
+
+    def calculate_exposure_time_details(self, sfd, w_eff, source, output_val, base_factor,
+                                        tech, testing_class="class_b",
+                                        film_class="C5", detector_type="cr_standard",
+                                        kv=None, material="steel",
+                                        chart_source=None, chart_db=None,
+                                        film_model=None, density=None,
+                                        target_snr=None):
+        """
+        Full exposure-time calculation returning both timing values and a
+        structured `provenance` dictionary explaining the active method,
+        equations, material attenuation/REF parameters, and receptor corrections.
+        """
+        sfd = float(sfd)
+        w_eff = float(w_eff)
+        output_safe = max(0.01, float(output_val))
+        base_factor = float(base_factor)
+        ref_factor = self.get_ref_factor(material)
+        w_eq_steel = w_eff * ref_factor
+
+        # Target OD & film parameters (analog)
+        target_od = float(density) if (density is not None and float(density) > 0.0) else (
+            2.3 if testing_class == "class_b" else 2.0
+        )
+        film_speed = self.FILM_SPEED_FACTORS.get(film_class, 16.0)
+        gradient = self.FILM_GRADIENT.get(film_class, 3.0)
+        od_factor = self._density_correction_factor(
+            testing_class, film_class, ref_density=2.0, target_density=target_od
+        )
+
+        # Target SNR_N & detector DQE parameters (digital)
+        det_factor = self.DETECTOR_TYPE_FACTORS.get(detector_type, 1.0)
+        if target_snr is not None and float(target_snr) > 0.0:
+            snr_target_used = float(target_snr)
+            snr_factor = (snr_target_used / 70.0) ** 2
+            snr_is_dynamic = True
+        else:
+            snr_target_used = 130.0 if testing_class == "class_b" else 70.0
+            snr_factor = self.SNR_CORRECTION.get(testing_class, 1.0)
+            snr_is_dynamic = False
+
+        requested_method = chart_source if (chart_source and chart_source != "model") else "model"
+        active_method = "model"
+        fallback_reason = None
+
         # ── Chart-based routing ───────────────────────────────────────────────
-        if chart_source is not None and chart_source != "model":
+        if requested_method != "model":
             if chart_db is None:
                 if ExposureChartDatabase is not None:
                     json_path = resource_path("exposure_chart_dataset.json")
@@ -1555,92 +1545,251 @@ class RTCalculator:
 
             resolved_film = self._resolve_chart_film(chart_source, film_model, film_class)
 
-            # Type X chart path
+            # Type X chart path (X-ray)
             if chart_source == "type_x":
                 if source != "x_ray":
                     logger.warning("Type X chart is for X-ray only; falling back to physics model")
+                    fallback_reason = "type_x_requires_xray"
                 else:
-                    result = self._calc_from_type_x(chart_db, kv, w_eff, output_val, sfd)
-                    if result is not None and result > 0:
-                        time_seconds = min(864000.0, result * 60.0)
-                        minutes = int(time_seconds // 60)
-                        seconds = int(time_seconds % 60)
-                        return minutes, seconds, time_seconds
+                    kv_eff = float(kv) if kv is not None else 120.0
+                    exposure_mamin = chart_db.get_type_x_exposure(kv_eff, w_eq_steel, interpolate=True)
+                    if exposure_mamin is not None and exposure_mamin > 0:
+                        sfd_ref = 700.0
+                        sfd_correction = (sfd / sfd_ref) ** 2
+                        if tech == "analog":
+                            receptor_mod = od_factor * (16.0 / film_speed)
+                        else:
+                            receptor_mod = snr_factor / det_factor
+                        t_min = (exposure_mamin * sfd_correction * receptor_mod) / output_safe
+                        if t_min > 0:
+                            active_method = "type_x"
+                            time_seconds = min(864000.0, t_min * 60.0)
+                            minutes = int(time_seconds // 60)
+                            seconds = int(time_seconds % 60)
+                            prov = {
+                                "method": "type_x",
+                                "requested_method": requested_method,
+                                "fallback_reason": None,
+                                "tech": tech,
+                                "source": source,
+                                "material": material,
+                                "ref_factor": ref_factor,
+                                "w_eff": w_eff,
+                                "w_eq_steel": w_eq_steel,
+                                "kv": kv_eff,
+                                "sfd": sfd,
+                                "sfd_ref": sfd_ref,
+                                "sfd_correction": sfd_correction,
+                                "output_val": output_safe,
+                                "exposure_mamin_chart": exposure_mamin,
+                                "receptor_mod": receptor_mod,
+                                "film_class": film_class if tech == "analog" else None,
+                                "film_speed": film_speed if tech == "analog" else None,
+                                "gradient": gradient if tech == "analog" else None,
+                                "target_od": target_od if tech == "analog" else None,
+                                "od_factor": od_factor if tech == "analog" else None,
+                                "detector_type": detector_type if tech == "digital" else None,
+                                "det_factor": det_factor if tech == "digital" else None,
+                                "target_snr": snr_target_used if tech == "digital" else None,
+                                "snr_factor": snr_factor if tech == "digital" else None,
+                                "t_minutes_base": t_min,
+                                "time_seconds": time_seconds,
+                            }
+                            return {
+                                "minutes": minutes,
+                                "seconds": seconds,
+                                "time_seconds": time_seconds,
+                                "provenance": prov,
+                            }
+                    fallback_reason = "type_x_out_of_range"
 
-            # R-Factor (film) chart path
+            # R-Factor (film / SCRATA slide rule) chart path
             elif resolved_film is not None:
                 r_factor = chart_db.lookup_r_factor(resolved_film, source)
-                if r_factor is not None:
+                if r_factor is not None and source in chart_db.HVL:
+                    od_for_rfactor = float(density) if (density is not None and float(density) > 0.0) else (
+                        2.0 if density == 2.0 else target_od
+                    )
                     result = self._calc_from_rfactor(
-                        chart_db, resolved_film, source, sfd, w_eff, output_val, density
+                        chart_db, resolved_film, source, sfd, w_eff, output_safe,
+                        od_for_rfactor, ref_factor=ref_factor,
                     )
                     if result is not None and result > 0:
+                        active_method = "rfactor"
+                        hvl = chart_db.HVL.get(source, 13.2)
+                        gamma = chart_db.GAMMA.get(source, 0.48)
+                        rel_speed = chart_db.FILM_RELATIVE_SPEED.get(resolved_film, 1.0)
+                        r_aa400 = chart_db.lookup_r_factor("AA400", source)
+                        effective_r = (
+                            (r_aa400 / rel_speed)
+                            if (r_aa400 is not None and rel_speed > 0 and resolved_film != "AA400")
+                            else r_factor
+                        )
+                        attenuation = 2.0 ** (w_eq_steel / hvl)
+                        density_corr = 10.0 ** ((od_for_rfactor - 2.0) / 2.0)
                         time_seconds = min(864000.0, result * 60.0)
                         minutes = int(time_seconds // 60)
                         seconds = int(time_seconds % 60)
-                        return minutes, seconds, time_seconds
+                        prov = {
+                            "method": "rfactor",
+                            "requested_method": requested_method,
+                            "fallback_reason": None,
+                            "tech": tech,
+                            "source": source,
+                            "material": material,
+                            "ref_factor": ref_factor,
+                            "w_eff": w_eff,
+                            "w_eq_steel": w_eq_steel,
+                            "sfd": sfd,
+                            "output_val": output_safe,
+                            "film_key": resolved_film,
+                            "film_class": film_class,
+                            "r_factor_raw": r_factor,
+                            "r_factor_eff": effective_r,
+                            "rel_speed": rel_speed,
+                            "hvl": hvl,
+                            "gamma": gamma,
+                            "attenuation": attenuation,
+                            "target_od": od_for_rfactor,
+                            "od_factor": density_corr,
+                            "t_minutes_base": result,
+                            "time_seconds": time_seconds,
+                        }
+                        return {
+                            "minutes": minutes,
+                            "seconds": seconds,
+                            "time_seconds": time_seconds,
+                            "provenance": prov,
+                        }
                 else:
                     logger.warning(
                         "Film %s has no R-Factor data for source %s; falling back to physics model",
                         resolved_film, source
                     )
+                    fallback_reason = "rfactor_source_unavailable"
             else:
                 logger.warning(
                     "chart_source=%s not recognized; falling back to physics model",
                     chart_source
                 )
+                fallback_reason = "chart_unrecognized"
 
-        # ── Attenuation coefficient per source, with beam hardening correction
+        # ── Physics Model (Beer-Lambert + Inverse Square Law) ─────────────────
+        kv_eff = None
+        mu_steel_base = None
         if source == "x_ray":
-            if kv is None:
-                kv = 120.0
-            mu = self.get_mu_from_kv(kv, material)
-            mu = self._apply_beam_hardening(mu, w_eff, source, kv, material)
+            kv_eff = float(kv) if kv is not None else 120.0
+            mu_raw = self.get_mu_from_kv(kv_eff, material)
+            mu = self._apply_beam_hardening(mu_raw, w_eff, source, kv_eff, material)
+            beam_hardening_pct = (1.0 - mu / mu_raw) * 100.0 if mu_raw > 0 else 0.0
         else:
             MU = {
                 "isotope_ir192": 0.035,   # Iridium-192  (0.37 MeV avg)
                 "isotope_se75":  0.055,   # Selenium-75  (0.27 MeV avg)
                 "isotope_co60":  0.022,   # Cobalt-60    (1.25 MeV avg)
-                # Low-energy isotopes (approximate broad-beam effective values):
                 "isotope_yb169": 0.115,   # Ytterbium-169 (0.13 MeV avg)
                 "isotope_tm170": 0.30,    # Thulium-170   (0.084 MeV avg)
             }
-            mu = MU.get(source, 0.035)
+            mu_steel_base = MU.get(source, 0.035)
+            # Scale isotope linear attenuation coefficient by material REF
+            mu_raw = mu_steel_base * ref_factor
+            mu = mu_raw
+            beam_hardening_pct = 0.0
 
         try:
             exponent = min(700.0, mu * w_eff)
             attenuation = math.exp(exponent)
         except OverflowError:
+            exponent = 700.0
             attenuation = 1e300
 
         # ── Base exposure time (source + geometry + material only)
         sfd_m = sfd / 1000.0   # mm → m
-        t_base = (base_factor * (sfd_m ** 2) * attenuation) / max(0.01, output_val)
+        t_base = (base_factor * (sfd_m ** 2) * attenuation) / output_safe
 
         if tech == "analog":
-            # ── Film speed: faster film → shorter exposure
-            film_speed = self.FILM_SPEED_FACTORS.get(film_class, 16.0)   # default C5
-            # ── OD target: film-class-aware gradient density correction
-            od_factor = self._density_correction_factor(testing_class, film_class)
             time_minutes = t_base * od_factor / film_speed
-
         else:  # digital
-            # ── Detector DQE: better detector → shorter exposure
-            det_factor = self.DETECTOR_TYPE_FACTORS.get(detector_type, 1.0)
-            # ── SNR target: Class B requires higher SNR_N → more dose (∝ dose²)
-            snr_factor = self.SNR_CORRECTION.get(testing_class, 1.0)
             time_minutes = t_base * snr_factor / det_factor
 
         # ── kVp⁵ sanity check (X-ray only) ──────────────────────────────────
-        if source == "x_ray" and kv is not None and time_minutes > 0:
-            self._check_kvp5(kv, time_minutes, material, tech, film_class, testing_class)
+        if source == "x_ray" and kv_eff is not None and time_minutes > 0:
+            self._check_kvp5(kv_eff, time_minutes, material, tech, film_class, testing_class)
 
         # ── Convert to seconds and cap at 10 days
         time_seconds = min(864000.0, time_minutes * 60.0)
-
         minutes = int(time_seconds // 60)
         seconds = int(time_seconds % 60)
-        return minutes, seconds, time_seconds
+
+        prov = {
+            "method": active_method,
+            "requested_method": requested_method,
+            "fallback_reason": fallback_reason,
+            "tech": tech,
+            "source": source,
+            "material": material,
+            "ref_factor": ref_factor,
+            "w_eff": w_eff,
+            "w_eq_steel": w_eq_steel,
+            "kv": kv_eff,
+            "mu_steel_base": mu_steel_base,
+            "mu_raw": mu_raw,
+            "mu_eff": mu,
+            "beam_hardening_pct": beam_hardening_pct,
+            "exponent": exponent,
+            "attenuation": attenuation,
+            "base_factor": base_factor,
+            "sfd": sfd,
+            "sfd_m": sfd_m,
+            "output_val": output_safe,
+            "t_base_min": t_base,
+            "film_class": film_class if tech == "analog" else None,
+            "film_speed": film_speed if tech == "analog" else None,
+            "gradient": gradient if tech == "analog" else None,
+            "target_od": target_od if tech == "analog" else None,
+            "od_factor": od_factor if tech == "analog" else None,
+            "detector_type": detector_type if tech == "digital" else None,
+            "det_factor": det_factor if tech == "digital" else None,
+            "target_snr": snr_target_used if tech == "digital" else None,
+            "snr_factor": snr_factor if tech == "digital" else None,
+            "snr_is_dynamic": snr_is_dynamic if tech == "digital" else None,
+            "t_minutes_base": time_minutes,
+            "time_seconds": time_seconds,
+        }
+        return {
+            "minutes": minutes,
+            "seconds": seconds,
+            "time_seconds": time_seconds,
+            "provenance": prov,
+        }
+
+    def calculate_trial_shot_correction(self, tech, t1_sec, sfd1, sfd2,
+                                        measured_quality, target_quality,
+                                        film_class="C5"):
+        """
+        Calculates the corrected exposure time t2 (seconds) and field factor
+        from a known trial exposure (t1_sec at sfd1 yielding measured_quality).
+          - Analog:  t2 = t1 × 10^((D_target - D_measured) / G̅) × (SFD2 / SFD1)²
+          - Digital: t2 = t1 × (SNR_target / SNR_measured)² × (SDD2 / SDD1)²
+        """
+        t1 = max(0.1, float(t1_sec))
+        d1 = max(10.0, float(sfd1))
+        d2 = max(10.0, float(sfd2))
+        q_meas = max(0.01, float(measured_quality))
+        q_targ = max(0.01, float(target_quality))
+        dist_ratio = (d2 / d1) ** 2
+        if tech == "analog":
+            gradient = self.FILM_GRADIENT.get(film_class, 3.0)
+            qual_ratio = 10.0 ** ((q_targ - q_meas) / gradient)
+        else:
+            qual_ratio = (q_targ / q_meas) ** 2
+        t2 = t1 * qual_ratio * dist_ratio
+        return {
+            "t2_sec": t2,
+            "quality_ratio": qual_ratio,
+            "distance_ratio": dist_ratio,
+            "total_ratio": qual_ratio * dist_ratio,
+        }
 
     def _resolve_chart_film(self, chart_source, film_model, film_class):
         if film_model is not None:
@@ -1653,19 +1802,21 @@ class RTCalculator:
                 return rev_map[film_class]
         return None
 
-    def _calc_from_rfactor(self, chart_db, film_key, source, sfd, w, activity, density):
+    def _calc_from_rfactor(self, chart_db, film_key, source, sfd, w, activity,
+                           density=2.0, ref_factor=1.0):
         if source not in chart_db.HVL:
             return None
         t_min = chart_db.calculate_exposure_time_rfactor(
             sfd=sfd, w=w, source=source, activity=activity,
-            film_key=film_key, density=density
+            film_key=film_key, density=density if density is not None else 2.0,
+            ref_factor=ref_factor,
         )
         return t_min
 
-    def _calc_from_type_x(self, chart_db, kv, thickness, ma, sfd):
-        kv = kv if kv is not None else 120.0
-        kv_int = int(round(kv / 20) * 20)
-        exposure_mamin = chart_db.get_type_x_exposure(kv_int, thickness)
+    def _calc_from_type_x(self, chart_db, kv, thickness, ma, sfd, ref_factor=1.0):
+        kv_f = float(kv) if kv is not None else 120.0
+        w_eq = float(thickness) * float(ref_factor if ref_factor and ref_factor > 0 else 1.0)
+        exposure_mamin = chart_db.get_type_x_exposure(kv_f, w_eq, interpolate=True)
         if exposure_mamin is None or exposure_mamin <= 0:
             return None
         sfd_ref = 700.0

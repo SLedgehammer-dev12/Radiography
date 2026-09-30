@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.10.0] - 2026-09-30
+
+### Added
+- **Interactive 3D Shooting Geometry (`web/src/components/WeldSetup3D.tsx`)**:
+  - Real-time 3D pipe, weld crown/root pass, volumetric radiation cone, IQI placement marker, and ray-cast detector weld shadow projection
+  - Physically distinct 3D geometries for **SWSI** (internal/panoramic source), **DWSI** (axially offset source entering upper pipe parent metal beside the top weld cap to project only the bottom weld at $z = 0$), **DWDI Superimposed** ($\alpha = 0^\circ$ perpendicular beam passing through both upper and lower welds onto overlapping detector bands), and **DWDI Elliptic** ($\sim 16^\circ$ axial offset with dual rays passing through both upper and lower welds to form a separated 2-arc open ellipse on the shifted detector)
+  - Camera presets (`3D Isometric`, `Cross-Section`, `Longitudinal / Elliptic`, `Beam's-Eye View`), cutaway toggle, and multi-station circumferential exposure array animator
+- **Interactive ISO 17636 Annex A Operating Point Chart (`AnnexAChartSvg`)** and **Defect Strip Schematic (`DefectStripSvg`)** in the web application
+- **Multi-Method Exposure Time Calculation & Formula Provenance (`src/core/calculator.py`, `src/core/exposure_charts.py`, `src/core/engine.py`, `src/core/report.py`)**:
+  - Added full formula provenance (`exposure_time_provenance`) detailing the active method, mathematical equation, substituted variables (material, source, effective thickness $w_{\text{eff}}$, SFD/SDD, film class factor $k_{\text{film}}$, target density $D/2.0$, HVL/TVL attenuation, and steel equivalence $k_{\text{eq}}$), and intermediate values across Web UI, Desktop (PyQt6), Mobile (KivyMD), and PDF Inspection Reports
+  - Analog Film Model: ISO 17636-1 Table B.1 film system class sensitivity factor $k_{\text{film}}$ (C1–C6) and target optical density scaling $(D_{\text{target}} / 2.0)$ now scale both empirical $E_0$ and lookup-table exposure time calculations
+  - Calibrated HVL/TVL Lookup Table: added Se-75, Co-60, and X-Ray 300 kV reference curves alongside Ir-192, plus material-specific steel equivalence thickness conversion ($k_{\text{eq}}$ for SS304, Duplex, Al, Ti, Cu-Ni, Inconel) and exponential HVL tail extrapolation beyond 100 mm
+  - X-Ray tube voltage scaling ($T \propto (V_{\text{ref}} / V)^n$) when applied kV deviates from empirical curve kV
+
+### Fixed
+- **ISO 17636-1 Clause 7.6 (`b = t` simplification rule)**: `b < 1.2·t` check now compares object-to-detector distance `b` against `1.2 × w_total` (pipe wall thickness `t` + weld cap + root reinforcement) instead of bare wall thickness `t`, and applies `b_eff = w_total`
+- **Web UI Ergonomics**: Redesigned primary output metrics (`T`, `SFD_min`/`SDD_min`, `f_min`, `Ug`, `N_min`) into full-width stacked hero rows with inline formula provenance, status badges, and one-click sync buttons (`← Min SFD`, `← Hesaplanan T`, `← Min N`)
+
 ## [1.9.0] - 2026-09-26
 
 ### Added

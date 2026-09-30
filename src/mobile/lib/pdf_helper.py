@@ -33,7 +33,10 @@ def _register_noto():
 def generate_mobile_pdf(filepath, state, results, compliance, defect_eval, sketch_path=None):
     from core.report import PDFReportGenerator
     from core.engine import (
-        format_exposures_provenance, format_f_min_provenance, format_sfd_provenance,
+        format_exposure_time_provenance,
+        format_exposures_provenance,
+        format_f_min_provenance,
+        format_sfd_provenance,
     )
     from core.translation import Translation, format_filter_recommendation
 
@@ -94,6 +97,11 @@ def generate_mobile_pdf(filepath, state, results, compliance, defect_eval, sketc
             results.get("sfd_min_provenance"), trans),
         "exposures_provenance_text": format_exposures_provenance(
             results.get("exposures_provenance"), trans),
+        "exposure_time_provenance_text": (
+            results.get("exposure_time_provenance_text")
+            or format_exposure_time_provenance(
+                results.get("exposure_time_provenance"), trans)
+        ),
     }
 
     defect_eval_data = {}

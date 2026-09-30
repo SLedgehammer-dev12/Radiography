@@ -52,7 +52,8 @@ def test_ug_uses_f_equals_sfd_minus_b(state):
     state.d = 2.0
     state.app_sfd = 600.0
     r = state.run_calculations()
-    expected = 2.0 * 6.02 / (600.0 - 6.02)
+    b = state.pipe_wall + state.get_form_values()["cap"]
+    expected = 2.0 * b / (600.0 - b)
     assert r["ug"] == pytest.approx(expected)
 
 

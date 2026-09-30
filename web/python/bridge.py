@@ -14,6 +14,7 @@ import os
 
 from src.core.engine import (  # noqa: F401
     CalculationEngine,
+    format_exposure_time_provenance,
     format_exposures_provenance,
     format_f_min_provenance,
     format_sfd_provenance,
@@ -118,6 +119,11 @@ def _build_report_outputs(calculated, display):
             calculated.get("sfd_min_provenance"), _trans),
         "exposures_provenance_text": format_exposures_provenance(
             calculated.get("exposures_provenance"), _trans),
+        "exposure_time_provenance_text": (
+            calculated.get("exposure_time_provenance_text")
+            or format_exposure_time_provenance(
+                calculated.get("exposure_time_provenance"), _trans)
+        ),
     }
 
 

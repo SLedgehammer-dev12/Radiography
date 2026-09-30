@@ -43,7 +43,7 @@
    "required_duplex_no": 11,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 71.8572794521662
+   "calc_time_raw": 61.20939509678752
   }
  },
  {
@@ -90,7 +90,7 @@
    "required_duplex_no": 12,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 6.899854885447978
+   "calc_time_raw": 4.081546811859201
   }
  },
  {
@@ -137,7 +137,7 @@
    "required_duplex_no": 12,
    "required_snr": 140.0,
    "required_density": null,
-   "calc_time_raw": 7.559086732293667
+   "calc_time_raw": 8.764158530195555
   }
  },
  {
@@ -184,7 +184,7 @@
    "required_duplex_no": 11,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 6.6909801979270265
+   "calc_time_raw": 3.957988877803624
   }
  },
  {
@@ -231,7 +231,7 @@
    "required_duplex_no": 13,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 8.762229487634707
+   "calc_time_raw": 5.183217679760253
   }
  },
  {
@@ -278,7 +278,7 @@
    "required_duplex_no": 13,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 15.406667654379415
+   "calc_time_raw": 9.113675039561912
   }
  },
  {
@@ -325,7 +325,7 @@
    "required_duplex_no": 11,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 51.80475404410393
+   "calc_time_raw": 44.128273187524194
   }
  },
  {
@@ -372,7 +372,7 @@
    "required_duplex_no": 12,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 6.899854885447978
+   "calc_time_raw": 3.4339185281024696
   }
  },
  {
@@ -419,7 +419,7 @@
    "required_duplex_no": 12,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 7.559086732293667
+   "calc_time_raw": 3.4907863887506245
   }
  },
  {
@@ -466,7 +466,7 @@
    "required_duplex_no": 11,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 6.6909801979270265
+   "calc_time_raw": 3.4149704402260324
   }
  },
  {
@@ -513,7 +513,7 @@
    "required_duplex_no": 13,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 8.762229487634707
+   "calc_time_raw": 3.5848371123071603
   }
  },
  {
@@ -560,7 +560,7 @@
    "required_duplex_no": 13,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 15.406667654379415
+   "calc_time_raw": 3.9681343099431805
   }
  },
  {
@@ -607,7 +607,7 @@
    "required_duplex_no": 11,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 60.02264585726652
+   "calc_time_raw": 51.128429479126744
   }
  },
  {
@@ -654,7 +654,7 @@
    "required_duplex_no": 12,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 6.899854885447978
+   "calc_time_raw": 3.704521264806721
   }
  },
  {
@@ -701,7 +701,7 @@
    "required_duplex_no": 12,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 7.559086732293667
+   "calc_time_raw": 3.8916336741706945
   }
  },
  {
@@ -748,7 +748,7 @@
    "required_duplex_no": 11,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 6.6909801979270265
+   "calc_time_raw": 3.643535265583695
   }
  },
  {
@@ -795,7 +795,7 @@
    "required_duplex_no": 13,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 8.762229487634707
+   "calc_time_raw": 4.2147363417369315
   }
  },
  {
@@ -842,7 +842,7 @@
    "required_duplex_no": 13,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 15.406667654379415
+   "calc_time_raw": 5.716381710386051
   }
  },
  {
@@ -889,7 +889,7 @@
    "required_duplex_no": 11,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 81.23790283720251
+   "calc_time_raw": 69.19998821979982
   }
  },
  {
@@ -936,7 +936,7 @@
    "required_duplex_no": 12,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 6.899854885447978
+   "calc_time_raw": 4.440451396352892
   }
  },
  {
@@ -983,7 +983,7 @@
    "required_duplex_no": 12,
    "required_snr": 140.0,
    "required_density": null,
-   "calc_time_raw": 7.559086732293667
+   "calc_time_raw": 9.889271773987263
   }
  },
  {
@@ -1030,7 +1030,7 @@
    "required_duplex_no": 11,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 6.6909801979270265
+   "calc_time_raw": 4.253405844238854
   }
  },
  {
@@ -1077,7 +1077,7 @@
    "required_duplex_no": 13,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 8.762229487634707
+   "calc_time_raw": 6.204569502510947
   }
  },
  {
@@ -1124,7 +1124,7 @@
    "required_duplex_no": 13,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 15.406667654379415
+   "calc_time_raw": 13.672356725023064
   }
  },
  {
@@ -1171,7 +1171,7 @@
    "required_duplex_no": 13,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 74.03835587984112
+   "calc_time_raw": 63.067277413174324
   }
  },
  {
@@ -1218,7 +1218,7 @@
    "required_duplex_no": 13,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 76.34963733509906
+   "calc_time_raw": 65.03607084444995
   }
  },
  {
@@ -1265,7 +1265,7 @@
    "required_duplex_no": 12,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 83.67692743603818
+   "calc_time_raw": 71.27759568642115
   }
  },
  {
@@ -1312,7 +1312,7 @@
    "required_duplex_no": 12,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 86.28909957732338
+   "calc_time_raw": 73.50269351750704
   }
  },
  {
@@ -1359,7 +1359,7 @@
    "required_duplex_no": 11,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 97.80574147655952
+   "calc_time_raw": 83.31278777062744
   }
  },
  {
@@ -1406,7 +1406,7 @@
    "required_duplex_no": 11,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 105.77173001809035
+   "calc_time_raw": 90.09836807219763
   }
  },
  {
@@ -1453,7 +1453,7 @@
    "required_duplex_no": 10,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 161.4936245837533
+   "calc_time_raw": 137.56333593647128
   }
  },
  {
@@ -1500,7 +1500,7 @@
    "required_duplex_no": 13,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 90.07325481267875
+   "calc_time_raw": 76.7261088022818
   }
  },
  {
@@ -1547,7 +1547,7 @@
    "required_duplex_no": 13,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 95.78473037564746
+   "calc_time_raw": 81.5912521389721
   }
  },
  {
@@ -1594,7 +1594,7 @@
    "required_duplex_no": 12,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 114.69343263653225
+   "calc_time_raw": 97.69804377202391
   }
  },
  {
@@ -1641,7 +1641,7 @@
    "required_duplex_no": 12,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 121.47887964910778
+   "calc_time_raw": 103.47801638255852
   }
  },
  {
@@ -1688,7 +1688,7 @@
    "required_duplex_no": 11,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 152.51285653200853
+   "calc_time_raw": 129.9133471789957
   }
  },
  {
@@ -1735,7 +1735,7 @@
    "required_duplex_no": 11,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 174.85289800759153
+   "calc_time_raw": 148.94301871099188
   }
  },
  {
@@ -1782,7 +1782,7 @@
    "required_duplex_no": 10,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 358.9448722920882
+   "calc_time_raw": 305.75605803052764
   }
  },
  {
@@ -1829,7 +1829,7 @@
    "required_duplex_no": 12,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 90.07325481267875
+   "calc_time_raw": 76.7261088022818
   }
  },
  {
@@ -1876,7 +1876,7 @@
    "required_duplex_no": 12,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 95.78473037564746
+   "calc_time_raw": 81.5912521389721
   }
  },
  {
@@ -1923,7 +1923,7 @@
    "required_duplex_no": 11,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 114.69343263653225
+   "calc_time_raw": 97.69804377202391
   }
  },
  {
@@ -1970,7 +1970,7 @@
    "required_duplex_no": 12,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 121.47887964910778
+   "calc_time_raw": 103.47801638255852
   }
  },
  {
@@ -2017,7 +2017,7 @@
    "required_duplex_no": 11,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 152.51285653200853
+   "calc_time_raw": 129.9133471789957
   }
  },
  {
@@ -2064,7 +2064,7 @@
    "required_duplex_no": 11,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 174.85289800759153
+   "calc_time_raw": 148.94301871099188
   }
  },
  {
@@ -2111,7 +2111,7 @@
    "required_duplex_no": 10,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 358.9448722920882
+   "calc_time_raw": 305.75605803052764
   }
  },
  {
@@ -2158,7 +2158,7 @@
    "required_duplex_no": 12,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 90.07325481267875
+   "calc_time_raw": 76.7261088022818
   }
  },
  {
@@ -2205,7 +2205,7 @@
    "required_duplex_no": 12,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 95.78473037564746
+   "calc_time_raw": 81.5912521389721
   }
  },
  {
@@ -2252,7 +2252,7 @@
    "required_duplex_no": 11,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 114.69343263653225
+   "calc_time_raw": 97.69804377202391
   }
  },
  {
@@ -2299,7 +2299,7 @@
    "required_duplex_no": 12,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 121.47887964910778
+   "calc_time_raw": 103.47801638255852
   }
  },
  {
@@ -2346,7 +2346,7 @@
    "required_duplex_no": 11,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 152.51285653200853
+   "calc_time_raw": 129.9133471789957
   }
  },
  {
@@ -2393,7 +2393,7 @@
    "required_duplex_no": 11,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 174.85289800759153
+   "calc_time_raw": 148.94301871099188
   }
  },
  {
@@ -2440,7 +2440,7 @@
    "required_duplex_no": 10,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 358.9448722920882
+   "calc_time_raw": 305.75605803052764
   }
  },
  {
@@ -2487,7 +2487,7 @@
    "required_duplex_no": 11,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 71.8572794521662
+   "calc_time_raw": 61.20939509678752
   }
  },
  {
@@ -2534,7 +2534,7 @@
    "required_duplex_no": 11,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 112.05026194188383
+   "calc_time_raw": 95.4465407845683
   }
  },
  {
@@ -2581,7 +2581,7 @@
    "required_duplex_no": 11,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 112.05026194188383
+   "calc_time_raw": 95.4465407845683
   }
  },
  {
@@ -2628,7 +2628,7 @@
    "required_duplex_no": 11,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 112.05026194188383
+   "calc_time_raw": 95.4465407845683
   }
  },
  {
@@ -2675,7 +2675,7 @@
    "required_duplex_no": 12,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 6.899854885447978
+   "calc_time_raw": 4.081546811859201
   }
  },
  {
@@ -2722,7 +2722,7 @@
    "required_duplex_no": 12,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 8.518160214750461
+   "calc_time_raw": 5.03884070674384
   }
  },
  {
@@ -2769,7 +2769,7 @@
    "required_duplex_no": 12,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 8.518160214750461
+   "calc_time_raw": 5.03884070674384
   }
  },
  {
@@ -2816,7 +2816,7 @@
    "required_duplex_no": 12,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 8.518160214750461
+   "calc_time_raw": 5.03884070674384
   }
  },
  {
@@ -2863,7 +2863,7 @@
    "required_duplex_no": 12,
    "required_snr": 140.0,
    "required_density": null,
-   "calc_time_raw": 7.559086732293667
+   "calc_time_raw": 8.764158530195555
   }
  },
  {
@@ -2910,7 +2910,7 @@
    "required_duplex_no": 12,
    "required_snr": 140.0,
    "required_density": null,
-   "calc_time_raw": 10.223616429833267
+   "calc_time_raw": 11.853468324444368
   }
  },
  {
@@ -2957,7 +2957,7 @@
    "required_duplex_no": 11,
    "required_snr": 140.0,
    "required_density": null,
-   "calc_time_raw": 10.223616429833267
+   "calc_time_raw": 11.853468324444368
   }
  },
  {
@@ -3004,7 +3004,7 @@
    "required_duplex_no": 11,
    "required_snr": 140.0,
    "required_density": null,
-   "calc_time_raw": 10.223616429833267
+   "calc_time_raw": 11.853468324444368
   }
  },
  {
@@ -3051,7 +3051,7 @@
    "required_duplex_no": 11,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 6.6909801979270265
+   "calc_time_raw": 3.957988877803624
   }
  },
  {
@@ -3098,7 +3098,7 @@
    "required_duplex_no": 11,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 8.010237253364028
+   "calc_time_raw": 4.738383468420011
   }
  },
  {
@@ -3145,7 +3145,7 @@
    "required_duplex_no": 11,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 8.010237253364028
+   "calc_time_raw": 4.738383468420011
   }
  },
  {
@@ -3192,7 +3192,7 @@
    "required_duplex_no": 11,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 8.010237253364028
+   "calc_time_raw": 4.738383468420011
   }
  },
  {
@@ -3239,7 +3239,7 @@
    "required_duplex_no": 13,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 8.762229487634707
+   "calc_time_raw": 5.183217679760253
   }
  },
  {
@@ -3286,7 +3286,7 @@
    "required_duplex_no": 13,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 13.737102450165539
+   "calc_time_raw": 8.126058828846814
   }
  },
  {
@@ -3333,7 +3333,7 @@
    "required_duplex_no": 12,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 13.737102450165539
+   "calc_time_raw": 8.126058828846814
   }
  },
  {
@@ -3380,7 +3380,7 @@
    "required_duplex_no": 12,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 13.737102450165539
+   "calc_time_raw": 8.126058828846814
   }
  },
  {
@@ -3427,7 +3427,7 @@
    "required_duplex_no": 13,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 15.406667654379415
+   "calc_time_raw": 9.113675039561912
   }
  },
  {
@@ -3474,7 +3474,7 @@
    "required_duplex_no": 13,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 42.470103455448346
+   "calc_time_raw": 25.12280594820961
   }
  },
  {
@@ -3521,7 +3521,7 @@
    "required_duplex_no": 12,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 42.470103455448346
+   "calc_time_raw": 25.12280594820961
   }
  },
  {
@@ -3568,7 +3568,7 @@
    "required_duplex_no": 12,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 42.470103455448346
+   "calc_time_raw": 25.12280594820961
   }
  },
  {
@@ -3803,7 +3803,7 @@
    "required_duplex_no": 12,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 86.28909957732338
+   "calc_time_raw": 73.50269351750704
   }
  },
  {
@@ -3850,7 +3850,7 @@
    "required_duplex_no": 12,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 121.47887964910778
+   "calc_time_raw": 103.47801638255852
   }
  },
  {
@@ -3897,7 +3897,7 @@
    "required_duplex_no": 12,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 95.78473037564746
+   "calc_time_raw": 81.5912521389721
   }
  },
  {
@@ -3944,7 +3944,7 @@
    "required_duplex_no": 12,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 95.78473037564746
+   "calc_time_raw": 81.5912521389721
   }
  },
  {
@@ -4179,7 +4179,7 @@
    "required_duplex_no": 12,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 86.28909957732338
+   "calc_time_raw": 73.50269351750704
   }
  },
  {
@@ -4226,7 +4226,7 @@
    "required_duplex_no": 12,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 121.47887964910778
+   "calc_time_raw": 103.47801638255852
   }
  },
  {
@@ -4273,7 +4273,7 @@
    "required_duplex_no": 12,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 95.78473037564746
+   "calc_time_raw": 81.5912521389721
   }
  },
  {
@@ -4320,7 +4320,7 @@
    "required_duplex_no": 12,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 95.78473037564746
+   "calc_time_raw": 81.5912521389721
   }
  },
  {
@@ -4414,7 +4414,7 @@
    "required_duplex_no": 11,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 71.8572794521662
+   "calc_time_raw": 61.20939509678752
   }
  },
  {
@@ -4508,7 +4508,7 @@
    "required_duplex_no": 11,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 51.80475404410393
+   "calc_time_raw": 44.128273187524194
   }
  },
  {
@@ -4602,7 +4602,7 @@
    "required_duplex_no": 11,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 60.02264585726652
+   "calc_time_raw": 51.128429479126744
   }
  },
  {
@@ -4649,7 +4649,7 @@
    "required_duplex_no": 9,
    "required_snr": 70,
    "required_density": null,
-   "calc_time_raw": 2.15701678548831
+   "calc_time_raw": 2.418738562842708
   }
  },
  {
@@ -4696,7 +4696,7 @@
    "required_duplex_no": 11,
    "required_snr": 100,
    "required_density": null,
-   "calc_time_raw": 7.441707909934669
+   "calc_time_raw": 4.936201148658588
   }
  },
  {
@@ -5871,7 +5871,7 @@
    "required_duplex_no": 11,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 61.845467151219594
+   "calc_time_raw": 52.681143269894235
   }
  },
  {
@@ -5918,7 +5918,7 @@
    "required_duplex_no": 10,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 71.01722181334056
+   "calc_time_raw": 60.4938180486308
   }
  },
  {
@@ -5965,7 +5965,7 @@
    "required_duplex_no": 10,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 93.4661004367686
+   "calc_time_raw": 79.61619912981176
   }
  },
  {
@@ -6012,7 +6012,7 @@
    "required_duplex_no": 10,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 100.08806099008156
+   "calc_time_raw": 85.2569108699896
   }
  },
  {
@@ -6059,7 +6059,7 @@
    "required_duplex_no": 11,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 49.42848158614859
+   "calc_time_raw": 42.10411918607156
   }
  },
  {
@@ -6106,7 +6106,7 @@
    "required_duplex_no": 10,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 113.31355606205805
+   "calc_time_raw": 96.52263870414882
   }
  },
  {
@@ -6153,7 +6153,7 @@
    "required_duplex_no": 13,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 74.03835587984112
+   "calc_time_raw": 63.067277413174324
   }
  },
  {
@@ -6200,7 +6200,7 @@
    "required_duplex_no": 13,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 76.34963733509906
+   "calc_time_raw": 65.03607084444995
   }
  },
  {
@@ -6247,7 +6247,7 @@
    "required_duplex_no": 12,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 83.67692743603818
+   "calc_time_raw": 71.27759568642115
   }
  },
  {
@@ -6294,7 +6294,7 @@
    "required_duplex_no": 12,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 86.28909957732338
+   "calc_time_raw": 73.50269351750704
   }
  },
  {
@@ -6341,7 +6341,7 @@
    "required_duplex_no": 11,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 97.80574147655952
+   "calc_time_raw": 83.31278777062744
   }
  },
  {
@@ -6388,7 +6388,7 @@
    "required_duplex_no": 11,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 105.77173001809035
+   "calc_time_raw": 90.09836807219763
   }
  },
  {
@@ -6435,7 +6435,7 @@
    "required_duplex_no": 10,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 161.4936245837533
+   "calc_time_raw": 137.56333593647128
   }
  },
  {
@@ -6482,7 +6482,7 @@
    "required_duplex_no": 11,
    "required_snr": 120,
    "required_density": null,
-   "calc_time_raw": 97.80574147655952
+   "calc_time_raw": 83.31278777062744
   }
  },
  {
@@ -6576,7 +6576,7 @@
    "required_duplex_no": null,
    "required_snr": null,
    "required_density": 3.0,
-   "calc_time_raw": 0.23854300566314784
+   "calc_time_raw": 0.42419611537957397
   }
  },
  {
@@ -6764,7 +6764,7 @@
    "required_duplex_no": null,
    "required_snr": null,
    "required_density": 2.3,
-   "calc_time_raw": 2.4220258845513953
+   "calc_time_raw": 6.906813114511838
   }
  },
  {

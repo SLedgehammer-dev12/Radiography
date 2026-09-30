@@ -275,3 +275,62 @@ class TestRTCalculatorWithCharts(unittest.TestCase):
             film_model="AA400", chart_db=self.db
         )
         self.assertGreater(raw_time, 0)
+
+    def test_rfactor_film_speed_monotonicity(self):
+        """Slower films (M100, MX125, T200) must require longer exposure than faster films (AA400, HS800)."""
+        times = {}
+        for film in ["M100", "MX125", "T200", "AA400", "HS800"]:
+            t_min = self.db.calculate_exposure_time_rfactor(
+                sfd=600.0, w=20.0, source="isotope_ir192", activity=40.0,
+                film_key=film, density=2.0
+            )
+            self.assertIsNotNone(t_min)
+            times[film] = t_min
+        self.assertGreater(times["M100"], times["MX125"])
+        self.assertGreater(times["MX125"], times["T200"])
+        self.assertGreater(times["T200"], times["AA400"])
+        self.assertGreater(times["AA400"], times["HS800"])
+
+    def test_type_x_2d_log_interpolation(self):
+        """Non-grid (kv, thickness) should smoothly log-interpolate between grid points."""
+        e_180_15 = self.db.get_type_x_exposure(180, 15)
+        e_200_15 = self.db.get_type_x_exposure(200, 15)
+        e_190_15 = self.db.get_type_x_exposure(190, 15)
+        # Higher kV needs less mA*min for same thickness
+        self.assertGreater(e_180_15, e_190_15)
+        self.assertGreater(e_190_15, e_200_15)
+
+        e_200_20 = self.db.get_type_x_exposure(200, 20)
+        e_200_17_5 = self.db.get_type_x_exposure(200, 17.5)
+        self.assertLess(e_200_15, e_200_17_5)
+        self.assertLess(e_200_17_5, e_200_20)
+
+    def test_isotope_material_ref_scaling(self):
+        """Aluminum/Titanium (REF < 1) should need less exposure time than Steel, Copper/Nickel (REF > 1) more."""
+        _, _, t_al = self.calc.calculate_exposure_time(
+            600.0, 20.0, "isotope_ir192", 40.0, 30.0, "analog", material="aluminum"
+        )
+        _, _, t_st = self.calc.calculate_exposure_time(
+            600.0, 20.0, "isotope_ir192", 40.0, 30.0, "analog", material="steel"
+        )
+        _, _, t_cu = self.calc.calculate_exposure_time(
+            600.0, 20.0, "isotope_ir192", 40.0, 30.0, "analog", material="copper_nickel"
+        )
+        self.assertLess(t_al, t_st)
+        self.assertGreater(t_cu, t_st)
+
+    def test_trial_shot_correction_analog_and_digital(self):
+        analog_corr = self.calc.calculate_trial_shot_correction(
+            tech="analog", t1_sec=60.0, sfd1=600.0, sfd2=600.0,
+            measured_quality=1.8, target_quality=2.3, film_class="C5"
+        )
+        self.assertGreater(analog_corr["t2_sec"], 60.0)
+        self.assertGreater(analog_corr["total_ratio"], 1.0)
+
+        digital_corr = self.calc.calculate_trial_shot_correction(
+            tech="digital", t1_sec=50.0, sfd1=600.0, sfd2=600.0,
+            measured_quality=70.0, target_quality=140.0
+        )
+        self.assertAlmostEqual(digital_corr["total_ratio"], 4.0, places=3)
+        self.assertAlmostEqual(digital_corr["t2_sec"], 200.0, places=2)
+

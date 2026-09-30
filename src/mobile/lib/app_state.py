@@ -223,6 +223,8 @@ class AppState:
             "sfd_min_provenance": values.get("sfd_min_provenance"),
             "exposures_provenance": values.get("exposures_provenance"),
             "f_min_provenance": values.get("f_min_provenance"),
+            "exposure_time_provenance": values.get("exposure_time_provenance"),
+            "exposure_time_provenance_text": values.get("exposure_time_provenance_text"),
         }
 
         self.compliance = self.engine.check_compliance(form, calculated, {}, self.language)

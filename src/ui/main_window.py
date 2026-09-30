@@ -2121,6 +2121,11 @@ class MainWindow(QMainWindow,
             self.info_buttons["req_exposures"].setToolTip(
                 self._format_exposures_provenance(exposures_prov))
 
+        # Dynamic exposure-time formula & parameter provenance tooltip.
+        exp_time_text = result["values"].get("exposure_time_provenance_text")
+        if exp_time_text and "calc_time" in getattr(self, "info_buttons", {}):
+            self.info_buttons["calc_time"].setToolTip(exp_time_text)
+
         if warnings:
             self.txt_warnings.setText("\n".join(warnings))
         else:
@@ -2387,6 +2392,9 @@ class MainWindow(QMainWindow,
                 self.last_calculated.get("sfd_min_provenance")),
             "exposures_provenance_text": self._format_exposures_provenance(
                 self.last_calculated.get("exposures_provenance")),
+            "exposure_time_provenance_text": self.last_calculated.get(
+                "exposure_time_provenance_text"
+            ),
         }
 
         # Gather defect details if evaluated

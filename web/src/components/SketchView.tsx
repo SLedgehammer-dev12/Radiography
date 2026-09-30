@@ -59,7 +59,17 @@ function WeldBump({
   );
 }
 
-function SourceMarker({ transform, kind, x, y }: { transform: Transform; kind: "star" | "dot"; x: number; y: number }) {
+function SourceMarker({
+  transform,
+  kind,
+  x,
+  y,
+}: {
+  transform: Transform;
+  kind: "star" | "dot";
+  x: number;
+  y: number;
+}) {
   const sx = transform.X(x);
   const sy = transform.Y(y);
   if (kind === "star") {
@@ -87,6 +97,7 @@ function Labels({
     y: number;
     size?: number;
     anchor?: "middle" | "start" | "end";
+    fill?: string;
   }[];
 }) {
   return (
@@ -97,7 +108,7 @@ function Labels({
           x={transform.X(label.x)}
           y={transform.Y(label.y)}
           fontSize={label.size ?? 11}
-          fill="var(--sketch-text)"
+          fill={label.fill ?? "var(--sketch-text)"}
           textAnchor={label.anchor ?? "middle"}
         >
           {label.text}
@@ -113,10 +124,20 @@ export interface WeldSetupProps {
   cap: number;
   geometry: string;
   sfd: number;
+  fMin?: number;
+  bDist?: number;
+  bed?: number;
+  bgap?: number;
+  ug?: number;
+  filmSide?: boolean;
+  isPlanar?: boolean;
+  nRequired?: number;
+  nApplied?: number;
   panelWidth?: number | null;
   panelHeight?: number | null;
   overlapPct?: number;
   safetyRadiusM?: number | null;
+  supervisedRadiusM?: number | null;
   labels: {
     pipe: string;
     source: string;
@@ -135,9 +156,19 @@ export function WeldSetupSvg({
   cap,
   geometry,
   sfd,
+  fMin = 0,
+  bDist = 0,
+  bed = 0,
+  bgap = 0,
+  ug = 0,
+  filmSide = true,
+  isPlanar = false,
+  nRequired = 1,
+  nApplied = 0,
   panelWidth,
   overlapPct = 10,
   safetyRadiusM,
+  supervisedRadiusM,
   labels,
 }: WeldSetupProps) {
   const R = Math.max(od / 2, 1);
@@ -147,12 +178,12 @@ export function WeldSetupSvg({
       ? Math.max(R * 1.8, Math.min(safetyRadiusM * 0.05, R * 4))
       : 0;
 
-  let extent = Math.max(R * 1.5, ringR * 1.05);
-  if (panelWidth) extent = Math.max(extent, (panelWidth / 2) * 1.1);
-  let top = Math.max(R * 1.5, ringR * 1.05);
-  let bottom = -Math.max(R * 1.5, ringR * 1.05);
-  if (geometry !== "swsi") top = Math.max(top, sfd - R + R * 0.5);
-  if (panelWidth) bottom = Math.min(bottom, -R - R * 0.6);
+  let extent = Math.max(R * 1.55, ringR * 1.05);
+  if (panelWidth) extent = Math.max(extent, (panelWidth / 2) * 1.15);
+  let top = Math.max(R * 1.55, ringR * 1.05);
+  let bottom = -Math.max(R * 1.55, ringR * 1.05);
+  if (geometry !== "swsi") top = Math.max(top, sfd - R + R * 0.55);
+  if (panelWidth) bottom = Math.min(bottom, -R - R * 0.65);
   const transform = makeTransform(-extent, extent, bottom, top);
 
   const weldHeight = cap > 0 ? Math.min(cap, R * 0.3) : R * 0.08;
@@ -167,17 +198,65 @@ export function WeldSetupSvg({
     y: number;
     size?: number;
     anchor?: "middle" | "start" | "end";
+    fill?: string;
   }[] = [];
+
+  // Circumferential N-station division ticks around pipe
+  const totalStations = Math.max(1, nApplied > 0 ? nApplied : nRequired);
+  if (totalStations > 1) {
+    for (let st = 0; st < totalStations; st += 1) {
+      const deg = -90 + (st * 360) / totalStations;
+      const rad = (deg * Math.PI) / 180;
+      const pIn = [R * 1.02 * Math.cos(rad), R * 1.02 * Math.sin(rad)];
+      const pOut = [R * 1.13 * Math.cos(rad), R * 1.13 * Math.sin(rad)];
+      elements.push(
+        <line
+          key={`st-tick-${st}`}
+          x1={transform.X(pIn[0])}
+          y1={transform.Y(pIn[1])}
+          x2={transform.X(pOut[0])}
+          y2={transform.Y(pOut[1])}
+          stroke="var(--sketch-det)"
+          strokeWidth={1.3}
+          opacity={0.55}
+        />,
+      );
+    }
+  }
+
+  // Highlight uninspected dead arc in red if nApplied > 0 && nApplied < nRequired
+  if (nApplied > 0 && nApplied < nRequired) {
+    const coveredDeg = (nApplied / nRequired) * 360;
+    elements.push(
+      <path
+        key="dead-arc"
+        d={arcPath(transform, R * 1.08, coveredDeg - 90, 270)}
+        fill="none"
+        stroke="#ef4444"
+        strokeWidth={3}
+        strokeDasharray="4 3"
+      />,
+    );
+  }
+
+  let ySourceCoord = 0;
+  let xSourceCoord = 0;
 
   if (geometry === "swsi") {
     elements.push(<SourceMarker key="s" transform={transform} kind="star" x={0} y={0} />);
     elements.push(
-      <path key="det" d={arcPath(transform, R * 1.04, 180, 360)} fill="none" stroke={detColor} strokeWidth={4} />,
+      <path
+        key="det"
+        d={arcPath(transform, R * 1.04, 180, 360)}
+        fill="none"
+        stroke={detColor}
+        strokeWidth={4}
+      />,
     );
     elements.push(
       <polygon
         key="beam"
-        points={`${transform.X(0)},${transform.Y(0)} ${transform.X(-R * 0.2)},${transform.Y(-R)} ${transform.X(R * 0.2)},${transform.Y(-R)}`}
+        points={`${transform.X(0)},${transform.Y(0)} ${transform.X(-R * 0.25)},${transform.Y(-R)} ${transform.X(R * 0.25)},${transform.Y(-R)}`}
         fill={beamColor}
         opacity={0.15}
       />,
@@ -185,12 +264,21 @@ export function WeldSetupSvg({
     labelItems.push({ text: labels.source, x: 0, y: R * 1.35 });
   } else {
     const offset =
-      geometry === "dwdi_elliptic" ? Math.min(sfd * Math.tan((15 * Math.PI) / 180), R * 0.9) : 0;
+      geometry === "dwdi_elliptic"
+        ? Math.min(sfd * Math.tan((15 * Math.PI) / 180), R * 0.9)
+        : 0;
     const ySource = sfd - R;
+    xSourceCoord = offset;
+    ySourceCoord = ySource;
     elements.push(
       <SourceMarker key="s" transform={transform} kind="dot" x={offset} y={ySource} />,
     );
-    const arc = geometry === "dwsi" ? [220, 320] : geometry === "dwdi_elliptic" ? [200, 340] : [210, 330];
+    const arc =
+      geometry === "dwsi"
+        ? [220, 320]
+        : geometry === "dwdi_elliptic"
+          ? [200, 340]
+          : [210, 330];
     const cx = geometry === "dwdi_elliptic" ? -offset * 0.5 : 0;
     elements.push(
       <path
@@ -217,43 +305,774 @@ export function WeldSetupSvg({
     );
     labelItems.push({ text: labels.source, x: offset, y: ySource + R * 0.22 });
     if (geometry === "dwdi_elliptic") {
-      labelItems.push({ text: `${labels.sourceOffset}: ${offset.toFixed(0)} mm`, x: offset / 2, y: ySource + R * 0.5, size: 9 });
-      labelItems.push({ text: `${labels.beamAngle} α ≈ 15°`, x: offset + R * 0.5, y: ySource - R * 0.2, size: 9 });
+      // Source offset dimension arrow
+      elements.push(
+        <line
+          key="offset-line"
+          x1={transform.X(0)}
+          y1={transform.Y(ySource)}
+          x2={transform.X(offset)}
+          y2={transform.Y(ySource)}
+          stroke="var(--sketch-source)"
+          strokeWidth={1.3}
+          strokeDasharray="3 2"
+        />,
+      );
+      labelItems.push({
+        text: `${labels.sourceOffset}: ${offset.toFixed(0)} mm (Z-ekseni)`,
+        x: offset / 2,
+        y: ySource + R * 0.45,
+        size: 9,
+      });
+      labelItems.push({
+        text: `${labels.beamAngle} α ≈ 15°`,
+        x: offset + R * 0.45,
+        y: ySource - R * 0.18,
+        size: 9,
+      });
     }
   }
 
-  elements.push(<WeldBump key="wt" transform={transform} x={0} y={R} weldWidth={weldWidth} weldHeight={weldHeight} inward={false} />);
-  elements.push(<WeldBump key="wti" transform={transform} x={0} y={Ri} weldWidth={weldWidth} weldHeight={weldHeight} inward={true} />);
-  elements.push(<WeldBump key="wb" transform={transform} x={0} y={-R} weldWidth={weldWidth} weldHeight={weldHeight} inward={true} />);
-  elements.push(<WeldBump key="wbi" transform={transform} x={0} y={-Ri} weldWidth={weldWidth} weldHeight={weldHeight} inward={false} />);
+  elements.push(
+    <WeldBump
+      key="wt"
+      transform={transform}
+      x={0}
+      y={R}
+      weldWidth={weldWidth}
+      weldHeight={weldHeight}
+      inward={false}
+    />,
+  );
+  elements.push(
+    <WeldBump
+      key="wti"
+      transform={transform}
+      x={0}
+      y={Ri}
+      weldWidth={weldWidth}
+      weldHeight={weldHeight}
+      inward={true}
+    />,
+  );
+  elements.push(
+    <WeldBump
+      key="wb"
+      transform={transform}
+      x={0}
+      y={-R}
+      weldWidth={weldWidth}
+      weldHeight={weldHeight}
+      inward={true}
+    />,
+  );
+  elements.push(
+    <WeldBump
+      key="wbi"
+      transform={transform}
+      x={0}
+      y={-Ri}
+      weldWidth={weldWidth}
+      weldHeight={weldHeight}
+      inward={false}
+    />,
+  );
+
+  // IQI Placement marker on 2D cross-section
+  const yIqi = filmSide
+    ? -R * 1.04
+    : geometry === "swsi"
+      ? -Ri * 0.96
+      : R * 1.06;
+  elements.push(
+    <g key="iqi-marker">
+      <rect
+        x={transform.X(R * 0.16) - 12}
+        y={transform.Y(yIqi) - 6}
+        width={24}
+        height={12}
+        rx={3}
+        fill={geometry === "dwsi" && !filmSide ? "#ef4444" : "#0284c7"}
+      />
+      <text
+        x={transform.X(R * 0.16)}
+        y={transform.Y(yIqi) + 3}
+        fontSize={8}
+        fontWeight={700}
+        fill="#ffffff"
+        textAnchor="middle"
+      >
+        IQI
+      </text>
+    </g>,
+  );
+
+  // Dimension line for SFD / SDD on left side
+  const dimX = -R * 1.28;
+  const detBottomY = panelWidth ? -R - R * 0.15 : -R * 1.04;
+  elements.push(
+    <g key="sfd-dim" opacity={0.82}>
+      <line
+        x1={transform.X(dimX)}
+        y1={transform.Y(ySourceCoord)}
+        x2={transform.X(dimX)}
+        y2={transform.Y(detBottomY)}
+        stroke="var(--sketch-text)"
+        strokeWidth={1}
+        strokeDasharray="3 2"
+      />
+      <line
+        x1={transform.X(dimX) - 4}
+        y1={transform.Y(ySourceCoord)}
+        x2={transform.X(xSourceCoord)}
+        y2={transform.Y(ySourceCoord)}
+        stroke="var(--sketch-text)"
+        strokeWidth={0.7}
+        strokeDasharray="2 3"
+        opacity={0.5}
+      />
+      <line
+        x1={transform.X(dimX) - 4}
+        y1={transform.Y(detBottomY)}
+        x2={transform.X(0)}
+        y2={transform.Y(detBottomY)}
+        stroke="var(--sketch-text)"
+        strokeWidth={0.7}
+        strokeDasharray="2 3"
+        opacity={0.5}
+      />
+    </g>,
+  );
+  labelItems.push({
+    text: `SFD=${sfd.toFixed(0)} mm`,
+    x: dimX - R * 0.05,
+    y: (ySourceCoord + detBottomY) / 2,
+    size: 9,
+    anchor: "end",
+  });
+  if (bDist > 0) {
+    labelItems.push({
+      text: `b=${bDist.toFixed(1)} mm${isPlanar && (bed > 0 || bgap > 0) ? ` (bed=${bed.toFixed(1)}, bgap=${bgap.toFixed(1)})` : ""}`,
+      x: R * 1.12,
+      y: -R * 0.85,
+      size: 8.5,
+      anchor: "start",
+    });
+  }
+  if (fMin > 0 || ug > 0) {
+    labelItems.push({
+      text: `OD=${od.toFixed(1)} | t=${t.toFixed(2)} mm | N=${nApplied > 0 ? `${nApplied}/${nRequired}` : nRequired}`,
+      x: 0,
+      y: bottom + (top - bottom) * 0.04,
+      size: 9.5,
+    });
+  }
 
   if (panelWidth) {
     const half = panelWidth / 2;
     const yPanel = -R - R * 0.15;
     const overlap = Math.max(10, (overlapPct / 100) * panelWidth);
     elements.push(
-      <line key="panel" x1={transform.X(-half)} y1={transform.Y(yPanel)} x2={transform.X(half)} y2={transform.Y(yPanel)} stroke={detColor} strokeWidth={7} />,
+      <line
+        key="panel"
+        x1={transform.X(-half)}
+        y1={transform.Y(yPanel)}
+        x2={transform.X(half)}
+        y2={transform.Y(yPanel)}
+        stroke={detColor}
+        strokeWidth={7}
+      />,
     );
     elements.push(
-      <line key="overlap" x1={transform.X(half - overlap)} y1={transform.Y(yPanel)} x2={transform.X(half)} y2={transform.Y(yPanel)} stroke="var(--sketch-weld)" strokeWidth={7} />,
+      <line
+        key="overlap"
+        x1={transform.X(half - overlap)}
+        y1={transform.Y(yPanel)}
+        x2={transform.X(half)}
+        y2={transform.Y(yPanel)}
+        stroke="var(--sketch-weld)"
+        strokeWidth={7}
+      />,
     );
-    labelItems.push({ text: `${labels.overlap} ${overlap.toFixed(0)} mm`, x: half - overlap / 2, y: yPanel + R * 0.28, size: 9 });
-    labelItems.push({ text: `${labels.dda} ${panelWidth.toFixed(0)} mm`, x: 0, y: yPanel - R * 0.28, size: 9 });
+    // Show sagitta (b_ed) gap between pipe outer curve and flat panel edge
+    const edgeX = Math.min(half * 0.85, R * 0.92);
+    const pipeEdgeY = -Math.sqrt(Math.max(0, R * R - edgeX * edgeX));
+    elements.push(
+      <line
+        key="bed-indicator"
+        x1={transform.X(-edgeX)}
+        y1={transform.Y(pipeEdgeY)}
+        x2={transform.X(-edgeX)}
+        y2={transform.Y(yPanel)}
+        stroke="var(--sketch-weld)"
+        strokeWidth={1.3}
+        strokeDasharray="2 2"
+      />,
+    );
+    labelItems.push({
+      text: `${labels.overlap} ${overlap.toFixed(0)} mm`,
+      x: half - overlap / 2,
+      y: yPanel + R * 0.28,
+      size: 9,
+    });
+    labelItems.push({
+      text: `${labels.dda} ${panelWidth.toFixed(0)} mm`,
+      x: 0,
+      y: yPanel - R * 0.25,
+      size: 9,
+    });
   }
 
   if (ringR > 0) {
     elements.push(
-      <circle key="ring" cx={transform.X(0)} cy={transform.Y(0)} r={ringR * transform.scale} fill="none" stroke="var(--sketch-weld)" strokeWidth={1.5} strokeDasharray="6 5" opacity={0.75} />,
+      <circle
+        key="ring"
+        cx={transform.X(0)}
+        cy={transform.Y(0)}
+        r={ringR * transform.scale}
+        fill="none"
+        stroke="var(--sketch-weld)"
+        strokeWidth={1.5}
+        strokeDasharray="6 5"
+        opacity={0.75}
+      />,
     );
-    labelItems.push({ text: `${labels.safety}: R≈${(safetyRadiusM ?? 0).toFixed(0)} m`, x: ringR * 0.5, y: ringR * 0.5, size: 9 });
+    labelItems.push({
+      text: `${labels.safety}: R≈${(safetyRadiusM ?? 0).toFixed(0)} m`,
+      x: ringR * 0.5,
+      y: ringR * 0.5,
+      size: 9,
+    });
   }
+
+  // True Metre-Scale Radiation Perimeter Inset (top-right corner, matching desktop sketch.py)
+  const showBarrierInset = Boolean(safetyRadiusM && safetyRadiusM > 0);
+  const rCtrl = safetyRadiusM ?? 0;
+  const rSup = supervisedRadiusM && supervisedRadiusM > rCtrl ? supervisedRadiusM : rCtrl * 1.63;
+  const insetCx = W - 64;
+  const insetCy = 60;
+  const insetMaxR = 42;
+  const ctrlR = rSup > 0 ? Math.max(8, (rCtrl / rSup) * insetMaxR) : insetMaxR;
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="sketch-svg" role="img" aria-label={labels.pipe}>
-      <circle cx={transform.X(0)} cy={transform.Y(0)} r={R * transform.scale} fill="none" stroke="var(--sketch-pipe)" strokeWidth={2} />
-      <circle cx={transform.X(0)} cy={transform.Y(0)} r={Ri * transform.scale} fill="none" stroke="var(--sketch-pipe)" strokeWidth={1.5} strokeDasharray="7 5" />
+      <circle
+        cx={transform.X(0)}
+        cy={transform.Y(0)}
+        r={R * transform.scale}
+        fill="none"
+        stroke="var(--sketch-pipe)"
+        strokeWidth={2}
+      />
+      <circle
+        cx={transform.X(0)}
+        cy={transform.Y(0)}
+        r={Ri * transform.scale}
+        fill="none"
+        stroke="var(--sketch-pipe)"
+        strokeWidth={1.5}
+        strokeDasharray="7 5"
+      />
       {elements}
       <Labels transform={transform} labels={labelItems} />
+
+      {showBarrierInset && (
+        <g className="barrier-inset">
+          <rect
+            x={W - 122}
+            y={8}
+            width={114}
+            height={106}
+            rx={6}
+            fill="var(--bg-alt)"
+            stroke="var(--border)"
+            strokeWidth={1}
+            opacity={0.92}
+          />
+          <text
+            x={insetCx}
+            y={20}
+            fontSize={8.5}
+            fontWeight={700}
+            fill="var(--sketch-text)"
+            textAnchor="middle"
+          >
+            Barikat Haritası (m)
+          </text>
+          <circle
+            cx={insetCx}
+            cy={insetCy + 6}
+            r={insetMaxR}
+            fill="rgba(245, 158, 11, 0.08)"
+            stroke="#f59e0b"
+            strokeWidth={1.2}
+            strokeDasharray="3 2"
+          />
+          <circle
+            cx={insetCx}
+            cy={insetCy + 6}
+            r={ctrlR}
+            fill="rgba(239, 68, 68, 0.14)"
+            stroke="#ef4444"
+            strokeWidth={1.5}
+            strokeDasharray="4 2"
+          />
+          <circle cx={insetCx} cy={insetCy + 6} r={2.5} fill="#ef4444" />
+          <text
+            x={insetCx}
+            y={insetCy + 6 - ctrlR + 9}
+            fontSize={7.5}
+            fill="#ef4444"
+            textAnchor="middle"
+          >
+            {rCtrl.toFixed(1)}m
+          </text>
+          <text
+            x={insetCx}
+            y={insetCy + 6 + insetMaxR - 3}
+            fontSize={7.5}
+            fill="#f59e0b"
+            textAnchor="middle"
+          >
+            {rSup.toFixed(1)}m (7.5 µSv/h)
+          </text>
+        </g>
+      )}
+    </svg>
+  );
+}
+
+export interface AnnexAChartProps {
+  figure?: string;
+  tOverDe?: number;
+  ratioName?: string;
+  ratio?: number;
+  n?: number;
+  nextN?: number | null;
+  nextRatio?: number | null;
+  nextDistanceMm?: number | null;
+  boundaries?: [number, number][];
+  lang?: string;
+}
+
+/** Interactive Annex A Nomogram / Operating Point Chart */
+export function AnnexAChartSvg({
+  figure = "A.2",
+  tOverDe = 0.05,
+  ratioName = "De/SFD",
+  ratio = 0.28,
+  n = 4,
+  nextN = null,
+  nextRatio = null,
+  nextDistanceMm = null,
+  boundaries = [],
+  lang = "tr",
+}: AnnexAChartProps) {
+  const tr = lang === "tr";
+  const padL = 52;
+  const padR = 24;
+  const padT = 34;
+  const padB = 44;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+
+  const maxX = Math.max(0.22, tOverDe * 1.3);
+  const maxY = Math.max(1.0, ratio * 1.35, nextRatio ? nextRatio * 1.25 : 0.8);
+
+  const toX = (val: number) => padL + Math.min(1, Math.max(0, val / maxX)) * plotW;
+  const toY = (val: number) => padT + plotH - Math.min(1, Math.max(0, val / maxY)) * plotH;
+
+  const opX = toX(tOverDe);
+  const opY = toY(ratio);
+
+  // Sort boundaries by threshold
+  const sortedBounds = [...boundaries].sort((a, b) => a[0] - b[0]);
+
+  return (
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      className="annex-a-svg"
+      role="img"
+      aria-label={`ISO 17636 Annex A ${figure}`}
+    >
+      <rect
+        x={padL}
+        y={padT}
+        width={plotW}
+        height={plotH}
+        fill="var(--bg)"
+        stroke="var(--border)"
+        strokeWidth={1.2}
+      />
+
+      {/* Horizontal zone bands from Annex A boundaries */}
+      {sortedBounds.map(([boundVal, expCount], idx) => {
+        const prevVal = idx === 0 ? 0 : sortedBounds[idx - 1][0];
+        const yTop = toY(Math.min(maxY, boundVal));
+        const yBot = toY(Math.min(maxY, prevVal));
+        if (yBot <= yTop) return null;
+        const isCurrentZone = expCount === n;
+        return (
+          <g key={`zone-${idx}`}>
+            <rect
+              x={padL}
+              y={yTop}
+              width={plotW}
+              height={Math.max(0, yBot - yTop)}
+              fill={
+                isCurrentZone
+                  ? "rgba(16, 185, 129, 0.16)"
+                  : idx % 2 === 0
+                    ? "rgba(148, 163, 184, 0.05)"
+                    : "transparent"
+              }
+            />
+            <line
+              x1={padL}
+              y1={yTop}
+              x2={padL + plotW}
+              y2={yTop}
+              stroke={isCurrentZone ? "#10b981" : "var(--border)"}
+              strokeWidth={isCurrentZone ? 1.5 : 1}
+              strokeDasharray="4 3"
+            />
+            <text
+              x={padL + plotW - 8}
+              y={(yTop + yBot) / 2 + 4}
+              fontSize={10}
+              fontWeight={isCurrentZone ? 700 : 500}
+              fill={isCurrentZone ? "#10b981" : "var(--sketch-text)"}
+              textAnchor="end"
+            >
+              N = {expCount} {tr ? "Poz" : "Exp"} ({ratioName} ≤ {boundVal.toFixed(2)})
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Axes grid & ticks */}
+      {[0, 0.05, 0.1, 0.15, 0.2].map((xv) => {
+        if (xv > maxX) return null;
+        const px = toX(xv);
+        return (
+          <g key={`xt-${xv}`}>
+            <line
+              x1={px}
+              y1={padT}
+              x2={px}
+              y2={padT + plotH}
+              stroke="var(--border)"
+              strokeWidth={0.6}
+              opacity={0.4}
+            />
+            <text
+              x={px}
+              y={padT + plotH + 15}
+              fontSize={9.5}
+              fill="var(--sketch-text)"
+              textAnchor="middle"
+            >
+              {xv.toFixed(2)}
+            </text>
+          </g>
+        );
+      })}
+      {[0, 0.2, 0.4, 0.6, 0.8, 1.0].map((yv) => {
+        if (yv > maxY) return null;
+        const py = toY(yv);
+        return (
+          <g key={`yt-${yv}`}>
+            <text
+              x={padL - 6}
+              y={py + 3}
+              fontSize={9.5}
+              fill="var(--sketch-text)"
+              textAnchor="end"
+            >
+              {yv.toFixed(2)}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Next exposure boundary target arrow */}
+      {nextRatio != null && nextN != null && (
+        <g>
+          <line
+            x1={opX}
+            y1={opY}
+            x2={opX}
+            y2={toY(nextRatio)}
+            stroke="#f59e0b"
+            strokeWidth={2}
+            strokeDasharray="3 2"
+          />
+          <circle cx={opX} cy={toY(nextRatio)} r={4} fill="#f59e0b" />
+          <text
+            x={Math.min(padL + plotW - 10, Math.max(padL + 10, opX + 10))}
+            y={toY(nextRatio) - 6}
+            fontSize={9.5}
+            fontWeight={600}
+            fill="#f59e0b"
+            textAnchor={opX > W * 0.6 ? "end" : "start"}
+          >
+            {tr
+              ? `N=${nextN} sınırı: ${ratioName}=${nextRatio.toFixed(3)}${nextDistanceMm ? ` (SFD ≥ ${nextDistanceMm.toFixed(0)} mm)` : ""}`
+              : `N=${nextN} limit: ${ratioName}=${nextRatio.toFixed(3)}${nextDistanceMm ? ` (SFD ≥ ${nextDistanceMm.toFixed(0)} mm)` : ""}`}
+          </text>
+        </g>
+      )}
+
+      {/* Operating point crosshair & marker */}
+      <line
+        x1={opX}
+        y1={padT}
+        x2={opX}
+        y2={padT + plotH}
+        stroke="var(--sketch-source)"
+        strokeWidth={1}
+        strokeDasharray="3 3"
+      />
+      <line
+        x1={padL}
+        y1={opY}
+        x2={padL + plotW}
+        y2={opY}
+        stroke="var(--sketch-source)"
+        strokeWidth={1}
+        strokeDasharray="3 3"
+      />
+      <circle
+        cx={opX}
+        cy={opY}
+        r={11}
+        fill="var(--sketch-source)"
+        opacity={0.22}
+      />
+      <circle
+        cx={opX}
+        cy={opY}
+        r={5.5}
+        fill="var(--sketch-source)"
+        stroke="#ffffff"
+        strokeWidth={1.5}
+      />
+      <text
+        x={opX > W * 0.65 ? opX - 10 : opX + 10}
+        y={opY - 10}
+        fontSize={10.5}
+        fontWeight={700}
+        fill="var(--sketch-text)"
+        textAnchor={opX > W * 0.65 ? "end" : "start"}
+      >
+        {tr ? "Çalışma Noktası" : "Operating Point"} (N={n})
+      </text>
+
+      {/* Titles */}
+      <text
+        x={W / 2}
+        y={20}
+        fontSize={12}
+        fontWeight={700}
+        fill="var(--sketch-text)"
+        textAnchor="middle"
+      >
+        ISO 17636 Annex A ({figure}) — t/De = {tOverDe.toFixed(4)} | {ratioName} ={" "}
+        {ratio.toFixed(3)}
+      </text>
+      <text
+        x={padL + plotW / 2}
+        y={H - 10}
+        fontSize={10.5}
+        fontWeight={600}
+        fill="var(--sketch-text)"
+        textAnchor="middle"
+      >
+        t / De ({tr ? "Et Kalınlığı / Dış Çap Oranı" : "Wall Thickness / OD Ratio"})
+      </text>
+      <text
+        x={14}
+        y={padT + plotH / 2}
+        fontSize={10.5}
+        fontWeight={600}
+        fill="var(--sketch-text)"
+        textAnchor="middle"
+        transform={`rotate(-90, 14, ${padT + plotH / 2})`}
+      >
+        {ratioName}
+      </text>
+    </svg>
+  );
+}
+
+/** 300 mm (12 inch) Weld Strip Defect Visualizer */
+export function DefectStripSvg({
+  defectType,
+  lengthMm,
+  widthMm,
+  accumulatedMm,
+  wallT,
+  accepted,
+  lang = "tr",
+}: {
+  defectType: string;
+  lengthMm: number;
+  widthMm: number;
+  accumulatedMm: number;
+  wallT: number;
+  accepted: boolean | null;
+  lang?: string;
+}) {
+  const tr = lang === "tr";
+  const stripLenMm = 300;
+  const svgW = 400;
+  const svgH = 115;
+  const padX = 24;
+  const stripW = svgW - padX * 2;
+  const stripY = 26;
+  const stripH = 34;
+
+  const pxPerMm = stripW / stripLenMm;
+  const singleW = Math.min(stripW, Math.max(4, lengthMm * pxPerMm));
+  const singleH = Math.min(stripH - 6, Math.max(4, (widthMm / Math.max(wallT, 4)) * stripH));
+  const accumW = Math.min(stripW, Math.max(0, accumulatedMm * pxPerMm));
+
+  const statusColor =
+    accepted === null ? "#f59e0b" : accepted ? "#10b981" : "#ef4444";
+
+  return (
+    <svg
+      viewBox={`0 0 ${svgW} ${svgH}`}
+      className="defect-strip-svg"
+      role="img"
+      aria-label={tr ? "300 mm Kaynak Şeridi Kusur Haritası" : "300 mm Weld Strip Defect Map"}
+    >
+      <text
+        x={padX}
+        y={16}
+        fontSize={10}
+        fontWeight={600}
+        fill="var(--sketch-text)"
+      >
+        {tr
+          ? `300 mm (12") Kaynak Değerlendirme Şeridi — t = ${wallT.toFixed(2)} mm`
+          : `300 mm (12") Weld Evaluation Strip — t = ${wallT.toFixed(2)} mm`}
+      </text>
+
+      {/* Weld seam background */}
+      <rect
+        x={padX}
+        y={stripY}
+        width={stripW}
+        height={stripH}
+        rx={4}
+        fill="var(--bg)"
+        stroke="var(--border)"
+        strokeWidth={1.2}
+      />
+      {/* Weld centerline */}
+      <line
+        x1={padX}
+        y1={stripY + stripH / 2}
+        x2={padX + stripW}
+        y2={stripY + stripH / 2}
+        stroke="var(--border)"
+        strokeWidth={0.8}
+        strokeDasharray="4 3"
+      />
+
+      {/* Primary defect shape */}
+      {defectType === "defect_porosity" ? (
+        <g>
+          <circle
+            cx={padX + 45}
+            cy={stripY + stripH / 2}
+            r={Math.max(3, singleH / 2)}
+            fill={statusColor}
+          />
+          <circle
+            cx={padX + 45 + Math.min(25, singleW * 0.5)}
+            cy={stripY + stripH / 2 - 4}
+            r={Math.max(2.5, singleH * 0.38)}
+            fill={statusColor}
+            opacity={0.8}
+          />
+          <circle
+            cx={padX + 45 + Math.min(45, singleW * 0.85)}
+            cy={stripY + stripH / 2 + 3}
+            r={Math.max(2, singleH * 0.32)}
+            fill={statusColor}
+            opacity={0.7}
+          />
+        </g>
+      ) : (
+        <rect
+          x={padX + 28}
+          y={stripY + (stripH - singleH) / 2}
+          width={singleW}
+          height={singleH}
+          rx={defectType === "defect_crack" ? 0.5 : 2.5}
+          fill={statusColor}
+          opacity={0.88}
+        />
+      )}
+
+      <text
+        x={padX + 32 + singleW + 6}
+        y={stripY + stripH / 2 + 3}
+        fontSize={9.5}
+        fontWeight={600}
+        fill={statusColor}
+      >
+        L={lengthMm} mm × W={widthMm} mm
+      </text>
+
+      {/* Accumulated defect length gauge along 300 mm reference */}
+      <text
+        x={padX}
+        y={80}
+        fontSize={9.5}
+        fill="var(--sketch-text)"
+      >
+        {tr
+          ? `12" (300 mm) Birikimli Kusur: ${accumulatedMm} / 300 mm`
+          : `12" (300 mm) Accumulated: ${accumulatedMm} / 300 mm`}
+      </text>
+      <rect
+        x={padX}
+        y={86}
+        width={stripW}
+        height={10}
+        rx={5}
+        fill="var(--bg)"
+        stroke="var(--border)"
+        strokeWidth={1}
+      />
+      <rect
+        x={padX}
+        y={86}
+        width={accumW}
+        height={10}
+        rx={5}
+        fill={statusColor}
+      />
+      {/* 25 mm (1 in) API 1104 reference limit tick */}
+      <line
+        x1={padX + 25 * pxPerMm}
+        y1={83}
+        x2={padX + 25 * pxPerMm}
+        y2={100}
+        stroke="#f59e0b"
+        strokeWidth={1.5}
+      />
+      <text
+        x={padX + 25 * pxPerMm + 4}
+        y={109}
+        fontSize={8.5}
+        fill="#f59e0b"
+      >
+        25 mm (1&quot;) ref
+      </text>
     </svg>
   );
 }
@@ -261,7 +1080,14 @@ export function WeldSetupSvg({
 interface FigureSpec {
   alias?: string;
   source: { kind: "star" | "dot"; x: number; y: number; label?: string };
-  detector: { kind: "outer" | "inner" | "circle" | "flat"; t1?: number; t2?: number; x1?: number; x2?: number; y?: number };
+  detector: {
+    kind: "outer" | "inner" | "circle" | "flat";
+    t1?: number;
+    t2?: number;
+    x1?: number;
+    x2?: number;
+    y?: number;
+  };
   beams?: { from: [number, number]; angles: [number, number]; radius: number }[];
   welds?: [number, number][];
   labels?: { text: string; x: number; y: number; size?: number }[];
@@ -444,7 +1270,14 @@ export function StandardFigureSvg({ figure, title }: { figure: string; title: st
     const detector = spec.detector;
     if (detector.kind === "circle") {
       return (
-        <circle cx={transform.X(0)} cy={transform.Y(0)} r={1.08 * transform.scale} fill="none" stroke={detColor} strokeWidth={3} />
+        <circle
+          cx={transform.X(0)}
+          cy={transform.Y(0)}
+          r={1.08 * transform.scale}
+          fill="none"
+          stroke={detColor}
+          strokeWidth={3}
+        />
       );
     }
     if (detector.kind === "flat") {
@@ -472,12 +1305,33 @@ export function StandardFigureSvg({ figure, title }: { figure: string; title: st
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="sketch-svg" role="img" aria-label={title}>
-      <circle cx={transform.X(0)} cy={transform.Y(0)} r={1 * transform.scale} fill="none" stroke="var(--sketch-pipe)" strokeWidth={2} />
-      <circle cx={transform.X(0)} cy={transform.Y(0)} r={0.8 * transform.scale} fill="none" stroke="var(--sketch-pipe)" strokeWidth={1.5} strokeDasharray="7 5" />
+      <circle
+        cx={transform.X(0)}
+        cy={transform.Y(0)}
+        r={1 * transform.scale}
+        fill="none"
+        stroke="var(--sketch-pipe)"
+        strokeWidth={2}
+      />
+      <circle
+        cx={transform.X(0)}
+        cy={transform.Y(0)}
+        r={0.8 * transform.scale}
+        fill="none"
+        stroke="var(--sketch-pipe)"
+        strokeWidth={1.5}
+        strokeDasharray="7 5"
+      />
       {spec.beams?.map((beam, index) => {
         const [a1, a2] = beam.angles;
-        const p1 = [beam.radius * Math.cos((a1 * Math.PI) / 180), beam.radius * Math.sin((a1 * Math.PI) / 180)];
-        const p2 = [beam.radius * Math.cos((a2 * Math.PI) / 180), beam.radius * Math.sin((a2 * Math.PI) / 180)];
+        const p1 = [
+          beam.radius * Math.cos((a1 * Math.PI) / 180),
+          beam.radius * Math.sin((a1 * Math.PI) / 180),
+        ];
+        const p2 = [
+          beam.radius * Math.cos((a2 * Math.PI) / 180),
+          beam.radius * Math.sin((a2 * Math.PI) / 180),
+        ];
         return (
           <g key={index}>
             <polygon
@@ -485,8 +1339,24 @@ export function StandardFigureSvg({ figure, title }: { figure: string; title: st
               fill={beamColor}
               opacity={0.12}
             />
-            <line x1={transform.X(beam.from[0])} y1={transform.Y(beam.from[1])} x2={transform.X(p1[0])} y2={transform.Y(p1[1])} stroke={beamColor} strokeWidth={1.2} strokeDasharray="3 3" />
-            <line x1={transform.X(beam.from[0])} y1={transform.Y(beam.from[1])} x2={transform.X(p2[0])} y2={transform.Y(p2[1])} stroke={beamColor} strokeWidth={1.2} strokeDasharray="3 3" />
+            <line
+              x1={transform.X(beam.from[0])}
+              y1={transform.Y(beam.from[1])}
+              x2={transform.X(p1[0])}
+              y2={transform.Y(p1[1])}
+              stroke={beamColor}
+              strokeWidth={1.2}
+              strokeDasharray="3 3"
+            />
+            <line
+              x1={transform.X(beam.from[0])}
+              y1={transform.Y(beam.from[1])}
+              x2={transform.X(p2[0])}
+              y2={transform.Y(p2[1])}
+              stroke={beamColor}
+              strokeWidth={1.2}
+              strokeDasharray="3 3"
+            />
           </g>
         );
       })}
@@ -501,7 +1371,12 @@ export function StandardFigureSvg({ figure, title }: { figure: string; title: st
           fill="var(--sketch-weld)"
         />
       ))}
-      <SourceMarker transform={transform} kind={spec.source.kind} x={spec.source.x} y={spec.source.y} />
+      <SourceMarker
+        transform={transform}
+        kind={spec.source.kind}
+        x={spec.source.x}
+        y={spec.source.y}
+      />
       {spec.source.label && (
         <text
           x={transform.X(spec.source.x) + 12}
@@ -517,7 +1392,14 @@ export function StandardFigureSvg({ figure, title }: { figure: string; title: st
         transform={transform}
         labels={(spec.labels ?? []).map((label) => ({ ...label, size: label.size }))}
       />
-      <text x={W / 2} y={20} fontSize={12} fontWeight={600} fill="var(--sketch-text)" textAnchor="middle">
+      <text
+        x={W / 2}
+        y={20}
+        fontSize={12}
+        fontWeight={600}
+        fill="var(--sketch-text)"
+        textAnchor="middle"
+      >
         {title}
       </text>
     </svg>

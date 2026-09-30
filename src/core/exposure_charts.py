@@ -50,6 +50,16 @@ class ExposureChartDatabase:
         "C6": "HS800",
     }
 
+    # ISO 11699-1 relative film speed normalized to AA400 (C5 = 1.0).
+    # Slower films (M100/MX125/T200) require more dose; faster (HS800) less.
+    FILM_RELATIVE_SPEED = {
+        "M100": 0.125,   # C2 (speed 2 / 16) -> 8x exposure vs AA400
+        "MX125": 0.25,   # C3 (speed 4 / 16) -> 4x exposure vs AA400
+        "T200": 0.50,    # C4 (speed 8 / 16) -> 2x exposure vs AA400
+        "AA400": 1.00,   # C5 (speed 16 / 16) -> 1x baseline
+        "HS800": 2.00,   # C6 (speed 32 / 16) -> 0.5x exposure vs AA400
+    }
+
     # SCRATA slide rule constants (broad-beam effective HVL, mm steel)
     # Source: NDTCalc.com slide rule documentation
     HVL = {
@@ -96,20 +106,32 @@ class ExposureChartDatabase:
             return []
         return list(self.R_FACTOR_TABLE[film_key].keys())
 
-    def calculate_exposure_time_rfactor(self, sfd, w, source, activity, film_key, density=2.0):
+    def calculate_exposure_time_rfactor(self, sfd, w, source, activity, film_key,
+                                        density=2.0, ref_factor=1.0, gradient=2.0):
         r_factor = self.lookup_r_factor(film_key, source)
         if r_factor is None:
             return None
         hvl = self.HVL.get(source, 13.2)
         gamma = self.GAMMA.get(source, 0.48)
-        if gamma <= 0:
+        if gamma <= 0 or activity <= 0:
             return None
 
-        density_correction = 10 ** ((density - 2.0) / 2.0)
-        sfd_m = sfd / 1000.0
-        attenuation = 2 ** (w / hvl)
+        # Effective dose factor: normalized so AA400 (C5) uses its exact R-factor,
+        # while slower/faster films scale inversely with ISO 11699-1 film speed.
+        rel_speed = self.FILM_RELATIVE_SPEED.get(film_key, 1.0)
+        r_aa400 = self.lookup_r_factor("AA400", source)
+        if r_aa400 is not None and rel_speed > 0 and film_key != "AA400":
+            effective_r = r_aa400 / rel_speed
+        else:
+            effective_r = r_factor
 
-        t_hours = (r_factor * density_correction * (sfd_m ** 2) * attenuation) / (activity * gamma)
+        g_val = gradient if (gradient is not None and gradient > 0) else 2.0
+        density_correction = 10 ** ((density - 2.0) / g_val)
+        sfd_m = sfd / 1000.0
+        w_eq = float(w) * float(ref_factor if ref_factor and ref_factor > 0 else 1.0)
+        attenuation = 2 ** (w_eq / hvl)
+
+        t_hours = (effective_r * density_correction * (sfd_m ** 2) * attenuation) / (activity * gamma)
         t_minutes = t_hours * 60.0
         return t_minutes
 
@@ -136,16 +158,78 @@ class ExposureChartDatabase:
                 kv_data[t_mm] = exposure_mamin
             self.TYPE_X_CHART[kv] = kv_data
 
-    def get_type_x_exposure(self, kv, thickness):
-        if not self.TYPE_X_CHART:
-            return None
-        kv = int(kv)
-        nearest_kv = min(self.TYPE_X_CHART.keys(), key=lambda k: abs(k - kv))
-        kv_data = self.TYPE_X_CHART[nearest_kv]
+    def _interp_thickness(self, kv_data, thickness):
+        """Log-linear interpolation of exposure (mA·min) along thickness (mm)."""
         if not kv_data:
             return None
-        nearest_t = min(kv_data.keys(), key=lambda t: abs(t - thickness))
-        return kv_data[nearest_t]
+        t_keys = sorted(kv_data.keys())
+        t_val = float(thickness)
+        if t_val <= t_keys[0]:
+            if len(t_keys) >= 2 and kv_data[t_keys[0]] > 0 and kv_data[t_keys[1]] > 0:
+                slope = math.log(kv_data[t_keys[1]] / kv_data[t_keys[0]]) / (t_keys[1] - t_keys[0])
+                return kv_data[t_keys[0]] * math.exp(slope * (t_val - t_keys[0]))
+            return kv_data[t_keys[0]]
+        if t_val >= t_keys[-1]:
+            if len(t_keys) >= 2 and kv_data[t_keys[-2]] > 0 and kv_data[t_keys[-1]] > 0:
+                slope = math.log(kv_data[t_keys[-1]] / kv_data[t_keys[-2]]) / (t_keys[-1] - t_keys[-2])
+                return kv_data[t_keys[-1]] * math.exp(slope * min(100.0, t_val - t_keys[-1]))
+            return kv_data[t_keys[-1]]
+        for i in range(len(t_keys) - 1):
+            t1, t2 = t_keys[i], t_keys[i + 1]
+            if t1 <= t_val <= t2:
+                if abs(t_val - t1) < 1e-9:
+                    return kv_data[t1]
+                if abs(t_val - t2) < 1e-9:
+                    return kv_data[t2]
+                v1, v2 = kv_data[t1], kv_data[t2]
+                if v1 > 0 and v2 > 0:
+                    frac = (t_val - t1) / (t2 - t1)
+                    return math.exp(math.log(v1) + frac * (math.log(v2) - math.log(v1)))
+                return v1 + ((t_val - t1) / (t2 - t1)) * (v2 - v1)
+        return kv_data[t_keys[0]]
+
+    def get_type_x_exposure(self, kv, thickness, interpolate=True):
+        if not self.TYPE_X_CHART:
+            return None
+        kv_f = float(kv)
+        t_f = float(thickness)
+        kv_keys = sorted(self.TYPE_X_CHART.keys())
+        if not interpolate or len(kv_keys) == 1:
+            nearest_kv = min(kv_keys, key=lambda k: abs(k - kv_f))
+            kv_data = self.TYPE_X_CHART[nearest_kv]
+            if not kv_data:
+                return None
+            nearest_t = min(kv_data.keys(), key=lambda t: abs(t - t_f))
+            return kv_data[nearest_t]
+
+        # Exact grid match fast path
+        kv_int = int(round(kv_f))
+        t_int = int(round(t_f))
+        if abs(kv_f - kv_int) < 1e-9 and abs(t_f - t_int) < 1e-9:
+            if kv_int in self.TYPE_X_CHART and t_int in self.TYPE_X_CHART[kv_int]:
+                return self.TYPE_X_CHART[kv_int][t_int]
+
+        if kv_f <= kv_keys[0]:
+            return self._interp_thickness(self.TYPE_X_CHART[kv_keys[0]], t_f)
+        if kv_f >= kv_keys[-1]:
+            return self._interp_thickness(self.TYPE_X_CHART[kv_keys[-1]], t_f)
+
+        for i in range(len(kv_keys) - 1):
+            k1, k2 = kv_keys[i], kv_keys[i + 1]
+            if k1 <= kv_f <= k2:
+                if abs(kv_f - k1) < 1e-9:
+                    return self._interp_thickness(self.TYPE_X_CHART[k1], t_f)
+                if abs(kv_f - k2) < 1e-9:
+                    return self._interp_thickness(self.TYPE_X_CHART[k2], t_f)
+                e1 = self._interp_thickness(self.TYPE_X_CHART[k1], t_f)
+                e2 = self._interp_thickness(self.TYPE_X_CHART[k2], t_f)
+                if e1 is None or e2 is None:
+                    return e1 if e1 is not None else e2
+                if e1 > 0 and e2 > 0 and k1 > 0 and k2 > 0:
+                    frac = (math.log(kv_f) - math.log(k1)) / (math.log(k2) - math.log(k1))
+                    return math.exp(math.log(e1) + frac * (math.log(e2) - math.log(e1)))
+                return e1 + ((kv_f - k1) / (k2 - k1)) * (e2 - e1)
+        return None
 
     def save_to_csv(self, filepath="exposure_chart_dataset.csv"):
         rows = []

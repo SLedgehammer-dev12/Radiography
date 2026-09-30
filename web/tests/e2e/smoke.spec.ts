@@ -190,3 +190,35 @@ test("shows the f_min provenance (base formula, Level 3 reductions)", async ({
   });
   await expect(hero.locator(".hero-sub")).toContainText("uygulanan f_min");
 });
+
+test("renders interactive 3D shooting geometry, Annex A chart, and syncs isotope base_e", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.locator(".layout")).toBeVisible({ timeout: 150_000 });
+  await expect(page.getByTestId("output-w_nom")).not.toContainText("-", {
+    timeout: 60_000,
+  });
+
+  // 3D canvas is visible by default on the "3D Kurulum" tab
+  const canvas3d = page.locator("canvas.sketch-3d-canvas");
+  await expect(canvas3d).toBeVisible();
+  await page.getByRole("button", { name: /Boyuna \(Eliptik\)/ }).click();
+  await page.getByRole("button", { name: /Işın Gözü/ }).click();
+
+  // Switch to Annex A tab and verify chart SVG
+  await page.getByRole("button", { name: "Annex A" }).click();
+  await expect(page.locator("svg.annex-a-svg")).toBeVisible();
+
+  // Switching radiation source to Ir-192 updates base_e to 30
+  const sourceSelect = page
+    .locator(".field", { hasText: "Radyasyon Kaynağı" })
+    .locator("select")
+    .first();
+  await sourceSelect.selectOption("isotope_ir192");
+  const baseEInput = page
+    .locator(".field", { hasText: "Pozlama Tablosu Sabiti" })
+    .locator("input");
+  await expect(baseEInput).toHaveValue("30");
+});
+

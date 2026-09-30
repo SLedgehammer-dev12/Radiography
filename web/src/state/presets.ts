@@ -12,7 +12,7 @@ const SOURCES = [
 const CLASSES = ["class_b", "class_a"];
 const GEOMETRIES = ["dwsi", "swsi", "dwdi_elliptic", "dwdi_super"];
 const STANDARDS = ["iso", "asme"];
-const DETECTORS = ["cr_standard", "cr_hires", "dda_si", "dda_se", "dda_gdos"];
+const DETECTORS = ["cr_standard", "cr_highres", "dda_si", "dda_se", "dda_gdos"];
 const CHARTS = ["model", "AA400", "MX125", "T200", "HS800", "M100", "type_x"];
 const COLLIMATORS = [0, 1, 2, 4];
 const FILM_SIZES: Record<string, [number, number]> = {
@@ -22,6 +22,15 @@ const FILM_SIZES: Record<string, [number, number]> = {
   "100x500": [100, 500],
 };
 
+export const DEFAULT_BASE_E_BY_SOURCE: Record<string, number> = {
+  x_ray: 3.0,
+  isotope_ir192: 30.0,
+  isotope_se75: 40.0,
+  isotope_co60: 20.0,
+  isotope_yb169: 150.0,
+  isotope_tm170: 500.0,
+};
+
 export const NAMED_PRESETS: Record<string, Partial<FormState>> = {
   "4 inç SCH40 DWDI X-Ray Atölye": {
     source: "x_ray",
@@ -29,6 +38,7 @@ export const NAMED_PRESETS: Record<string, Partial<FormState>> = {
     od: 114.3,
     output_val: 5.0,
     app_kv: 200.0,
+    base_e: 3.0,
   },
   "16 inç DWSI Ir-192 Saha": {
     source: "isotope_ir192",
@@ -36,12 +46,14 @@ export const NAMED_PRESETS: Record<string, Partial<FormState>> = {
     od: 406.4,
     output_val: 40.0,
     app_activity: 40.0,
+    base_e: 30.0,
   },
   "2 inç DDA Dijital RT": {
     tech: "digital",
     detector_curved: false,
     geometry: "dwsi",
     od: 60.3,
+    base_e: 3.0,
   },
   "ASME VIII 25 mm SWSI Co-60": {
     source: "isotope_co60",
@@ -51,6 +63,7 @@ export const NAMED_PRESETS: Record<string, Partial<FormState>> = {
     t: 25.0,
     output_val: 20.0,
     app_activity: 20.0,
+    base_e: 20.0,
   },
 };
 
@@ -287,7 +300,12 @@ export function desktopStateToForm(
   num("txt_bgap", "bgap");
 
   if (state.txt_base_e !== undefined && state.txt_base_e !== "") {
-    form.base_e = asNumber(state.txt_base_e, DEFAULT_FORM.base_e);
+    form.base_e = asNumber(
+      state.txt_base_e,
+      DEFAULT_BASE_E_BY_SOURCE[form.source ?? "x_ray"] ?? DEFAULT_FORM.base_e,
+    );
+  } else if (form.source) {
+    form.base_e = DEFAULT_BASE_E_BY_SOURCE[form.source] ?? DEFAULT_FORM.base_e;
   }
   if (state.txt_barrier_limit !== undefined && state.txt_barrier_limit !== "") {
     form.barrier_limit_usvh = asNumber(state.txt_barrier_limit, 20);
