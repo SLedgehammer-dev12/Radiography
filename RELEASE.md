@@ -53,10 +53,24 @@ Pushing the tag triggers `.github/workflows/build.yml`:
 ```
 Test (Ubuntu) → [parallel]
   ├── Build Windows .exe
-  └── Build macOS .dmg (universal2)
+  ├── Build macOS .dmg (universal2)
+  ├── Build Android .apk (does not block the release)
+  └── Build Web launchers (Windows .exe + macOS .dmg)
        ↓
   Create GitHub Release
 ```
+
+A push to `main` only releases when `src/core/version.py` is newer than the
+latest tag; if the tag for the current version already exists, the release is
+skipped (no duplicate builds). The web front-end additionally has its own
+pipeline in `.github/workflows/web.yml` (core tests + Playwright + build +
+optional GitHub Pages deploy).
+
+### Release assets
+- `Radiography-<ver>-Windows-x64.exe`, `Radiography-<ver>-macOS.dmg` (desktop)
+- `Radiography-<ver>-Android.apk` (mobile, best effort)
+- `Radiography-Web-<ver>-Windows-x64.exe`, `Radiography-Web-<ver>-macOS.dmg`
+  (browser version; see `web/README.md`)
 
 ### 5. Verify
 - Check [GitHub Actions](https://github.com/SLedgehammer-dev12/Radiography/actions) for green builds

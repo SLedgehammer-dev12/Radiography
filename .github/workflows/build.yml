@@ -54,14 +54,21 @@ jobs:
 
               head_tags = subprocess.run(["git", "tag", "--points-at", "HEAD"],
                                          capture_output=True, text=True).stdout.split()
-              if tag_name in head_tags:
-                  should_release = "true"
-              else:
-                  tags = subprocess.run(["git", "tag", "--list", "v*"],
+              all_tags = subprocess.run(["git", "tag", "--list", "v*"],
                                         capture_output=True, text=True).stdout.split()
-                  tags = [t for t in tags if t != tag_name]
-                  latest = max(tags, key=parse) if tags else None
-                  should_release = "true" if (version and (latest is None or parse(version) > parse(latest))) else "false"
+              if tag_name in head_tags:
+                  # Tag points at this commit -> release.
+                  should_release = "true"
+              elif tag_name in all_tags:
+                  # The tag already exists (e.g. a docs push after a tagged
+                  # release) -> do not rebuild and re-publish the release.
+                  should_release = "false"
+              else:
+                  latest = max((t for t in all_tags if t != tag_name),
+                               key=parse, default=None)
+                  should_release = "true" if (
+                      version and (latest is None or parse(version) > parse(latest))
+                  ) else "false"
 
           with open(os.environ["GITHUB_OUTPUT"], "a") as out:
               out.write(f"version={version}\n")
