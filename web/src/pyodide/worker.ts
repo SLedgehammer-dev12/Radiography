@@ -11,19 +11,22 @@ function post(message: unknown) {
   (self as unknown as Worker).postMessage(message);
 }
 
+// Base URL injected by Vite (e.g. "/" locally, "/Radiography/" on Pages).
+const BASE = import.meta.env.BASE_URL;
+
 async function boot() {
   post({ type: "status", stage: "loading-pyodide" });
   pyodide = await loadPyodide({
-    indexURL: new URL("/pyodide/", self.location.origin).href,
+    indexURL: new URL(`${BASE}pyodide/`, self.location.origin).href,
   });
 
   post({ type: "status", stage: "loading-core" });
-  const files = (await (await fetch("/python/files.json")).json()) as string[];
+  const files = (await (await fetch(`${BASE}python/files.json`)).json()) as string[];
   pyodide.FS.mkdirTree("/python");
   for (const file of files) {
-    const response = await fetch(`/python/${file}`);
+    const response = await fetch(`${BASE}python/${file}`);
     if (!response.ok) {
-      throw new Error(`Failed to fetch /python/${file}: ${response.status}`);
+      throw new Error(`Failed to fetch ${BASE}python/${file}: ${response.status}`);
     }
     const text = await response.text();
     const parts = file.split("/");
@@ -34,10 +37,10 @@ async function boot() {
   }
 
   const binaries: [string, string][] = [
-    ["/data/exposure_chart_dataset.json", "/python/exposure_chart_dataset.json"],
-    ["/assets/fonts/NotoSans-Regular.ttf", "/python/src/mobile/assets/fonts/NotoSans-Regular.ttf"],
-    ["/assets/fonts/NotoSans-Bold.ttf", "/python/src/mobile/assets/fonts/NotoSans-Bold.ttf"],
-    ["/assets/fonts/NotoSans-Italic.ttf", "/python/src/mobile/assets/fonts/NotoSans-Italic.ttf"],
+    [`${BASE}data/exposure_chart_dataset.json`, "/python/exposure_chart_dataset.json"],
+    [`${BASE}assets/fonts/NotoSans-Regular.ttf`, "/python/src/mobile/assets/fonts/NotoSans-Regular.ttf"],
+    [`${BASE}assets/fonts/NotoSans-Bold.ttf`, "/python/src/mobile/assets/fonts/NotoSans-Bold.ttf"],
+    [`${BASE}assets/fonts/NotoSans-Italic.ttf`, "/python/src/mobile/assets/fonts/NotoSans-Italic.ttf"],
   ];
   for (const [source, destination] of binaries) {
     const response = await fetch(source);
@@ -73,7 +76,7 @@ self.onmessage = async (event: MessageEvent<Request>) => {
       // initial boot stays fast. Wheels are vendored locally by
       // scripts/sync-assets.mjs so this also works offline.
       await pyodide!.loadPackage(["micropip", "pillow"]);
-      const wheels = (await (await fetch("/pyodide/wheels.json")).json()) as string[];
+      const wheels = (await (await fetch(`${BASE}pyodide/wheels.json`)).json()) as string[];
       const micropip = pyodide!.pyimport("micropip") as {
         install: (
           packages: string[],
@@ -83,7 +86,7 @@ self.onmessage = async (event: MessageEvent<Request>) => {
       };
       const localWheels = wheels
         .filter((name) => !name.startsWith("micropip") && !name.startsWith("pillow"))
-        .map((name) => `/pyodide/${name}`);
+        .map((name) => new URL(`${BASE}pyodide/${name}`, self.location.origin).href);
       if (localWheels.length) {
         await micropip.install(localWheels, false, false);
       }

@@ -1,38 +1,41 @@
 /* Radiography offline service worker.
  * Pre-caches the app shell, the Pyodide runtime, the Python core sources and
  * the PDF wheels so the whole tool works offline after the first visit.
+ *
+ * All paths are derived from the registration scope, so the same worker works
+ * at the site root (local launcher) and under a sub-path (GitHub Pages).
  */
 
-const CACHE = "radiography-v2";
+const BASE = new URL(self.registration.scope).pathname; // "/" or "/Radiography/"
+const CACHE = "radiography-v3";
 
 const CORE_ASSETS = [
-  "/",
-  "/index.html",
-  "/manifest.webmanifest",
-  "/icon.svg",
-  "/pyodide/pyodide.mjs",
-  "/pyodide/pyodide.asm.mjs",
-  "/pyodide/pyodide.asm.wasm",
-  "/pyodide/python_stdlib.zip",
-  "/pyodide/pyodide-lock.json",
-  "/python/files.json",
-  "/python/bridge.py",
-  "/data/exposure_chart_dataset.json",
-  "/assets/fonts/NotoSans-Regular.ttf",
-  "/assets/fonts/NotoSans-Bold.ttf",
-  "/assets/fonts/NotoSans-Italic.ttf",
+  `${BASE}index.html`,
+  `${BASE}manifest.webmanifest`,
+  `${BASE}icon.svg`,
+  `${BASE}pyodide/pyodide.mjs`,
+  `${BASE}pyodide/pyodide.asm.mjs`,
+  `${BASE}pyodide/pyodide.asm.wasm`,
+  `${BASE}pyodide/python_stdlib.zip`,
+  `${BASE}pyodide/pyodide-lock.json`,
+  `${BASE}python/files.json`,
+  `${BASE}python/bridge.py`,
+  `${BASE}data/exposure_chart_dataset.json`,
+  `${BASE}assets/fonts/NotoSans-Regular.ttf`,
+  `${BASE}assets/fonts/NotoSans-Bold.ttf`,
+  `${BASE}assets/fonts/NotoSans-Italic.ttf`,
 ];
 
 async function precache() {
   const cache = await caches.open(CACHE);
   await cache.addAll(CORE_ASSETS).catch(() => undefined);
 
-  for (const manifest of ["/python/files.json", "/pyodide/wheels.json"]) {
+  for (const manifest of [`${BASE}python/files.json`, `${BASE}pyodide/wheels.json`]) {
     try {
       const response = await fetch(manifest);
       if (!response.ok) continue;
       const entries = await response.json();
-      const base = manifest.includes("wheels") ? "/pyodide/" : "/python/";
+      const base = manifest.includes("wheels") ? `${BASE}pyodide/` : `${BASE}python/`;
       await cache.addAll(entries.map((name) => `${base}${name}`));
     } catch {
       /* optional assets */
@@ -63,7 +66,9 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
   const isNavigation =
-    request.mode === "navigate" || url.pathname === "/" || url.pathname.endsWith("/index.html");
+    request.mode === "navigate" ||
+    url.pathname === BASE ||
+    url.pathname.endsWith("/index.html");
 
   // Navigation: network-first so a freshly built app is always served when
   // online; the cache is only a fallback for offline use.
@@ -75,7 +80,11 @@ self.addEventListener("fetch", (event) => {
           caches.open(CACHE).then((cache) => cache.put(request, copy));
           return response;
         })
-        .catch(() => caches.match(request).then((cached) => cached || caches.match("/index.html"))),
+        .catch(() =>
+          caches
+            .match(request)
+            .then((cached) => cached || caches.match(`${BASE}index.html`)),
+        ),
     );
     return;
   }
@@ -92,7 +101,7 @@ self.addEventListener("fetch", (event) => {
           }
           return response;
         })
-        .catch(() => caches.match("/index.html"));
+        .catch(() => caches.match(`${BASE}index.html`));
     }),
   );
 });

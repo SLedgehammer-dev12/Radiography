@@ -164,9 +164,9 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - name: Build
+      - name: Build (Pages sub-path)
         working-directory: web
-        run: npm ci && npm run build
+        run: npm ci && npm run build -- --base=/Radiography/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
