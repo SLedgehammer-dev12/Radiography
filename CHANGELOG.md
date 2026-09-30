@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.10.1] - 2026-09-30
+
+### Fixed
+- **Desktop macOS (`.app` / `.dmg`) & Windows (`.exe`) Startup Crash**:
+  - Added `src/core/data/annex_a_iso17636_1.json` to `Radiography.spec` (`datas`) and `buildozer.spec` (`source.include_patterns`), and added `sys._MEIPASS` path resolution in `src/core/annex_a.py`. Previously, the packaged PyInstaller executable crashed on startup (`FileNotFoundError: .../src/core/data/annex_a_iso17636_1.json`) before opening `MainWindow`
+  - Added `--self-test` mode in `main.py` and wired CI smoke tests (`build-windows`, `build-macos`) so every packaged desktop binary is executed and verified in GitHub Actions before release
+- **Web macOS (`.dmg` / `.app`) "Damaged and Can't Be Opened" Error**:
+  - `web/launcher/package.py` previously patched `Contents/Info.plist` *after* PyInstaller's ad-hoc codesign, invalidating the arm64 code signature seal (`invalid Info.plist (plist or signature have been modified)`). The `.app` bundle and `.dmg` are now re-signed (`codesign --force --deep --sign -`) and verified (`codesign --verify --deep --strict`) after `Info.plist` updates
+
 ## [1.10.0] - 2026-09-30
 
 ### Added

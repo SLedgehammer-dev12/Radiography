@@ -122,6 +122,14 @@ jobs:
         run: |
           $ver = "${{ needs.check-version.outputs.version }}"
           Get-ChildItem dist\*.exe | Rename-Item -NewName { "Radiography-$ver-Windows-x64.exe" }
+      - name: Smoke test packaged Windows .exe
+        shell: powershell
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          $exe = (Get-ChildItem dist\Radiography-*-Windows-x64.exe | Select-Object -First 1).FullName
+          & $exe --self-test
+          if ($LASTEXITCODE -ne 0) { throw "Windows .exe --self-test failed with exit code $LASTEXITCODE" }
       - name: Upload .exe artifact
         uses: actions/upload-artifact@v4
         with:
@@ -147,11 +155,20 @@ jobs:
         run: pip install -r requirements.txt pyinstaller dmgbuild
       - name: Build .app bundle (universal2)
         run: pyinstaller --clean Radiography.spec
+      - name: Ad-hoc codesign and smoke test .app bundle
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          xattr -cr "dist/Radiography.app" || true
+          codesign --force --deep --sign - "dist/Radiography.app"
+          codesign --verify --deep --strict "dist/Radiography.app"
+          "dist/Radiography.app/Contents/MacOS/Radiography" --self-test
       - name: Build .dmg
         run: |
           VER="${{ needs.check-version.outputs.version }}"
           DMG_NAME="Radiography-${VER}-macOS.dmg"
           DMG_VOLUME_NAME="Radiography ${VER}" dmgbuild -s dmg_settings.py "Radiography ${VER}" "dist/${DMG_NAME}"
+          codesign --force --sign - "dist/${DMG_NAME}"
           echo "DMG_NAME=${DMG_NAME}" >> $GITHUB_ENV
       - name: Upload .dmg artifact
         uses: actions/upload-artifact@v4
@@ -272,6 +289,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           APP=$(ls -d "release-artifacts/Radiography Web "*.app | head -1)
+          codesign --verify --deep --strict "$APP"
           BIN="$APP/Contents/MacOS/$(basename "$APP" .app)"
           "$BIN" --no-gui --no-browser --port 8767 &
           PID=$!

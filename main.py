@@ -101,15 +101,38 @@ def main():
         RadiographyApp().run()
     else:
         from PyQt6.QtCore import Qt
-        from PyQt6.QtWidgets import QApplication
+        from PyQt6.QtWidgets import QApplication, QMessageBox
         from src.ui.main_window import MainWindow
 
-        app = QApplication(sys.argv)
-        _install_qapp_hook(app)
+        self_test = "--self-test" in sys.argv
+        argv = [arg for arg in sys.argv if arg != "--self-test"]
+
+        app = QApplication(argv)
+        if not self_test:
+            _install_qapp_hook(app)
 
         app.setAttribute(Qt.ApplicationAttribute.AA_DontShowIconsInMenus, False)
 
-        window = MainWindow()
+        try:
+            window = MainWindow()
+        except Exception:
+            tb_text = _record_exception(*sys.exc_info())
+            if self_test:
+                sys.exit(1)
+            try:
+                QMessageBox.critical(
+                    None,
+                    "Radiography — Başlatma Hatası / Startup Error",
+                    f"Uygulama başlatılırken bir hata oluştu:\n\n{tb_text[-1200:]}",
+                )
+            except Exception:
+                pass
+            sys.exit(1)
+
+        if self_test:
+            window.update_calculations()
+            sys.exit(0)
+
         window.show()
         sys.exit(app.exec())
 

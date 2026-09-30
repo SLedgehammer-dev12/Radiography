@@ -189,6 +189,7 @@ def build_onefile(version: str) -> Path:
         if target.exists():
             shutil.rmtree(target)
         shutil.copytree(app, target, symlinks=True)
+        _codesign_macos_bundle(target)
         return target
 
     built = build_dist / name
@@ -203,7 +204,29 @@ def _patch_macos_info_plist(app: Path, version: str) -> None:
     data["CFBundleShortVersionString"] = version
     data["CFBundleVersion"] = version
     data["CFBundleDisplayName"] = f"Radiography Web {version}"
+    data["NSHighResolutionCapable"] = True
     info.write_bytes(plistlib.dumps(data))
+
+
+def _codesign_macos_bundle(app_path: Path) -> None:
+    """Re-signs the macOS .app bundle after Info.plist modifications.
+
+    Without re-signing after editing Info.plist, Apple Silicon macOS rejects the
+    app with 'is damaged and can't be opened' ('invalid Info.plist (plist or
+    signature have been modified)').
+    """
+    subprocess.run(
+        ["xattr", "-cr", str(app_path)],
+        check=False,
+    )
+    subprocess.run(
+        ["codesign", "--force", "--deep", "--sign", "-", str(app_path)],
+        check=True,
+    )
+    subprocess.run(
+        ["codesign", "--verify", "--deep", "--strict", str(app_path)],
+        check=True,
+    )
 
 
 def build_dmg(app_path: Path, version: str) -> Path:
@@ -213,7 +236,9 @@ def build_dmg(app_path: Path, version: str) -> Path:
     if staging.exists():
         shutil.rmtree(staging)
     staging.mkdir(parents=True)
-    shutil.copytree(app_path, staging / app_path.name, symlinks=True)
+    staged_app = staging / app_path.name
+    shutil.copytree(app_path, staged_app, symlinks=True)
+    _codesign_macos_bundle(staged_app)
     os.symlink("/Applications", staging / "Applications")
 
     target = OUT / f"Radiography-Web-{version}-macOS.dmg"
@@ -227,6 +252,10 @@ def build_dmg(app_path: Path, version: str) -> Path:
             "-ov", "-format", "UDZO",
             str(target),
         ],
+        check=True,
+    )
+    subprocess.run(
+        ["codesign", "--force", "--sign", "-", str(target)],
         check=True,
     )
     return target

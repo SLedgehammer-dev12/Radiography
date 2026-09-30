@@ -125,6 +125,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           APP=$(ls -d "release-artifacts/Radiography Web "*.app | head -1)
+          codesign --verify --deep --strict "$APP"
           BIN="$APP/Contents/MacOS/$(basename "$APP" .app)"
           "$BIN" --no-gui --no-browser --port 8767 &
           PID=$!

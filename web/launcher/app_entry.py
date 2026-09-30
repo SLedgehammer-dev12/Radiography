@@ -172,7 +172,10 @@ def main(argv=None) -> int:
         return 0
 
     try:
-        return _run_gui(server, url)
+        try:
+            return _run_gui(server, url)
+        except Exception:
+            return _run_headless(server)
     finally:
         server.shutdown()
         server.server_close()

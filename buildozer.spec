@@ -21,10 +21,10 @@ source.dir = .
 source.main = src/mobile/main.py
 
 # (list) Source files to include (leave empty to include all the files)
-source.include_exts = py,png,jpg,kv,atlas,ttf
+source.include_exts = py,png,jpg,kv,atlas,ttf,json
 
 # (list) List of inclusions using pattern matching
-source.include_patterns = src/mobile/*.py,src/mobile/assets/*,src/mobile/assets/fonts/*.ttf,src/mobile/kv/*/*.kv,src/mobile/lib/*.py,src/mobile/responsive/*.py,src/mobile/screens/*.py,src/core/*.py,src/android/**
+source.include_patterns = src/mobile/*.py,src/mobile/assets/*,src/mobile/assets/fonts/*.ttf,src/mobile/kv/*/*.kv,src/mobile/lib/*.py,src/mobile/responsive/*.py,src/mobile/screens/*.py,src/core/*.py,src/core/data/*.json,src/android/**,exposure_chart_dataset.json
 
 # (list) Source files to exclude (leave empty to not exclude anything)
 source.exclude_exts = spec,pyc
@@ -38,7 +38,7 @@ source.exclude_dirs = tests, bin, venv, __pycache__, .git, src/ui
 
 # (str) Application versioning (method 1)
 # CI rewrites this from src/core/version.py before building; keep in sync manually.
-version = 1.10.0
+version = 1.10.1
 
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy

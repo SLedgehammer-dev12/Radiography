@@ -22,6 +22,7 @@ datas = [
     ("exposure_chart_dataset.json", "."),
     ("exposure_chart_dataset.csv", "."),
     ("X-Ray Exposure Chart steel.png", "."),
+    ("src/core/data/annex_a_iso17636_1.json", "src/core/data"),
     ("src/mobile/assets/fonts/NotoSans-Regular.ttf", "src/mobile/assets/fonts"),
     ("src/mobile/assets/fonts/NotoSans-Bold.ttf", "src/mobile/assets/fonts"),
     ("src/mobile/assets/fonts/NotoSans-Italic.ttf", "src/mobile/assets/fonts"),

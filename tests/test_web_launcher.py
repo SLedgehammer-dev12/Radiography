@@ -92,3 +92,16 @@ def test_app_entry_help(flag):
     entry = ROOT / "web" / "launcher" / "app_entry.py"
     assert entry.exists()
     assert flag in entry.read_text(encoding="utf-8")
+
+
+def test_pyinstaller_spec_bundles_annex_a_json():
+    spec_text = (ROOT / "Radiography.spec").read_text(encoding="utf-8")
+    assert "annex_a_iso17636_1.json" in spec_text
+    assert (ROOT / "src" / "core" / "data" / "annex_a_iso17636_1.json").exists()
+
+
+def test_package_py_resigns_macos_bundle():
+    pkg_text = (ROOT / "web" / "launcher" / "package.py").read_text(encoding="utf-8")
+    assert "_codesign_macos_bundle" in pkg_text
+    assert '"--verify", "--deep", "--strict"' in pkg_text
+

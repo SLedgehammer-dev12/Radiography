@@ -17,9 +17,27 @@ Tables are produced by ``tools/digitize_annex_a.py`` from the standard PDFs
 
 import json
 import os
+import sys
 
-_DATA_PATH = os.path.join(os.path.dirname(__file__), "data",
-                          "annex_a_iso17636_1.json")
+
+def _resolve_data_path():
+    rel = os.path.join("src", "core", "data", "annex_a_iso17636_1.json")
+    candidates = [
+        os.path.join(os.path.dirname(__file__), "data", "annex_a_iso17636_1.json"),
+    ]
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        candidates.append(os.path.join(meipass, rel))
+        candidates.append(os.path.join(meipass, "data", "annex_a_iso17636_1.json"))
+        candidates.append(os.path.join(meipass, "annex_a_iso17636_1.json"))
+    candidates.append(os.path.abspath(rel))
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    return candidates[0]
+
+
+_DATA_PATH = _resolve_data_path()
 
 _CACHE = None
 
@@ -27,7 +45,7 @@ _CACHE = None
 def _load():
     global _CACHE
     if _CACHE is None:
-        with open(_DATA_PATH, "r", encoding="utf-8") as handle:
+        with open(_resolve_data_path(), "r", encoding="utf-8") as handle:
             _CACHE = json.load(handle)
     return _CACHE
 
