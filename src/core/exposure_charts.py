@@ -19,25 +19,38 @@ class ExposureChartDatabase:
     R_FACTOR_TABLE = {
         "M100": {
             "isotope_ir192": 0.36,
+            "isotope_se75": 0.20,
+            "isotope_co60": 0.07,
+            "isotope_yb169": 0.12,
+            "isotope_tm170": 0.08,
         },
         "MX125": {
             "isotope_ir192": 0.40,
             "isotope_se75": 0.23,
+            "isotope_co60": 0.08,
+            "isotope_yb169": 0.14,
+            "isotope_tm170": 0.09,
         },
         "T200": {
             "isotope_ir192": 0.43,
             "isotope_se75": 0.27,
             "isotope_co60": 0.10,
+            "isotope_yb169": 0.16,
+            "isotope_tm170": 0.105,
         },
         "AA400": {
             "isotope_ir192": 0.46,
             "isotope_se75": 0.30,
             "isotope_co60": 0.13,
+            "isotope_yb169": 0.18,
+            "isotope_tm170": 0.12,
         },
         "HS800": {
             "isotope_ir192": 0.49,
             "isotope_se75": 0.34,
             "isotope_co60": 0.15,
+            "isotope_yb169": 0.20,
+            "isotope_tm170": 0.135,
         },
     }
 

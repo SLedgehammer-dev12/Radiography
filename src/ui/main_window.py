@@ -684,6 +684,7 @@ class MainWindow(QMainWindow,
                 }
             """)
             info_btn.setToolTip(self.trans.get("tt_" + name))
+            info_btn.clicked.connect(lambda _, n=name: self._show_output_info(n))
             self.info_buttons[name] = info_btn
 
             val = QLabel("-")
@@ -970,10 +971,12 @@ class MainWindow(QMainWindow,
         self.update_calculations()
 
     def update_chart_source_list(self):
-        """Populates cmb_chart_source with Analog Film charts or Digital CR/DDA methods."""
+        """Populates cmb_chart_source with Analog Film charts or Digital CR/DDA methods based on radiation source."""
         if not hasattr(self, "cmb_chart_source"):
             return
         is_digital = self.rad_digital.isChecked() if hasattr(self, "rad_digital") else True
+        source_idx = self.cmb_source.currentIndex() if hasattr(self, "cmb_source") else 0
+        is_xray = (source_idx == 0)
         det_type = (
             self.cmb_detector_type.currentData()
             if hasattr(self, "cmb_detector_type")
@@ -995,21 +998,38 @@ class MainWindow(QMainWindow,
             if is_dda:
                 self.cmb_chart_source.addItem(self.trans.get("chart_dda_frame"), "dda_frame_method")
                 self.cmb_chart_source.addItem(self.trans.get("chart_dda_panel"), "dda_panel_chart")
-                self.cmb_chart_source.addItem(self.trans.get("chart_digital_xray"), "digital_xray_chart")
+                if is_xray:
+                    self.cmb_chart_source.addItem(self.trans.get("chart_digital_xray"), "digital_xray_chart")
             else:
-                self.cmb_chart_source.addItem(self.trans.get("chart_cr_ips"), "cr_ips_chart")
-                self.cmb_chart_source.addItem(self.trans.get("chart_digital_xray"), "digital_xray_chart")
+                if not is_xray:
+                    self.cmb_chart_source.addItem(self.trans.get("chart_cr_ips"), "cr_ips_chart")
+                else:
+                    self.cmb_chart_source.addItem(self.trans.get("chart_digital_xray"), "digital_xray_chart")
         else:
             self.cmb_chart_source.addItem(self.trans.get("chart_model"), "model")
-            self.cmb_chart_source.addItem("AA400 (C5)", "AA400")
-            self.cmb_chart_source.addItem("MX125 (C3)", "MX125")
-            self.cmb_chart_source.addItem("T200 (C4)", "T200")
-            self.cmb_chart_source.addItem("HS800 (C6)", "HS800")
-            self.cmb_chart_source.addItem("M100 (C2)", "M100")
-            self.cmb_chart_source.addItem(self.trans.get("chart_type_x"), "type_x")
+            if is_xray:
+                self.cmb_chart_source.addItem(self.trans.get("chart_type_x"), "type_x")
+            else:
+                self.cmb_chart_source.addItem("AA400 (C5)", "AA400")
+                self.cmb_chart_source.addItem("MX125 (C3)", "MX125")
+                self.cmb_chart_source.addItem("T200 (C4)", "T200")
+                self.cmb_chart_source.addItem("HS800 (C6)", "HS800")
+                self.cmb_chart_source.addItem("M100 (C2)", "M100")
 
         idx = self.cmb_chart_source.findData(prev_data)
-        self.cmb_chart_source.setCurrentIndex(idx if idx >= 0 else 0)
+        if idx >= 0:
+            self.cmb_chart_source.setCurrentIndex(idx)
+        else:
+            if is_digital:
+                self.cmb_chart_source.setCurrentIndex(0)
+            else:
+                if is_xray:
+                    type_x_idx = self.cmb_chart_source.findData("type_x")
+                    self.cmb_chart_source.setCurrentIndex(type_x_idx if type_x_idx >= 0 else 0)
+                else:
+                    aa400_idx = self.cmb_chart_source.findData("AA400")
+                    self.cmb_chart_source.setCurrentIndex(aa400_idx if aa400_idx >= 0 else 0)
+
         self.cmb_chart_source.blockSignals(False)
         self._update_base_e()
 
@@ -1097,6 +1117,7 @@ class MainWindow(QMainWindow,
             else:                  # Tm-170
                 self.txt_base_e.setText("500.0")
 
+        self.update_chart_source_list()
         self.update_calculations()
 
     def on_chart_source_changed(self):
@@ -2215,6 +2236,19 @@ class MainWindow(QMainWindow,
         """Localized explanation of how the required exposure count was found."""
         from src.core.engine import format_exposures_provenance
         return format_exposures_provenance(prov, self.trans)
+
+    def _show_output_info(self, name: str) -> None:
+        """Display an informational dialog showing provenance/details for an output item."""
+        lbl_text = self.trans.get(name) if hasattr(self, "trans") else name
+        if hasattr(self, "out_labels") and name in self.out_labels:
+            lbl_widget = self.out_labels[name][0]
+            lbl_text = lbl_widget.text().replace(":", "").strip()
+        btn = getattr(self, "info_buttons", {}).get(name)
+        info_text = btn.toolTip() if btn else ""
+        if not info_text:
+            info_text = self.trans.get("tt_" + name, "") if hasattr(self, "trans") else ""
+        if info_text:
+            QMessageBox.information(self, lbl_text, info_text)
 
     def update_calculations(self):
         # DWDI is only valid for OD <= 100 mm; force DWSI otherwise (UI mirror

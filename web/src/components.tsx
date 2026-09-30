@@ -14,20 +14,84 @@ export const UnitContext = createContext<{ inch: boolean }>({ inch: false });
  * Accessible instant tooltip badge (?) that works on both hover and touch/focus.
  * Uses data-tip + CSS ::before/::after so element.textContent stays clean.
  */
-export function InfoTip({ text }: { text?: string }) {
+export function InfoTip({ text, title }: { text?: string; title?: string }) {
+  const [open, setOpen] = useState(false);
   if (!text) return null;
   return (
-    <span
-      className="info-tip"
-      tabIndex={0}
-      role="note"
-      aria-label={text}
-      data-tip={text}
-      onClick={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-      }}
-    />
+    <>
+      <span
+        className="info-tip"
+        tabIndex={0}
+        role="button"
+        aria-label={text}
+        data-tip={text}
+        title="Tıklayarak tam açıklamayı okuyun / Click for details"
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          setOpen(true);
+        }}
+      />
+      {open && (
+        <div
+          className="modal-backdrop"
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen(false);
+          }}
+        >
+          <div
+            className="modal info-modal"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="info-modal-header">
+              <h3>{title || "Bilgi / Information"}</h3>
+              <button
+                type="button"
+                className="info-modal-close"
+                onClick={() => setOpen(false)}
+                aria-label="Kapat"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="info-modal-body">
+              {text.split("\n").map((line, idx) => {
+                const trimmed = line.trim();
+                if (!trimmed) return <div key={idx} className="info-modal-spacer" />;
+                const colonIdx = trimmed.indexOf(":");
+                if (colonIdx > 0 && colonIdx < 40) {
+                  const label = trimmed.slice(0, colonIdx);
+                  const val = trimmed.slice(colonIdx + 1).trim();
+                  return (
+                    <div key={idx} className="info-modal-row">
+                      <strong className="info-modal-label">{label}:</strong>
+                      <span className="info-modal-val">{val}</span>
+                    </div>
+                  );
+                }
+                return (
+                  <div key={idx} className="info-modal-row">
+                    <span>{trimmed}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="primary"
+                onClick={() => setOpen(false)}
+              >
+                Kapat / Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

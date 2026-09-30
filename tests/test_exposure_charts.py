@@ -23,8 +23,17 @@ class TestExposureChartDatabase(unittest.TestCase):
         r = self.db.lookup_r_factor("MX125", "isotope_se75")
         self.assertAlmostEqual(r, 0.23, places=2)
 
-    def test_lookup_missing(self):
         r = self.db.lookup_r_factor("AA400", "isotope_tm170")
+        self.assertAlmostEqual(r, 0.12, places=2)
+
+        r = self.db.lookup_r_factor("M100", "isotope_yb169")
+        self.assertAlmostEqual(r, 0.12, places=2)
+
+        r = self.db.lookup_r_factor("MX125", "isotope_co60")
+        self.assertAlmostEqual(r, 0.08, places=2)
+
+    def test_lookup_missing(self):
+        r = self.db.lookup_r_factor("AA400", "x_ray")
         self.assertIsNone(r)
 
         r = self.db.lookup_r_factor("UNKNOWN", "isotope_ir192")
@@ -43,10 +52,17 @@ class TestExposureChartDatabase(unittest.TestCase):
         self.assertIn("isotope_ir192", sources)
         self.assertIn("isotope_se75", sources)
         self.assertIn("isotope_co60", sources)
+        self.assertIn("isotope_yb169", sources)
+        self.assertIn("isotope_tm170", sources)
+        self.assertNotIn("x_ray", sources)
 
         sources_m100 = self.db.get_available_sources_for_film("M100")
         self.assertIn("isotope_ir192", sources_m100)
-        self.assertNotIn("isotope_se75", sources_m100)
+        self.assertIn("isotope_se75", sources_m100)
+        self.assertIn("isotope_co60", sources_m100)
+        self.assertIn("isotope_yb169", sources_m100)
+        self.assertIn("isotope_tm170", sources_m100)
+        self.assertNotIn("x_ray", sources_m100)
 
     def test_calculate_exposure_time_rfactor_ir192(self):
         t_min = self.db.calculate_exposure_time_rfactor(
@@ -89,10 +105,25 @@ class TestExposureChartDatabase(unittest.TestCase):
 
     def test_calculate_exposure_time_rfactor_missing_source(self):
         t_min = self.db.calculate_exposure_time_rfactor(
-            sfd=600.0, w=20.0, source="isotope_tm170",
+            sfd=600.0, w=20.0, source="x_ray",
             activity=40.0, film_key="AA400", density=2.0
         )
         self.assertIsNone(t_min)
+
+    def test_calculate_exposure_time_rfactor_tm170_and_yb169(self):
+        t_tm = self.db.calculate_exposure_time_rfactor(
+            sfd=600.0, w=5.0, source="isotope_tm170",
+            activity=10.0, film_key="AA400", density=2.0
+        )
+        self.assertIsNotNone(t_tm)
+        self.assertGreater(t_tm, 0)
+
+        t_yb = self.db.calculate_exposure_time_rfactor(
+            sfd=600.0, w=10.0, source="isotope_yb169",
+            activity=20.0, film_key="MX125", density=2.0
+        )
+        self.assertIsNotNone(t_yb)
+        self.assertGreater(t_yb, 0)
 
     def test_hvl_constants(self):
         self.assertAlmostEqual(self.db.HVL["isotope_ir192"], 13.2, places=1)

@@ -354,18 +354,21 @@ def format_exposure_time_provenance(prov, trans):
     if dda_frame and tech == "digital":
         n_fr = dda_frame.get("n_frames", 1)
         t_fr = dda_frame.get("t_frame_sec", 1.0)
+        tot_acq = dda_frame.get("total_acq_sec", float(n_fr) * float(t_fr))
         gray_pct = dda_frame.get("target_gray_pct", 65.0)
         adu = dda_frame.get("target_adu_16bit", 42600)
         snr_1 = dda_frame.get("snr_1frame", 42.0)
         if tr:
             parts.append(
-                f"DDA Kare Entegrasyonu (ASTM E2698): Önerilen Tek Kare Süresi t_kare={t_fr:.2f} sn × "
-                f"Kare Ortalaması N_kare={n_fr} adet (SNR_1kare≈{snr_1:.0f}, Hedef Gri Seviye=%{gray_pct:.0f} ADC ≈ {adu} ADU)"
+                f"DDA Kare Entegrasyonu (ASTM E2698): Tek Kare Süresi: t_kare = {t_fr:.2f} sn • "
+                f"Toplam Kare Sayısı: N_kare = {n_fr} adet • Toplam Pozlama: T = {tot_acq:.1f} sn "
+                f"(Hedef Gri Seviye: %{gray_pct:.0f} ADC ≈ {adu} ADU, Tek Kare SNR_1kare ≈ {snr_1:.0f})"
             )
         else:
             parts.append(
-                f"DDA Frame Integration (ASTM E2698): Recommended Single Frame t_frame={t_fr:.2f} s × "
-                f"Frame Average N_frames={n_fr} (SNR_1frame≈{snr_1:.0f}, Target Gray Level={gray_pct:.0f}% ADC ≈ {adu} ADU)"
+                f"DDA Frame Integration (ASTM E2698): Single Frame Time: t_frame = {t_fr:.2f} s • "
+                f"Total Frames: N_frames = {n_fr} • Total Acquisition: T = {tot_acq:.1f} s "
+                f"(Target Gray Level: {gray_pct:.0f}% ADC ≈ {adu} ADU, Single Frame SNR_1frame ≈ {snr_1:.0f})"
             )
 
     # Extra multipliers (Level 3 SFD compensation & Field factor F)
@@ -1442,10 +1445,15 @@ class CalculationEngine:
 
         # 15. Chart tag + display strings
         dda_frame_info = exposure_time_prov.get("dda_frame") if tech == "digital" else None
-        dda_tag = (
-            f" ({dda_frame_info['n_frames']}×{dda_frame_info['t_frame_sec']:.2f}s)"
-            if dda_frame_info else ""
-        )
+        if dda_frame_info:
+            n_fr = dda_frame_info.get("n_frames", 1)
+            t_fr = dda_frame_info.get("t_frame_sec", 1.0)
+            if trans.language == "tr":
+                dda_tag = f" ({n_fr} kare × {t_fr:.2f} sn)"
+            else:
+                dda_tag = f" ({n_fr} frames × {t_fr:.2f} s)"
+        else:
+            dda_tag = ""
         chart_label = ""
         if chart_source != "model":
             chart_tag_map = {

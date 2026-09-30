@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.10.2] - 2026-10-01
+
+### Added
+- **Complete Isotope R-Factor Film Models (`src/core/exposure_charts.py`)**:
+  - Expanded `R_FACTOR_TABLE` to cover all 5 film models (`M100 (C2)`, `MX125 (C3)`, `T200 (C4)`, `AA400 (C5)`, `HS800 (C6)`) across all 5 gamma isotopes (`Ir-192`, `Se-75`, `Co-60`, `Yb-169`, `Tm-170`), fully calibrated with ISO 11699-1 film speeds and photon energy mass attenuation characteristics
+  - Slower and faster films scale inversely with ISO 11699-1 class speeds relative to AA400, eliminating missing chart data fallbacks across all isotope choices
+- **Dynamic Radiation-Source-Aware Chart Filtering & Smart Auto-Switching (`src/ui/main_window.py`, `web/src/App.tsx`, `web/src/state/presets.ts`)**:
+  - **X-Ray**: Hides gamma isotope R-factor film options from the dropdown, only showing valid X-ray methods (`Analitik Fizik Modeli`, `Type X (Agfa / Kodak kV-mA·min)` for analog, and DDA/CR X-ray methods for digital)
+  - **Isotopes**: Hides `Type X` and shows all supported film R-factor models alongside the analytical physics model
+  - **Smart Auto-Switch**: Switching between radiation sources automatically converts incompatible chart selections to the optimal valid chart without triggering out-of-range fallback warnings
+- **Exposure Time Provenance UI Ergonomics & DDA Frame Specification (`src/core/engine.py`, `web/src/components.tsx`, `web/src/App.tsx`, `src/ui/main_window.py`)**:
+  - Replaced the bulky inline hero block with a clean InfoTip hover and interactive modal dialog (`InfoTipModal` / `QMessageBox`) displaying full calculation formulas and parameters
+  - Explicitly states single frame duration ($t_{\text{kare}}$) and total frame count ($N_{\text{kare}}$) in the calculated time summary badges, hero cards, and provenance explanations
+
 ## [1.10.1] - 2026-09-30
 
 ### Fixed

@@ -4,6 +4,7 @@ import {
   CheckField,
   DurationSliderField,
   Group,
+  InfoTip,
   LengthField,
   LengthSliderField,
   NumberField,
@@ -80,26 +81,19 @@ const DETECTOR_TKEYS = [
   "detector_dda_se",
   "detector_dda_gdos",
 ];
-const ANALOG_CHART_OPTIONS: { value: string; labelKey?: string; label?: string }[] = [
-  { value: "model", labelKey: "chart_model" },
-  { value: "AA400", label: "AA400 (C5)" },
-  { value: "MX125", label: "MX125 (C3)" },
-  { value: "T200", label: "T200 (C4)" },
-  { value: "HS800", label: "HS800 (C6)" },
-  { value: "M100", label: "M100 (C2)" },
-  { value: "type_x", labelKey: "chart_type_x" },
-];
-const DIGITAL_CR_CHART_OPTIONS: { value: string; labelKey?: string; label?: string }[] = [
-  { value: "model", labelKey: "chart_digital_model" },
-  { value: "cr_ips_chart", labelKey: "chart_cr_ips" },
-  { value: "digital_xray_chart", labelKey: "chart_digital_xray" },
-];
-const DIGITAL_DDA_CHART_OPTIONS: { value: string; labelKey?: string; label?: string }[] = [
-  { value: "model", labelKey: "chart_digital_model" },
-  { value: "dda_frame_method", labelKey: "chart_dda_frame" },
-  { value: "dda_panel_chart", labelKey: "chart_dda_panel" },
-  { value: "digital_xray_chart", labelKey: "chart_digital_xray" },
-];
+const CHART_OPTION_META: Record<string, { labelKey?: string; label?: string }> = {
+  model: { labelKey: "chart_model" },
+  AA400: { label: "AA400 (C5)" },
+  MX125: { label: "MX125 (C3)" },
+  T200: { label: "T200 (C4)" },
+  HS800: { label: "HS800 (C6)" },
+  M100: { label: "M100 (C2)" },
+  type_x: { labelKey: "chart_type_x" },
+  cr_ips_chart: { labelKey: "chart_cr_ips" },
+  dda_frame_method: { labelKey: "chart_dda_frame" },
+  dda_panel_chart: { labelKey: "chart_dda_panel" },
+  digital_xray_chart: { labelKey: "chart_digital_xray" },
+};
 const OUTPUT_KEYS = [
   "w_nom",
   "w_eff",
@@ -189,9 +183,10 @@ function loadPersisted(): PersistedState {
       const validCharts = getActiveChartKeys(
         parsed.form.tech ?? "analog",
         parsed.form.detector_type ?? "cr_standard",
+        parsed.form.source ?? "x_ray",
       );
       if (parsed.form.chart_source && !validCharts.includes(parsed.form.chart_source)) {
-        parsed.form.chart_source = "model";
+        parsed.form.chart_source = validCharts[0] ?? "model";
       }
     }
     return parsed;
@@ -500,6 +495,20 @@ export default function App() {
   const exposureTimeProvenanceLines = exposureTimeProvenanceText
     ? exposureTimeProvenanceText.split("\n").filter((line) => line.trim())
     : [];
+  const expProv = result?.values?.exposure_time_provenance as
+    | Record<string, any>
+    | undefined;
+  const ddaFrame = expProv?.dda_frame as
+    | {
+        n_frames: number;
+        t_frame_sec: number;
+        total_acq_sec: number;
+        target_gray_pct: number;
+        target_adu_16bit: number;
+        snr_1frame: number;
+        panel_class?: string;
+      }
+    | undefined;
 
   const materialOptions = MATERIALS.map((value) => ({
     value,
@@ -979,11 +988,11 @@ export default function App() {
                 ]}
                 onChange={(value) => {
                   const tech = value as FormState["tech"];
-                  const validCharts = getActiveChartKeys(tech, form.detector_type);
+                  const validCharts = getActiveChartKeys(tech, form.detector_type, form.source);
                   patch("tech", tech);
                   patch("app_quality", tech === "digital" ? 140 : 2.5);
                   if (!validCharts.includes(form.chart_source)) {
-                    patch("chart_source", "model");
+                    patch("chart_source", validCharts[0] ?? "model");
                   }
                   if (tech === "analog") {
                     patch("f_source", null);
@@ -997,18 +1006,31 @@ export default function App() {
                   value={form.source}
                   options={sourceOptions}
                   onChange={(value) => {
-                    setForm((previous) => ({
-                      ...previous,
-                      source: value,
-                      base_e:
-                        DEFAULT_BASE_E_BY_SOURCE[value] ?? previous.base_e,
-                      output_val:
-                        value === "x_ray"
-                          ? previous.source === "x_ray"
-                            ? previous.output_val
-                            : 5.0
-                          : previous.app_activity || 40.0,
-                    }));
+                    const newSource = value as FormState["source"];
+                    const validCharts = getActiveChartKeys(form.tech, form.detector_type, newSource);
+                    setForm((previous) => {
+                      let nextChart = previous.chart_source;
+                      if (!validCharts.includes(nextChart)) {
+                        if (previous.tech !== "digital") {
+                          nextChart = newSource === "x_ray" ? "type_x" : "AA400";
+                        } else {
+                          nextChart = validCharts[0] ?? "model";
+                        }
+                      }
+                      return {
+                        ...previous,
+                        source: newSource,
+                        chart_source: nextChart,
+                        base_e:
+                          DEFAULT_BASE_E_BY_SOURCE[newSource] ?? previous.base_e,
+                        output_val:
+                          newSource === "x_ray"
+                            ? previous.source === "x_ray"
+                              ? previous.output_val
+                              : 5.0
+                            : previous.app_activity || 40.0,
+                      };
+                    });
                   }}
                 />
                 <LengthField
@@ -1452,16 +1474,20 @@ export default function App() {
               <SelectField
                 label={t(digital ? "chart_source_digital" : "chart_source")}
                 value={form.chart_source}
-                options={(
-                  digital
-                    ? form.detector_type.startsWith("dda_")
-                      ? DIGITAL_DDA_CHART_OPTIONS
-                      : DIGITAL_CR_CHART_OPTIONS
-                    : ANALOG_CHART_OPTIONS
-                ).map((option) => ({
-                  value: option.value,
-                  label: option.labelKey ? t(option.labelKey) : option.label!,
-                }))}
+                options={getActiveChartKeys(
+                  form.tech,
+                  form.detector_type,
+                  form.source,
+                ).map((key) => {
+                  if (key === "model" && digital) {
+                    return { value: key, label: t("chart_digital_model") };
+                  }
+                  const meta = CHART_OPTION_META[key];
+                  return {
+                    value: key,
+                    label: meta?.labelKey ? t(meta.labelKey) : (meta?.label ?? key),
+                  };
+                })}
                 onChange={(value) => patch("chart_source", value)}
               />
               {analog && (
@@ -1519,10 +1545,10 @@ export default function App() {
                       label: t(DETECTOR_TKEYS[index]),
                     }))}
                     onChange={(value) => {
-                      const validCharts = getActiveChartKeys(form.tech, value);
+                      const validCharts = getActiveChartKeys(form.tech, value, form.source);
                       patch("detector_type", value);
                       if (!validCharts.includes(form.chart_source)) {
-                        patch("chart_source", "model");
+                        patch("chart_source", validCharts[0] ?? "model");
                       }
                     }}
                   />
@@ -1691,45 +1717,44 @@ export default function App() {
             <div className="hero-grid">
               <div className="hero-card">
                 <div className="hero-main">
-                  <div className="hero-label">
-                    {t("calc_time").replace(/:\s*$/, "")}
+                  <div
+                    className="hero-label"
+                    style={{ display: "flex", alignItems: "center", gap: 6 }}
+                  >
+                    <span>{t("calc_time").replace(/:\s*$/, "")}</span>
+                    {exposureTimeProvenanceText && (
+                      <InfoTip
+                        text={exposureTimeProvenanceText}
+                        title={t("calc_time").replace(/:\s*$/, "")}
+                      />
+                    )}
                   </div>
-                  {exposureTimeProvenanceLines.length > 0 ? (
-                    <div
-                      className="hero-formula-list"
-                      title={exposureTimeProvenanceText}
-                    >
-                      {exposureTimeProvenanceLines.map((line, idx) => {
-                        const colonIdx = line.indexOf(":");
-                        if (colonIdx > 0) {
-                          const head = line.slice(0, colonIdx);
-                          const tail = line.slice(colonIdx + 1).trim();
-                          const isFormula =
-                            head === "Formül" || head === "Formula";
-                          return (
-                            <div key={idx} className="hero-formula-line">
-                              <strong>{head}:</strong>{" "}
-                              {isFormula ? (
-                                <span className="hero-formula-eq">{tail}</span>
-                              ) : (
-                                tail
-                              )}
-                            </div>
-                          );
-                        }
-                        return (
-                          <div key={idx} className="hero-formula-line">
-                            {line}
-                          </div>
-                        );
-                      })}
+                  {result && (
+                    <div className="hero-sub">
+                      {ddaFrame ? (
+                        lang === "tr" ? (
+                          <>
+                            <span className="hero-frame-highlight">
+                              <strong>{ddaFrame.n_frames}</strong> kare ×{" "}
+                              <strong>{ddaFrame.t_frame_sec.toFixed(2)} sn</strong>
+                            </span>
+                            {" • "}w_eff = {result.display.w_eff} •{" "}
+                            {digital ? "SDD" : "SFD"} = {form.sfd} mm
+                          </>
+                        ) : (
+                          <>
+                            <span className="hero-frame-highlight">
+                              <strong>{ddaFrame.n_frames}</strong> frames ×{" "}
+                              <strong>{ddaFrame.t_frame_sec.toFixed(2)} s</strong>
+                            </span>
+                            {" • "}w_eff = {result.display.w_eff} •{" "}
+                            {digital ? "SDD" : "SFD"} = {form.sfd} mm
+                          </>
+                        )
+                      ) : (
+                        `w_eff = ${result.display.w_eff} • ${digital ? "SDD" : "SFD"} = ${form.sfd} mm • F = ${form.base_multiplier}×`
+                      )}
                     </div>
-                  ) : (
-                    result && (
-                      <div className="hero-sub">
-                        {`w_eff = ${result.display.w_eff} • ${digital ? "SDD" : "SFD"} = ${form.sfd} mm • F = ${form.base_multiplier}×`}
-                      </div>
-                    )
                   )}
                 </div>
                 <div className="hero-right">
