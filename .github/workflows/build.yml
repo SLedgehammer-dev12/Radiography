@@ -128,8 +128,11 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: |
           $exe = (Get-ChildItem dist\Radiography-*-Windows-x64.exe | Select-Object -First 1).FullName
-          & $exe --self-test
-          if ($LASTEXITCODE -ne 0) { throw "Windows .exe --self-test failed with exit code $LASTEXITCODE" }
+          $proc = Start-Process -FilePath $exe -ArgumentList "--self-test" -Wait -PassThru
+          if ($proc.ExitCode -ne 0) {
+            Get-ChildItem "$env:USERPROFILE\Library\Logs\Radiography","$env:TEMP\Radiography" -Filter *.log -ErrorAction SilentlyContinue | ForEach-Object { Get-Content $_.FullName }
+            throw "Windows .exe --self-test failed with exit code $($proc.ExitCode)"
+          }
       - name: Upload .exe artifact
         uses: actions/upload-artifact@v4
         with:
