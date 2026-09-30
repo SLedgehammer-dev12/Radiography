@@ -37,7 +37,7 @@ jobs:
       - name: Run the shared test suite
         env:
           QT_QPA_PLATFORM: offscreen
-        run: pytest tests/ -q
+        run: python -m pytest tests/ -q
 
   web-build-e2e:
     name: Web build + Playwright E2E

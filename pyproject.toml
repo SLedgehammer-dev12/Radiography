@@ -20,3 +20,9 @@ dependencies = [
 
 [project.scripts]
 radiography = "main:main"
+
+[tool.pytest.ini_options]
+# Makes `import src` work with both `pytest` and `python -m pytest`
+# (the console script does not add the working directory to sys.path).
+pythonpath = ["."]
+testpaths = ["tests"]
