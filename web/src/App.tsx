@@ -522,9 +522,6 @@ export default function App() {
 
   const exposureTimeProvenanceText =
     (result?.values?.exposure_time_provenance_text as string | undefined) ?? "";
-  const exposureTimeProvenanceLines = exposureTimeProvenanceText
-    ? exposureTimeProvenanceText.split("\n").filter((line) => line.trim())
-    : [];
   const expProv = result?.values?.exposure_time_provenance as
     | Record<string, any>
     | undefined;
@@ -543,6 +540,17 @@ export default function App() {
         panel_class?: string;
       }
     | undefined;
+
+  const isLvl3Active = (
+    [
+      "sfd_comp",
+      "voltage_override",
+      "isotope_flex",
+      "source_flex",
+      "central_proj_reduction",
+      "dw_reduction",
+    ] as (keyof Lvl3Settings)[]
+  ).some((key) => Boolean(lvl3[key]));
 
   const materialOptions = MATERIALS.map((value) => ({
     value,
@@ -998,7 +1006,7 @@ export default function App() {
           <div className="menu-container">
             <button
               type="button"
-              className={`menu-trigger-btn ${lvl3.active ? "danger-accent" : ""} ${openMenu === "level3" ? "active" : ""}`}
+              className={`menu-trigger-btn ${isLvl3Active ? "danger-accent" : ""} ${openMenu === "level3" ? "active" : ""}`}
               onClick={() =>
                 setOpenMenu((prev) => (prev === "level3" ? null : "level3"))
               }
@@ -1006,7 +1014,7 @@ export default function App() {
               aria-expanded={openMenu === "level3"}
             >
               <span>{t("menu_authority")}</span>
-              {lvl3.active && <span className="menu-pill-danger">L3</span>}
+              {isLvl3Active && <span className="menu-pill-danger">L3</span>}
               <span className="dropdown-arrow">{openMenu === "level3" ? "▲" : "▼"}</span>
             </button>
             {openMenu === "level3" && (
@@ -2636,14 +2644,14 @@ export default function App() {
         {showAbout && (
           <AboutModal
             t={t}
-            currentVersion={pyClient.version ?? "1.10.3"}
+            currentVersion={pyClient.version ?? "1.10.4"}
             onClose={() => setShowAbout(false)}
           />
         )}
         {showUpdates && (
           <UpdateModal
             t={t}
-            currentVersion={pyClient.version ?? "1.10.3"}
+            currentVersion={pyClient.version ?? "1.10.4"}
             onClose={() => setShowUpdates(false)}
           />
         )}
@@ -2866,7 +2874,7 @@ interface AboutModalProps {
   currentVersion?: string;
 }
 
-function AboutModal({ t, onClose, currentVersion = "1.10.3" }: AboutModalProps) {
+function AboutModal({ t, onClose, currentVersion = "1.10.4" }: AboutModalProps) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal about-modal" onClick={(e) => e.stopPropagation()}>
@@ -2938,7 +2946,7 @@ interface UpdateModalProps {
   currentVersion?: string;
 }
 
-function UpdateModal({ t, onClose, currentVersion = "1.10.3" }: UpdateModalProps) {
+function UpdateModal({ t, onClose, currentVersion = "1.10.4" }: UpdateModalProps) {
   const [updateState, setUpdateState] = useState<{
     status: "checking" | "up_to_date" | "available" | "error";
     latestVersion?: string;
@@ -3037,7 +3045,9 @@ function UpdateModal({ t, onClose, currentVersion = "1.10.3" }: UpdateModalProps
                 type="button"
                 className="about-btn"
                 style={{ padding: "4px 10px", fontSize: "11px" }}
-                onClick={handleCheckUpdates}
+                onClick={() => {
+                  void handleCheckUpdates();
+                }}
                 title="Tekrar Kontrol Et"
               >
                 🔄 Yenile
@@ -3072,7 +3082,9 @@ function UpdateModal({ t, onClose, currentVersion = "1.10.3" }: UpdateModalProps
                 type="button"
                 className="about-btn"
                 style={{ padding: "4px 10px", fontSize: "11px" }}
-                onClick={handleCheckUpdates}
+                onClick={() => {
+                  void handleCheckUpdates();
+                }}
               >
                 Yeniden Dene
               </button>
