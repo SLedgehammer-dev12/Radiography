@@ -30,7 +30,7 @@ test("switches language and keeps calculating", async ({ page }) => {
   if (await settingsMenu.isVisible()) {
     await settingsMenu.click();
   }
-  await page.getByRole("button", { name: /English|EN|Dil/i }).click();
+  await page.locator(".dropdown-menu").getByRole("button", { name: /Dil|English|Türkçe/i }).click();
   await expect(title).not.toHaveText(turkishTitle ?? "", { timeout: 30_000 });
   await expect(page.getByTestId("output-w_nom")).toContainText("mm");
 });
@@ -76,7 +76,7 @@ test("round-trips a desktop-compatible preset", async ({ page }) => {
 
   const downloadPromise = page.waitForEvent("download");
   const menuTrigger = page.getByRole("button", {
-    name: /Proje & Şablonlar|Project & Templates/,
+    name: /Dosya|File/i,
   });
   if (await menuTrigger.isVisible()) {
     await menuTrigger.click();
@@ -202,7 +202,7 @@ test("shows the f_min provenance (base formula, Level 3 reductions)", async ({
     .locator(".modal .field", { hasText: "%20 f_min" })
     .locator('input[type="checkbox"]')
     .check();
-  await page.getByRole("button", { name: "Tamam" }).click();
+  await page.locator(".modal-actions").getByRole("button", { name: /Tamam|OK/i }).click();
   await expect(hero.locator(".hero-sub")).toContainText("Level 3", {
     timeout: 30_000,
   });
@@ -225,7 +225,7 @@ test("renders interactive 3D shooting geometry, Annex A chart, and syncs isotope
   await page.getByRole("button", { name: /Işın Gözü/ }).click();
 
   // Switch to Annex A tab and verify chart SVG
-  await page.getByRole("button", { name: "Annex A" }).click();
+  await page.locator(".tab", { hasText: "Annex A" }).click();
   await expect(page.locator("svg.annex-a-svg")).toBeVisible();
 
   // Switching radiation source to Ir-192 updates base_e to 30
