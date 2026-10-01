@@ -26,7 +26,11 @@ test("switches language and keeps calculating", async ({ page }) => {
 
   const title = page.locator(".group-title").first();
   const turkishTitle = await title.textContent();
-  await page.getByRole("button", { name: /English|EN/ }).click();
+  const settingsMenu = page.getByRole("button", { name: /Ayarlar|Settings/i });
+  if (await settingsMenu.isVisible()) {
+    await settingsMenu.click();
+  }
+  await page.getByRole("button", { name: /English|EN|Dil/i }).click();
   await expect(title).not.toHaveText(turkishTitle ?? "", { timeout: 30_000 });
   await expect(page.getByTestId("output-w_nom")).toContainText("mm");
 });
@@ -40,7 +44,11 @@ test("exports a PDF report via ReportLab in Pyodide", async ({ page }) => {
   });
 
   const downloadPromise = page.waitForEvent("download", { timeout: 240_000 });
-  await page.locator("header button.primary").click();
+  const fileMenu = page.getByRole("button", { name: /Dosya|File/i });
+  if (await fileMenu.isVisible()) {
+    await fileMenu.click();
+  }
+  await page.getByRole("button", { name: /PDF/i }).first().click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toContain("RT_Inspection_Report");
   const path = await download.path();
@@ -67,6 +75,12 @@ test("round-trips a desktop-compatible preset", async ({ page }) => {
   await expect(page.getByTestId("output-w_nom")).toContainText("12.04 mm");
 
   const downloadPromise = page.waitForEvent("download");
+  const menuTrigger = page.getByRole("button", {
+    name: /Proje & Şablonlar|Project & Templates/,
+  });
+  if (await menuTrigger.isVisible()) {
+    await menuTrigger.click();
+  }
   await page.getByRole("button", { name: /Şablon Kaydet|Save Preset/ }).click();
   const download = await downloadPromise;
   const path = await download.path();
@@ -179,7 +193,11 @@ test("shows the f_min provenance (base formula, Level 3 reductions)", async ({
   await expect(hero.locator(".hero-sub")).toContainText("Formül");
 
   // Enable the Level 3 double-wall reduction -> reduced value is shown.
-  await page.getByRole("button", { name: /Seviye 3/ }).click();
+  const authMenu = page.getByRole("button", { name: /Yetki|Authority/i });
+  if (await authMenu.isVisible()) {
+    await authMenu.click();
+  }
+  await page.getByRole("button", { name: /Seviye 3|Level 3/ }).click();
   await page
     .locator(".modal .field", { hasText: "%20 f_min" })
     .locator('input[type="checkbox"]')

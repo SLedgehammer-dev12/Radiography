@@ -218,6 +218,8 @@ export default function App() {
     persisted.reportInfo ?? {},
   );
   const [showLvl3, setShowLvl3] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
+  const [showUpdates, setShowUpdates] = useState(false);
   const [bootError, setBootError] = useState<string | null>(null);
   const [sketchTab, setSketchTab] = useState<
     "3d" | "dynamic" | "figure" | "annex_a"
@@ -241,6 +243,33 @@ export default function App() {
   const presetInput = useRef<HTMLInputElement>(null);
   const projectInput = useRef<HTMLInputElement>(null);
   const csvInput = useRef<HTMLInputElement>(null);
+  const [openMenu, setOpenMenu] = useState<
+    "file" | "settings" | "level3" | "view" | "help" | null
+  >(null);
+  const menuContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!openMenu) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        menuContainerRef.current &&
+        !menuContainerRef.current.contains(event.target as Node)
+      ) {
+        setOpenMenu(null);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpenMenu(null);
+      }
+    };
+    window.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [openMenu]);
 
   const { result, compliance, error, busy, ready } = useEngine(form, lvl3, lang);
   const t = useMemo(() => makeTranslator(strings), [strings]);
@@ -350,6 +379,7 @@ export default function App() {
   // u_max is X-ray only; duplex/panel counts and ASME rows are mode/standard
   // specific. SFD_min/SDD_min and quality labels switch with the technology.
   const hiddenOutputs = new Set<string>();
+  hiddenOutputs.add("calc_time"); // Prominently displayed in the Hero Card directly above
   if (!xray) hiddenOutputs.add("u_max");
   if (analog) {
     hiddenOutputs.add("duplex_iqi");
@@ -502,9 +532,13 @@ export default function App() {
     | {
         n_frames: number;
         t_frame_sec: number;
+        t_frame_ms?: number;
+        fps?: number;
         total_acq_sec: number;
         target_gray_pct: number;
         target_adu_16bit: number;
+        total_dose_ugy?: number;
+        dose_rate_ugy_s?: number;
         snr_1frame: number;
         panel_class?: string;
       }
@@ -733,21 +767,6 @@ export default function App() {
             <h1 className="title">{t("app_title")}</h1>
           </div>
           <div className="topbar-actions">
-            <button onClick={() => setLang(lang === "tr" ? "en" : "tr")}>
-              {t("lang_switch")}
-            </button>
-            <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
-              {theme === "dark" ? t("theme_light") : t("theme_dark")}
-            </button>
-            <button onClick={() => setUnitInch((value) => !value)}>
-              {unitInch ? "inç" : "mm"}
-            </button>
-            <button className="danger" onClick={() => setShowLvl3(true)}>
-              {t("level3_section")}
-            </button>
-            <button className="primary" onClick={exportPdf} disabled={pdfBusy}>
-              {pdfBusy ? "…" : t("export_pdf")}
-            </button>
             <span className={busy ? "status busy" : "status"}>
               {busy ? "…" : error ? "!" : "OK"}
             </span>
@@ -758,76 +777,365 @@ export default function App() {
             {notice}
           </div>
         )}
-        <div className="toolbar">
-          <select
-            value=""
-            onChange={(event) => {
-              const preset = NAMED_PRESETS[event.target.value];
-              if (preset) {
-                setForm((previous) => {
-                  const nextSource = preset.source ?? previous.source;
-                  return {
-                    ...previous,
-                    ...preset,
-                    base_e:
-                      preset.base_e ??
-                      DEFAULT_BASE_E_BY_SOURCE[nextSource] ??
-                      previous.base_e,
-                  };
-                });
+        <div className="toolbar menubar" ref={menuContainerRef}>
+          {/* 1. Dosya Menüsü */}
+          <div className="menu-container">
+            <button
+              type="button"
+              className={`menu-trigger-btn ${openMenu === "file" ? "active" : ""}`}
+              onClick={() =>
+                setOpenMenu((prev) => (prev === "file" ? null : "file"))
               }
-              event.target.value = "";
-            }}
-          >
-            <option value="">
-              {lang === "tr" ? "Hazır Şablonlar" : "Built-in Templates"}
-            </option>
-            {Object.keys(NAMED_PRESETS).map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-          <button onClick={exportPreset}>
-            {lang === "tr" ? "Şablon Kaydet" : "Save Preset"}
-          </button>
-          <button onClick={() => presetInput.current?.click()}>
-            {lang === "tr" ? "Şablon Yükle" : "Load Preset"}
-          </button>
-          <button onClick={exportProject}>
-            {lang === "tr" ? "Proje Dışa (JSON)" : "Export Project (JSON)"}
-          </button>
-          <button onClick={() => projectInput.current?.click()}>
-            {lang === "tr" ? "Proje İçe (JSON)" : "Import Project (JSON)"}
-          </button>
-          <button onClick={exportProjectCsv}>
-            {lang === "tr" ? "CSV Dışa" : "Export CSV"}
-          </button>
-          <button onClick={() => csvInput.current?.click()}>
-            {lang === "tr" ? "CSV İçe" : "Import CSV"}
-          </button>
-          <button
-            onClick={() =>
-              document
-                .querySelectorAll<HTMLDetailsElement>("details.group")
-                .forEach((element) => {
-                  element.open = true;
-                })
-            }
-          >
-            {lang === "tr" ? "Tümünü Aç" : "Expand All"}
-          </button>
-          <button
-            onClick={() =>
-              document
-                .querySelectorAll<HTMLDetailsElement>("details.group")
-                .forEach((element) => {
-                  element.open = false;
-                })
-            }
-          >
-            {lang === "tr" ? "Tümünü Kapat" : "Collapse All"}
-          </button>
+              aria-haspopup="true"
+              aria-expanded={openMenu === "file"}
+            >
+              <span>{t("menu_file")}</span>
+              <span className="dropdown-arrow">{openMenu === "file" ? "▲" : "▼"}</span>
+            </button>
+            {openMenu === "file" && (
+              <div className="dropdown-menu" role="menu">
+                <button
+                  type="button"
+                  className="dropdown-item primary-action"
+                  onClick={() => {
+                    exportPdf();
+                    setOpenMenu(null);
+                  }}
+                  disabled={pdfBusy}
+                >
+                  <span className="item-icon">📄</span>
+                  <span>{pdfBusy ? "…" : t("export_pdf")}</span>
+                </button>
+
+                <div className="dropdown-divider" />
+                <div className="menu-section-header">
+                  {t("section_presets")}
+                </div>
+                <div className="menu-select-wrapper">
+                  <select
+                    className="menu-select"
+                    value=""
+                    onChange={(event) => {
+                      const preset = NAMED_PRESETS[event.target.value];
+                      if (preset) {
+                        setForm((previous) => {
+                          const nextSource = preset.source ?? previous.source;
+                          return {
+                            ...previous,
+                            ...preset,
+                            base_e:
+                              preset.base_e ??
+                              DEFAULT_BASE_E_BY_SOURCE[nextSource] ??
+                              previous.base_e,
+                          };
+                        });
+                        setNotice(
+                          lang === "tr"
+                            ? `"${event.target.value}" şablonu uygulandı.`
+                            : `Applied "${event.target.value}" preset.`,
+                        );
+                      }
+                      event.target.value = "";
+                      setOpenMenu(null);
+                    }}
+                  >
+                    <option value="">
+                      {t("preset_select_prompt")}
+                    </option>
+                    {Object.keys(NAMED_PRESETS).map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  className="dropdown-item"
+                  onClick={() => {
+                    exportPreset();
+                    setOpenMenu(null);
+                  }}
+                >
+                  <span className="item-icon">💾</span>
+                  <span>{t("save_preset")}</span>
+                </button>
+                <button
+                  type="button"
+                  className="dropdown-item"
+                  onClick={() => {
+                    presetInput.current?.click();
+                    setOpenMenu(null);
+                  }}
+                >
+                  <span className="item-icon">📂</span>
+                  <span>{t("load_preset")}</span>
+                </button>
+
+                <div className="dropdown-divider" />
+                <div className="menu-section-header">
+                  {t("section_project")}
+                </div>
+                <button
+                  type="button"
+                  className="dropdown-item"
+                  onClick={() => {
+                    exportProject();
+                    setOpenMenu(null);
+                  }}
+                >
+                  <span className="item-icon">📤</span>
+                  <span>{t("export_project_json")}</span>
+                </button>
+                <button
+                  type="button"
+                  className="dropdown-item"
+                  onClick={() => {
+                    projectInput.current?.click();
+                    setOpenMenu(null);
+                  }}
+                >
+                  <span className="item-icon">📥</span>
+                  <span>{t("import_project_json")}</span>
+                </button>
+
+                <div className="dropdown-divider" />
+                <div className="menu-section-header">
+                  {t("section_csv")}
+                </div>
+                <button
+                  type="button"
+                  className="dropdown-item"
+                  onClick={() => {
+                    exportProjectCsv();
+                    setOpenMenu(null);
+                  }}
+                >
+                  <span className="item-icon">📊</span>
+                  <span>{t("export_csv")}</span>
+                </button>
+                <button
+                  type="button"
+                  className="dropdown-item"
+                  onClick={() => {
+                    csvInput.current?.click();
+                    setOpenMenu(null);
+                  }}
+                >
+                  <span className="item-icon">📑</span>
+                  <span>{t("import_csv")}</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* 2. Ayarlar Menüsü */}
+          <div className="menu-container">
+            <button
+              type="button"
+              className={`menu-trigger-btn ${openMenu === "settings" ? "active" : ""}`}
+              onClick={() =>
+                setOpenMenu((prev) => (prev === "settings" ? null : "settings"))
+              }
+              aria-haspopup="true"
+              aria-expanded={openMenu === "settings"}
+            >
+              <span>{t("menu_settings")}</span>
+              <span className="dropdown-arrow">{openMenu === "settings" ? "▲" : "▼"}</span>
+            </button>
+            {openMenu === "settings" && (
+              <div className="dropdown-menu" role="menu">
+                <button
+                  type="button"
+                  className="dropdown-item"
+                  onClick={() => {
+                    setLang(lang === "tr" ? "en" : "tr");
+                    setOpenMenu(null);
+                  }}
+                >
+                  <span className="item-icon">🌐</span>
+                  <span>
+                    {lang === "tr"
+                      ? "Dil: Türkçe (English'e Geç)"
+                      : "Language: English (Türkçe'ye Geç)"}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="dropdown-item"
+                  onClick={() => {
+                    setTheme(theme === "dark" ? "light" : "dark");
+                    setOpenMenu(null);
+                  }}
+                >
+                  <span className="item-icon">🌓</span>
+                  <span>
+                    {theme === "dark"
+                      ? (lang === "tr" ? "Tema: Karanlık (Aydınlığa Geç)" : "Theme: Dark (Switch to Light)")
+                      : (lang === "tr" ? "Tema: Aydınlık (Karanlığa Geç)" : "Theme: Light (Switch to Dark)")}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="dropdown-item"
+                  onClick={() => {
+                    setUnitInch((value) => !value);
+                    setOpenMenu(null);
+                  }}
+                >
+                  <span className="item-icon">📏</span>
+                  <span>
+                    {unitInch
+                      ? (lang === "tr" ? "Ölçü Birimi: inç (mm'ye Geç)" : "Unit: inch (Switch to mm)")
+                      : (lang === "tr" ? "Ölçü Birimi: mm (inç'e Geç)" : "Unit: mm (Switch to inch)")}
+                  </span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* 3. Yetki Menüsü */}
+          <div className="menu-container">
+            <button
+              type="button"
+              className={`menu-trigger-btn ${lvl3.active ? "danger-accent" : ""} ${openMenu === "level3" ? "active" : ""}`}
+              onClick={() =>
+                setOpenMenu((prev) => (prev === "level3" ? null : "level3"))
+              }
+              aria-haspopup="true"
+              aria-expanded={openMenu === "level3"}
+            >
+              <span>{t("menu_authority")}</span>
+              {lvl3.active && <span className="menu-pill-danger">L3</span>}
+              <span className="dropdown-arrow">{openMenu === "level3" ? "▲" : "▼"}</span>
+            </button>
+            {openMenu === "level3" && (
+              <div className="dropdown-menu" role="menu">
+                <button
+                  type="button"
+                  className="dropdown-item"
+                  onClick={() => {
+                    setShowLvl3(true);
+                    setOpenMenu(null);
+                  }}
+                >
+                  <span className="item-icon">🛡️</span>
+                  <span>{t("open_level3_panel")}</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* 4. Görünüm Menüsü */}
+          <div className="menu-container">
+            <button
+              type="button"
+              className={`menu-trigger-btn ${openMenu === "view" ? "active" : ""}`}
+              onClick={() =>
+                setOpenMenu((prev) => (prev === "view" ? null : "view"))
+              }
+              aria-haspopup="true"
+              aria-expanded={openMenu === "view"}
+            >
+              <span>{t("menu_view")}</span>
+              <span className="dropdown-arrow">{openMenu === "view" ? "▲" : "▼"}</span>
+            </button>
+            {openMenu === "view" && (
+              <div className="dropdown-menu" role="menu">
+                <button
+                  type="button"
+                  className="dropdown-item"
+                  onClick={() => {
+                    document
+                      .querySelectorAll<HTMLDetailsElement>("details.group")
+                      .forEach((element) => {
+                        element.open = true;
+                      });
+                    setOpenMenu(null);
+                  }}
+                >
+                  <span className="item-icon">🔽</span>
+                  <span>{t("expand_all")}</span>
+                </button>
+                <button
+                  type="button"
+                  className="dropdown-item"
+                  onClick={() => {
+                    document
+                      .querySelectorAll<HTMLDetailsElement>("details.group")
+                      .forEach((element) => {
+                        element.open = false;
+                      });
+                    setOpenMenu(null);
+                  }}
+                >
+                  <span className="item-icon">🔼</span>
+                  <span>{t("collapse_all")}</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* 5. Yardım Menüsü */}
+          <div className="menu-container">
+            <button
+              type="button"
+              className={`menu-trigger-btn ${openMenu === "help" ? "active" : ""}`}
+              onClick={() =>
+                setOpenMenu((prev) => (prev === "help" ? null : "help"))
+              }
+              aria-haspopup="true"
+              aria-expanded={openMenu === "help"}
+            >
+              <span>{t("menu_help")}</span>
+              <span className="dropdown-arrow">{openMenu === "help" ? "▲" : "▼"}</span>
+            </button>
+            {openMenu === "help" && (
+              <div className="dropdown-menu" role="menu">
+                <button
+                  type="button"
+                  className="dropdown-item"
+                  onClick={() => {
+                    setShowAbout(true);
+                    setOpenMenu(null);
+                  }}
+                >
+                  <span className="item-icon">ℹ️</span>
+                  <span>{t("open_about_panel")}</span>
+                </button>
+                <button
+                  type="button"
+                  className="dropdown-item"
+                  onClick={() => {
+                    setShowUpdates(true);
+                    setOpenMenu(null);
+                  }}
+                >
+                  <span className="item-icon">🔄</span>
+                  <span>{t("check_updates_btn")}</span>
+                </button>
+                <div className="dropdown-divider" />
+                <a
+                  className="dropdown-item"
+                  href="https://github.com/SLedgehammer-dev12/Radiography/issues"
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => setOpenMenu(null)}
+                >
+                  <span className="item-icon">🐞</span>
+                  <span>{t("report_issue")}</span>
+                </a>
+                <a
+                  className="dropdown-item"
+                  href="mailto:omer.erbas@botas.gov.tr"
+                  onClick={() => setOpenMenu(null)}
+                >
+                  <span className="item-icon">✉️</span>
+                  <span>{t("contact_email_action")}</span>
+                </a>
+              </div>
+            )}
+          </div>
           <input
             ref={presetInput}
             type="file"
@@ -1737,6 +2045,7 @@ export default function App() {
                             <span className="hero-frame-highlight">
                               <strong>{ddaFrame.n_frames}</strong> kare ×{" "}
                               <strong>{ddaFrame.t_frame_sec.toFixed(2)} sn</strong>
+                              {ddaFrame.fps ? ` (${ddaFrame.fps.toFixed(1)} fps)` : ""}
                             </span>
                             {" • "}w_eff = {result.display.w_eff} •{" "}
                             {digital ? "SDD" : "SFD"} = {form.sfd} mm
@@ -1746,6 +2055,7 @@ export default function App() {
                             <span className="hero-frame-highlight">
                               <strong>{ddaFrame.n_frames}</strong> frames ×{" "}
                               <strong>{ddaFrame.t_frame_sec.toFixed(2)} s</strong>
+                              {ddaFrame.fps ? ` (${ddaFrame.fps.toFixed(1)} fps)` : ""}
                             </span>
                             {" • "}w_eff = {result.display.w_eff} •{" "}
                             {digital ? "SDD" : "SFD"} = {form.sfd} mm
@@ -1758,7 +2068,7 @@ export default function App() {
                   )}
                 </div>
                 <div className="hero-right">
-                  <div className="hero-value">
+                  <div className="hero-value" data-testid="output-calc_time">
                     {result?.display.calc_time ?? "-"}
                   </div>
                   {result && (
@@ -1886,6 +2196,51 @@ export default function App() {
                 </div>
               </div>
             </div>
+            {digital && ddaFrame && (
+              <div className="dda-integration-card" data-testid="dda-integration-card">
+                <div className="dda-card-header">
+                  <span className="dda-card-title">
+                    🎞️ {lang === "tr" ? "DDA Kare & Doz Entegrasyonu (ASTM E2698 / ISO 17636-2)" : "DDA Frame & Dose Integration (ASTM E2698 / ISO 17636-2)"}
+                  </span>
+                  {ddaFrame.panel_class && (
+                    <span className="dda-panel-badge">{ddaFrame.panel_class}</span>
+                  )}
+                </div>
+                <div className="dda-metrics-grid">
+                  <div className="dda-metric-box">
+                    <span className="dda-metric-label">{lang === "tr" ? "Kare Sayısı" : "Frame Count"}</span>
+                    <span className="dda-metric-value">{ddaFrame.n_frames}</span>
+                    <span className="dda-metric-sub">{lang === "tr" ? "kare (ortalamalı)" : "frames (averaged)"}</span>
+                  </div>
+                  <div className="dda-metric-box">
+                    <span className="dda-metric-label">{lang === "tr" ? "Kare Süresi" : "Frame Time"}</span>
+                    <span className="dda-metric-value">{ddaFrame.t_frame_sec.toFixed(2)} sn</span>
+                    <span className="dda-metric-sub">{(ddaFrame.t_frame_ms ?? (ddaFrame.t_frame_sec * 1000)).toFixed(0)} ms</span>
+                  </div>
+                  <div className="dda-metric-box">
+                    <span className="dda-metric-label">{lang === "tr" ? "Çekim Hızı" : "Frame Rate"}</span>
+                    <span className="dda-metric-value">{(ddaFrame.fps ?? (1 / ddaFrame.t_frame_sec)).toFixed(1)}</span>
+                    <span className="dda-metric-sub">fps (Hz)</span>
+                  </div>
+                  <div className="dda-metric-box">
+                    <span className="dda-metric-label">{lang === "tr" ? "Hedef ADC Doyumu" : "Target ADC Level"}</span>
+                    <span className="dda-metric-value">%{ddaFrame.target_gray_pct}</span>
+                    <span className="dda-metric-sub">~{ddaFrame.target_adu_16bit.toLocaleString()} ADU</span>
+                  </div>
+                  {ddaFrame.total_dose_ugy !== undefined && (
+                    <div className="dda-metric-box">
+                      <span className="dda-metric-label">{lang === "tr" ? "Dedektör Dozu" : "Detector Dose"}</span>
+                      <span className="dda-metric-value">
+                        {ddaFrame.total_dose_ugy >= 1000
+                          ? `${(ddaFrame.total_dose_ugy / 1000).toFixed(2)} mGy`
+                          : `${ddaFrame.total_dose_ugy.toFixed(1)} µGy`}
+                      </span>
+                      <span className="dda-metric-sub">{ddaFrame.dose_rate_ugy_s ? `${ddaFrame.dose_rate_ugy_s.toFixed(1)} µGy/s` : ""}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             <Group title={t("outputs")}>
               {OUTPUT_KEYS.filter((key) => !hiddenOutputs.has(key)).map((key) => (
                 <OutputRow
@@ -2278,6 +2633,20 @@ export default function App() {
             onClose={() => setShowDecay(false)}
           />
         )}
+        {showAbout && (
+          <AboutModal
+            t={t}
+            currentVersion={pyClient.version ?? "1.10.3"}
+            onClose={() => setShowAbout(false)}
+          />
+        )}
+        {showUpdates && (
+          <UpdateModal
+            t={t}
+            currentVersion={pyClient.version ?? "1.10.3"}
+            onClose={() => setShowUpdates(false)}
+          />
+        )}
         <PageScrollbar />
       </div>
     </UnitContext.Provider>
@@ -2482,6 +2851,236 @@ function Lvl3Dialog({ lvl3, t, onChange, onClose }: Lvl3DialogProps) {
         </label>
         <div className="modal-actions">
           <button onClick={onClose}>{t("dialog_cancel")}</button>
+          <button className="primary" onClick={onClose}>
+            {t("dialog_ok")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface AboutModalProps {
+  t: (key: string, ...args: unknown[]) => string;
+  onClose: () => void;
+  currentVersion?: string;
+}
+
+function AboutModal({ t, onClose, currentVersion = "1.10.3" }: AboutModalProps) {
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal about-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="about-header">
+          <div className="about-title-block">
+            <h2>
+              <span>{t("app_title").split("(")[0]?.trim() || "Radiography"}</span>
+              <span className="about-version-badge">v{currentVersion}</span>
+            </h2>
+            <p className="about-owner">{t("app_owner")}</p>
+            <div className="about-standards-row">
+              <span className="about-std-tag">ISO 17636-1 / ISO 17636-2</span>
+              <span className="about-std-tag">ISO 19232 (IQI)</span>
+              <span className="about-std-tag">API 1104</span>
+              <span className="about-std-tag">ASME Sec. V / B31.3</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="info-modal-close"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Engineering Disclaimer */}
+        <div className="about-disclaimer-box">
+          <div className="about-disclaimer-title">
+            ⚠️ {t("engineering_disclaimer_title")}
+          </div>
+          <div>{t("disclaimer")}</div>
+        </div>
+
+        {/* Support & Contact */}
+        <div className="about-section">
+          <span className="about-section-title">{t("contact_title")}</span>
+          <div className="about-buttons-grid">
+            <a
+              href="https://github.com/SLedgehammer-dev12/Radiography/issues"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="about-btn"
+            >
+              <span>🐞</span>
+              <span>{t("report_issue")}</span>
+            </a>
+            <a href="mailto:omer.erbas@botas.gov.tr" className="about-btn">
+              <span>✉️</span>
+              <span>{t("contact_email_action")}</span>
+            </a>
+          </div>
+        </div>
+
+        <div className="modal-actions">
+          <button className="primary" onClick={onClose}>
+            {t("dialog_ok")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface UpdateModalProps {
+  t: (key: string, ...args: unknown[]) => string;
+  onClose: () => void;
+  currentVersion?: string;
+}
+
+function UpdateModal({ t, onClose, currentVersion = "1.10.3" }: UpdateModalProps) {
+  const [updateState, setUpdateState] = useState<{
+    status: "checking" | "up_to_date" | "available" | "error";
+    latestVersion?: string;
+    releaseUrl?: string;
+    errorMessage?: string;
+  }>({ status: "checking" });
+
+  const handleCheckUpdates = async (signal?: AbortSignal) => {
+    setUpdateState({ status: "checking" });
+    try {
+      const res = await fetch(
+        "https://api.github.com/repos/SLedgehammer-dev12/Radiography/releases/latest",
+        { headers: { Accept: "application/vnd.github+json" }, signal },
+      );
+      if (!res.ok) {
+        throw new Error(`GitHub API HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      const tagName: string = data.tag_name || "";
+
+      const parseV = (v: string): [number, number, number] => {
+        const match = v.match(/^v?(\d+)\.(\d+)\.(\d+)/);
+        if (!match) return [0, 0, 0];
+        return [parseInt(match[1], 10), parseInt(match[2], 10), parseInt(match[3], 10)];
+      };
+      const [maj1, min1, pat1] = parseV(tagName);
+      const [maj0, min0, pat0] = parseV(currentVersion);
+
+      const isNewer =
+        maj1 > maj0 ||
+        (maj1 === maj0 && min1 > min0) ||
+        (maj1 === maj0 && min1 === min0 && pat1 > pat0);
+
+      if (isNewer) {
+        setUpdateState({
+          status: "available",
+          latestVersion: tagName,
+          releaseUrl:
+            data.html_url ||
+            "https://github.com/SLedgehammer-dev12/Radiography/releases",
+        });
+      } else {
+        setUpdateState({
+          status: "up_to_date",
+          latestVersion: tagName || `v${currentVersion}`,
+        });
+      }
+    } catch (err: unknown) {
+      if (signal?.aborted) return;
+      setUpdateState({
+        status: "error",
+        errorMessage: err instanceof Error ? err.message : String(err),
+      });
+    }
+  };
+
+  useEffect(() => {
+    const controller = new AbortController();
+    handleCheckUpdates(controller.signal);
+    return () => controller.abort();
+  }, []);
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal update-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="about-header">
+          <div className="about-title-block">
+            <h2>
+              <span>🔄 {t("check_updates_btn")}</span>
+            </h2>
+            <p className="about-owner">
+              Mevcut Yüklü Sürüm: <strong>v{currentVersion}</strong>
+            </p>
+          </div>
+          <button
+            type="button"
+            className="info-modal-close"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="update-modal-body" style={{ margin: "14px 0" }}>
+          {updateState.status === "checking" && (
+            <div className="about-update-status loading">
+              <span>⏳ {t("checking_updates")}</span>
+            </div>
+          )}
+
+          {updateState.status === "up_to_date" && (
+            <div className="about-update-status success">
+              <span>✅ {t("up_to_date", currentVersion)}</span>
+              <button
+                type="button"
+                className="about-btn"
+                style={{ padding: "4px 10px", fontSize: "11px" }}
+                onClick={handleCheckUpdates}
+                title="Tekrar Kontrol Et"
+              >
+                🔄 Yenile
+              </button>
+            </div>
+          )}
+
+          {updateState.status === "available" && (
+            <div className="about-update-status available">
+              <span>🚀 {t("update_available", updateState.latestVersion)}</span>
+              <a
+                href={updateState.releaseUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="about-btn primary-btn"
+                style={{ padding: "5px 12px", fontSize: "12px" }}
+              >
+                {t("view_release")} ↗
+              </a>
+            </div>
+          )}
+
+          {updateState.status === "error" && (
+            <div
+              className="about-update-status available"
+              style={{ borderColor: "#f38ba8", color: "#f38ba8" }}
+            >
+              <span>
+                ⚠️ {updateState.errorMessage || "Kontrol başarısız oldu."}
+              </span>
+              <button
+                type="button"
+                className="about-btn"
+                style={{ padding: "4px 10px", fontSize: "11px" }}
+                onClick={handleCheckUpdates}
+              >
+                Yeniden Dene
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="modal-actions">
           <button className="primary" onClick={onClose}>
             {t("dialog_ok")}
           </button>

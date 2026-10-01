@@ -10,8 +10,8 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGr
                              QCheckBox, QPushButton, QGroupBox, QScrollArea, QFileDialog, 
                              QMessageBox, QFormLayout, QTabWidget, QDialog, QProgressDialog,
                              QMenuBar, QSplitter)
-from PyQt6.QtCore import Qt, QThread, QTimer, QSettings, pyqtSignal
-from PyQt6.QtGui import QFont, QPalette, QColor, QDoubleValidator, QIntValidator, QAction
+from PyQt6.QtCore import Qt, QThread, QTimer, QSettings, pyqtSignal, QUrl
+from PyQt6.QtGui import QFont, QPalette, QColor, QDoubleValidator, QIntValidator, QAction, QDesktopServices
 
 from src.core.translation import Translation
 from src.core.calculator import RTCalculator
@@ -2644,23 +2644,37 @@ class MainWindow(QMainWindow,
         data_menu.addAction(act_import_csv)
 
         help_menu = menu_bar.addMenu("&Help")
-        about_action = QAction(f"About Radiography v{CURRENT_VERSION}", self)
+        act_report_issue = QAction(self.trans.get("report_issue"), self)
+        act_report_issue.triggered.connect(lambda: QDesktopServices.openUrl(QUrl("https://github.com/SLedgehammer-dev12/Radiography/issues")))
+        help_menu.addAction(act_report_issue)
+
+        act_contact_email = QAction(self.trans.get("contact_email_action"), self)
+        act_contact_email.triggered.connect(lambda: QDesktopServices.openUrl(QUrl("mailto:omer.erbas@botas.gov.tr")))
+        help_menu.addAction(act_contact_email)
+
+        help_menu.addSeparator()
+
+        about_action = QAction(f"{self.trans.get('about_action')} (v{CURRENT_VERSION})", self)
         about_action.triggered.connect(self._show_about)
         help_menu.addAction(about_action)
 
     def _show_about(self):
-        QMessageBox.about(
-            self,
-            "About Radiography",
-            f"Radiographic Testing (RT) Exposure Calculator\n"
-            f"Version: {CURRENT_VERSION}\n"
-            f"ISO 17636 / API 1104 Compliant\n\n"
-            f"{self.trans.get('app_owner')}\n\n"
-            f"{self.trans.get('disclaimer')}\n\n"
-            f"{self.trans.get('contact_title')}:\n"
-            f"{self.trans.get('contact_github')}\n"
-            f"{self.trans.get('contact_email')}",
+        msg = QMessageBox(self)
+        msg.setWindowTitle(self.trans.get("about_title"))
+        title_text = f"<h3>Radiography v{CURRENT_VERSION}</h3><p>ISO 17636 / API 1104 / ASME Compliant</p>"
+        owner_text = f"<p><b>{self.trans.get('app_owner')}</b></p>"
+        disclaimer_header = f"<p><b>{self.trans.get('engineering_disclaimer_title')}</b></p>"
+        disclaimer_body = f"<p style='font-size: 11px;'>{self.trans.get('disclaimer')}</p>"
+        contact_header = f"<p><b>{self.trans.get('contact_title')}</b></p>"
+        contact_body = (
+            f"<ul>"
+            f"<li><a href='https://github.com/SLedgehammer-dev12/Radiography/issues'>{self.trans.get('report_issue')}</a></li>"
+            f"<li><a href='mailto:omer.erbas@botas.gov.tr'>{self.trans.get('contact_email')}</a></li>"
+            f"</ul>"
         )
+        msg.setText(f"{title_text}{owner_text}{disclaimer_header}{disclaimer_body}{contact_header}{contact_body}")
+        msg.setTextFormat(Qt.TextFormat.RichText)
+        msg.exec()
 
     def check_for_updates(self, silent=True):
         self.check_update_action.setEnabled(False)

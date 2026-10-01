@@ -354,21 +354,35 @@ def format_exposure_time_provenance(prov, trans):
     if dda_frame and tech == "digital":
         n_fr = dda_frame.get("n_frames", 1)
         t_fr = dda_frame.get("t_frame_sec", 1.0)
+        t_fr_ms = dda_frame.get("t_frame_ms", round(t_fr * 1000.0, 1))
+        fps = dda_frame.get("fps", round(1.0 / max(0.01, t_fr), 2))
         tot_acq = dda_frame.get("total_acq_sec", float(n_fr) * float(t_fr))
         gray_pct = dda_frame.get("target_gray_pct", 65.0)
         adu = dda_frame.get("target_adu_16bit", 42600)
         snr_1 = dda_frame.get("snr_1frame", 42.0)
+        tot_dose = dda_frame.get("total_dose_ugy", 0.0)
+        p_class = dda_frame.get("panel_class", "DDA")
         if tr:
             parts.append(
-                f"DDA Kare Entegrasyonu (ASTM E2698): Tek Kare Süresi: t_kare = {t_fr:.2f} sn • "
-                f"Toplam Kare Sayısı: N_kare = {n_fr} adet • Toplam Pozlama: T = {tot_acq:.1f} sn "
-                f"(Hedef Gri Seviye: %{gray_pct:.0f} ADC ≈ {adu} ADU, Tek Kare SNR_1kare ≈ {snr_1:.0f})"
+                f"DDA Kare & Doz Entegrasyonu (ASTM E2698 / ISO 17636-2): "
+                f"Kare Sayısı: N = {n_fr} adet (Averaging) • "
+                f"Kare Süresi: t_kare = {t_fr:.2f} sn ({t_fr_ms:.0f} ms) • "
+                f"Kare Hızı: {fps:.1f} FPS • "
+                f"Toplam Poz: T = {tot_acq:.2f} sn • "
+                f"Hedef ADC: %{gray_pct:.0f} (~{adu} ADU / 16-bit) • "
+                f"Dedektör Dozu: {tot_dose:.1f} µGy • "
+                f"Tek Kare SNR_1kare ≈ {snr_1:.1f} [{p_class}]"
             )
         else:
             parts.append(
-                f"DDA Frame Integration (ASTM E2698): Single Frame Time: t_frame = {t_fr:.2f} s • "
-                f"Total Frames: N_frames = {n_fr} • Total Acquisition: T = {tot_acq:.1f} s "
-                f"(Target Gray Level: {gray_pct:.0f}% ADC ≈ {adu} ADU, Single Frame SNR_1frame ≈ {snr_1:.0f})"
+                f"DDA Frame & Dose Integration (ASTM E2698 / ISO 17636-2): "
+                f"Frame Count: N = {n_fr} (Averaging) • "
+                f"Frame Time: t_frame = {t_fr:.2f} s ({t_fr_ms:.0f} ms) • "
+                f"Frame Rate: {fps:.1f} FPS • "
+                f"Total Acquisition: T = {tot_acq:.2f} s • "
+                f"Target ADC: {gray_pct:.0f}% (~{adu} ADU / 16-bit) • "
+                f"Detector Dose: {tot_dose:.1f} µGy • "
+                f"Single Frame SNR_1frame ≈ {snr_1:.1f} [{p_class}]"
             )
 
     # Extra multipliers (Level 3 SFD compensation & Field factor F)
@@ -1121,19 +1135,23 @@ class CalculationEngine:
             sec_calc = int(raw_time % 60)
 
         # Keep DDA frame integration in sync if Level 3 SFD comp or Field Factor F scaled raw_time
-        if tech == "digital" and exposure_time_prov.get("dda_frame") and (sfd_comp_target is not None or base_multiplier != 1.0):
-            det_for_dda = detector_type if detector_type in ("dda_si", "dda_se", "dda_gdos") else "dda_si"
-            exposure_time_prov["dda_frame"] = calc.calculate_dda_frame_integration(
-                raw_time, sfd, w_eff, source, output_val,
-                det_for_dda, sfd_comp_target or target_snr_val, kv=input_kv,
-                material=material,
-                srb_factor=exposure_time_prov.get("srb_factor", 1.0),
-                dqe_factor=exposure_time_prov.get("det_factor", 3.5),
-            )
+        if tech == "digital" and exposure_time_prov.get("dda_frame"):
+            if sfd_comp_target is not None or base_multiplier != 1.0:
+                det_for_dda = detector_type if detector_type in ("dda_si", "dda_se", "dda_gdos") else "dda_si"
+                exposure_time_prov["dda_frame"] = calc.calculate_dda_frame_integration(
+                    raw_time, sfd, w_eff, source, output_val,
+                    det_for_dda, sfd_comp_target or target_snr_val, kv=input_kv,
+                    material=material,
+                    srb_factor=exposure_time_prov.get("srb_factor", 1.0),
+                    dqe_factor=exposure_time_prov.get("det_factor", 3.5),
+                    testing_class=testing_class,
+                )
             if chart_source == "dda_frame_method":
                 raw_time = min(864000.0, exposure_time_prov["dda_frame"]["total_acq_sec"])
-                min_calc = int(raw_time // 60)
-                sec_calc = int(raw_time % 60)
+            else:
+                raw_time = max(raw_time, exposure_time_prov["dda_frame"]["total_acq_sec"])
+            min_calc = int(raw_time // 60)
+            sec_calc = int(raw_time % 60)
 
         exposure_time_prov["lvl3_sfd_comp"] = (sfd_comp_target is not None)
         exposure_time_prov["time_multiplier"] = time_multiplier
@@ -1465,6 +1483,14 @@ class CalculationEngine:
             }
             chart_label = f" [{chart_tag_map.get(chart_source, chart_source)}]"
 
+        if raw_time < 60.0:
+            if raw_time < 10.0:
+                time_display_val = f"{raw_time:.2f} sn" if trans.language == "tr" else f"{raw_time:.2f} s"
+            else:
+                time_display_val = f"{raw_time:.1f} sn" if trans.language == "tr" else f"{raw_time:.1f} s"
+        else:
+            time_display_val = f"{min_calc} dk {sec_calc} sn" if trans.language == "tr" else f"{min_calc} min {sec_calc} sec"
+
         display = {
             "w_nom": f"{w_nom:.2f} mm",
             "w_eff": f"{w_eff:.2f} mm",
@@ -1479,7 +1505,7 @@ class CalculationEngine:
             "single_wire_iqi": wire_str,
             "duplex_iqi": duplex_str if tech == "digital" else "N/A",
             "quality_target": target_quality,
-            "calc_time": f"{min_calc} min {sec_calc} sec{dda_tag}{chart_label}",
+            "calc_time": f"{time_display_val}{dda_tag}{chart_label}",
             "detector_quality": detector_quality_str,
             "asme_iqi": asme_iqi_str,
             "barrier_distance": barrier_str,

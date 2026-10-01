@@ -1569,12 +1569,14 @@ class RTCalculator:
     def calculate_dda_frame_integration(
         self, base_time_sec, sdd, w_eff, source, output_val,
         detector_type, target_snr, kv=None, material="steel",
-        srb_factor=1.0, dqe_factor=3.5,
+        srb_factor=1.0, dqe_factor=3.5, testing_class="class_b",
     ):
         """
         Computes DDA Flat Panel frame integration parameters (t_frame × N_frames)
         per ASTM E2698 / ISO 17636-2 Clause 7.4 to prevent 14/16-bit ADC saturation
         while achieving target normalized SNR_N by frame averaging (SNR_N ∝ √N_frames).
+        Ensures standards-compliant frame averaging floors (Class A >= 16, Class B >= 32)
+        and realistic industrial integration times (0.10s - 2.0s) & generator limits (>= 2.0s).
         """
         spec = (
             ExposureChartDatabase.DDA_PANEL_TABLE.get(detector_type)
@@ -1596,36 +1598,55 @@ class RTCalculator:
         snr_req = max(20.0, float(target_snr if target_snr else 100.0))
         dqe_norm = max(0.3, dqe_factor / 3.5)
         snr_1frame_eff = snr_1frame_ref * math.sqrt(dqe_norm / max(0.25, srb_factor))
-        n_frames_snr = max(1, int(math.ceil((snr_req / max(5.0, snr_1frame_eff)) ** 2)))
 
-        # Derive single-frame integration time from total dose time & frame bounds [0.05s, 10.0s]
-        t_raw = max(0.05, float(base_time_sec))
+        # Standard-compliant frame averaging floor per ISO 17636-2 / ASTM E2698:
+        # Minimum averaging: Class A >= 16 frames, Class B >= 32 frames to suppress fixed-pattern noise
+        is_class_b = str(testing_class).lower() == "class_b"
+        min_frames = 32 if is_class_b else 16
+        n_frames_snr = max(min_frames, int(math.ceil((snr_req / max(5.0, snr_1frame_eff)) ** 2)))
+
+        # Derive single-frame integration time from total dose time & frame bounds [0.10s, 2.0s]
+        t_raw = max(0.10, float(base_time_sec))
         t_frame_ideal = t_raw / float(n_frames_snr)
-        if t_frame_ideal < 0.05:
-            t_frame_sec = 0.05
-            n_frames = max(1, int(math.ceil(t_raw / t_frame_sec)))
-        elif t_frame_ideal > 10.0:
-            # Cap single frame at 10.0 s to avoid dark-current saturation
-            t_frame_sec = 10.0
+
+        if t_frame_ideal < 0.10:
+            t_frame_sec = 0.10
+            n_frames = n_frames_snr
+        elif t_frame_ideal > 2.0:
+            # Cap single frame at 2.0 s to avoid dark-current thermal saturation on uncooled panels
+            t_frame_sec = 2.0
             n_frames = max(n_frames_snr, int(math.ceil(t_raw / t_frame_sec)))
         else:
             t_frame_sec = round(t_frame_ideal, 2)
-            if t_frame_sec <= 0.0:
-                t_frame_sec = 0.05
+            if t_frame_sec < 0.10:
+                t_frame_sec = 0.10
             n_frames = n_frames_snr
 
+        # Industrial X-ray generator physical exposure floor (ramp-up & preheating >= 2.0 s)
         total_acq_sec = float(n_frames) * float(t_frame_sec)
+        if source == "x_ray" and total_acq_sec < 2.0:
+            t_frame_candidate = round(2.0 / float(n_frames), 2)
+            if t_frame_candidate >= 0.10:
+                t_frame_sec = max(t_frame_sec, t_frame_candidate)
+            else:
+                n_frames = max(n_frames, int(math.ceil(2.0 / t_frame_sec)))
+            total_acq_sec = float(n_frames) * float(t_frame_sec)
+
+        fps = round(1.0 / max(0.01, t_frame_sec), 2)
+        t_frame_ms = round(t_frame_sec * 1000.0, 1)
         dose_rate_ugy_s = frame_dose_target / max(0.05, t_frame_sec)
         total_dose_ugy = dose_rate_ugy_s * total_acq_sec
 
         return {
             "t_frame_sec": t_frame_sec,
+            "t_frame_ms": t_frame_ms,
+            "fps": fps,
             "n_frames": n_frames,
-            "total_acq_sec": total_acq_sec,
+            "total_acq_sec": round(total_acq_sec, 2),
             "frame_target_dose_ugy": frame_dose_target,
-            "total_dose_ugy": total_dose_ugy,
-            "dose_rate_ugy_s": dose_rate_ugy_s,
-            "snr_1frame": snr_1frame_eff,
+            "total_dose_ugy": round(total_dose_ugy, 1),
+            "dose_rate_ugy_s": round(dose_rate_ugy_s, 2),
+            "snr_1frame": round(snr_1frame_eff, 1),
             "target_gray_pct": target_gray_pct,
             "target_adu_16bit": target_adu_16bit,
             "panel_class": spec.get("panel_class", "DDA Düz Panel"),
@@ -1813,9 +1834,12 @@ class RTCalculator:
                                     time_seconds, sfd, w_eff, source, output_safe,
                                     detector_type, snr_target_used, kv=kv,
                                     material=material, srb_factor=srb_factor, dqe_factor=det_factor,
+                                    testing_class=testing_class,
                                 )
                                 if is_dda else None
                             )
+                            if is_dda and dda_frame:
+                                time_seconds = max(time_seconds, dda_frame["total_acq_sec"])
                             minutes = int(time_seconds // 60)
                             seconds = int(time_seconds % 60)
                             prov = {
@@ -1873,9 +1897,12 @@ class RTCalculator:
                                     time_seconds, sfd, w_eff, source, output_safe,
                                     detector_type, snr_target_used, kv=kv_eff,
                                     material=material, srb_factor=srb_factor, dqe_factor=det_factor,
+                                    testing_class=testing_class,
                                 )
                                 if (tech == "digital" and is_dda) else None
                             )
+                            if tech == "digital" and is_dda and dda_frame:
+                                time_seconds = max(time_seconds, dda_frame["total_acq_sec"])
                             minutes = int(time_seconds // 60)
                             seconds = int(time_seconds % 60)
                             prov = {
@@ -2045,11 +2072,15 @@ class RTCalculator:
                 time_seconds, sfd, w_eff, source, output_safe,
                 det_for_dda, snr_target_used, kv=kv_eff,
                 material=material, srb_factor=srb_factor, dqe_factor=det_factor,
+                testing_class=testing_class,
             )
             if requested_method == "dda_frame_method":
                 active_method = "dda_frame_method"
                 fallback_reason = None
                 time_seconds = min(864000.0, dda_frame["total_acq_sec"])
+                time_minutes = time_seconds / 60.0
+            elif is_dda and dda_frame:
+                time_seconds = max(time_seconds, dda_frame["total_acq_sec"])
                 time_minutes = time_seconds / 60.0
 
         minutes = int(time_seconds // 60)
