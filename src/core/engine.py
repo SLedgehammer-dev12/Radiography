@@ -106,6 +106,8 @@ def format_exposures_provenance(prov, trans):
         return trans.get("exp_prov_panoramic")
     if method == "dwdi_rule":
         return trans.get("exp_prov_dwdi", prov.get("ratio"), prov.get("n"))
+    if method == "out_of_chart":
+        return trans.get("exp_prov_out_of_chart", prov.get("n"))
     return trans.get("exp_prov_fallback", prov.get("n"))
 
 
@@ -836,20 +838,22 @@ class CalculationEngine:
             if detail is not None:
                 return int(detail["n"]), self._annex_provenance(
                     detail, figure, l3_dw=geo["lvl3_dw"])
-            n = calc.annex_a_exposures(
-                t, od, f_distance, testing_class, film_inside=True)
-            n = int(n) if n is not None else 1
-            return n, {"method": "geometric_fallback", "n": n}
+            # Outside the digitized Annex A chart. Returning 1 (the old
+            # behaviour) grossly under-counts the required exposures, so use
+            # the chart cap (highest N curve) as a conservative minimum.
+            cap = annex_a.chart_cap(testing_class, film_inside=True) or 1
+            return int(cap), {"method": "out_of_chart", "n": int(cap),
+                              "film_inside": True}
         if figure in self.FILM_OUTSIDE_FIGURES:
             detail = annex_a.lookup_detail(
                 t, od, sfd, testing_class, film_inside=False)
             if detail is not None:
                 return max(3, int(detail["n"])), self._annex_provenance(
                     detail, figure, l3_dw=geo["lvl3_dw"])
-            n = calc.annex_a_exposures(
-                t, od, sfd, testing_class, film_inside=False)
-            n = max(3, int(n)) if n is not None else 3
-            return n, {"method": "geometric_fallback", "n": n}
+            cap = annex_a.chart_cap(testing_class, film_inside=False) or 3
+            cap = max(3, int(cap))
+            return cap, {"method": "out_of_chart", "n": cap,
+                         "film_inside": False}
         return 1, {"method": "panoramic", "n": 1}
 
     # ------------------------------------------------------------------
@@ -959,6 +963,10 @@ class CalculationEngine:
             else:
                 exposures_prov = {"method": "geometric_fallback", "n": exposures}
 
+        if exposures_prov.get("method") == "out_of_chart":
+            warnings.append(trans.get("warn_exposures_out_of_chart",
+                                      exposures_prov.get("n")))
+
         n_panel = None
         n_applied = f["app_exposures"]
         n_required = exposures
@@ -998,7 +1006,12 @@ class CalculationEngine:
             n_required = cmp_res["n_required"]
             if n_applied > 0:
                 exposures_ok = (n_applied >= n_required)
-            if panel_res["limiting_factor"] == "panel":
+            if panel_res["limiting_factor"] == "invalid_panel_geometry":
+                if trans.language == "tr":
+                    warnings.append("UYARI: Dedektör panel aktif genişliği geçersiz (<= 0). Poz sayısı panel modeli yerine standart grafiğe göre belirlendi.")
+                else:
+                    warnings.append("WARNING: Detector panel active width is invalid (<= 0). The exposure count was determined from the standard graph instead of the panel model.")
+            elif panel_res["limiting_factor"] == "panel":
                 if trans.language == "tr":
                     warnings.append(f"BİLGİ: Panel aktif genişliği ({panel_width:.0f} mm) poz sayısını sınırlıyor (θ={panel_res['theta_panel_deg']:.1f}°).")
                 else:
@@ -1026,6 +1039,21 @@ class CalculationEngine:
         # 6. kV input (X-ray only)
         if source == "x_ray":
             input_kv = f["app_kv"]
+            if input_kv <= 0.0:
+                # Non-positive kV is invalid input; it otherwise divides by zero
+                # in the kVp^5 sanity check. Fall back to the default and warn.
+                if trans.language == "tr":
+                    warnings.append(
+                        f"UYARI: Girilen tüp voltajı ({input_kv:g} kV) geçersizdir "
+                        f"(0'dan büyük olmalıdır); hesaplamada varsayılan 120.0 kV kullanıldı."
+                    )
+                else:
+                    warnings.append(
+                        f"WARNING: Entered tube voltage ({input_kv:g} kV) is invalid "
+                        f"(must be > 0); defaulting to 120.0 kV for the calculation."
+                    )
+                input_kv = 120.0
+                f["app_kv"] = 120.0
         else:
             input_kv = None
 
@@ -1042,7 +1070,7 @@ class CalculationEngine:
 
         # 8. Detector quality
         if tech == "analog":
-            film_class_req = calc.get_required_film_class(w_nom, testing_class, material, source)
+            film_class_req = calc.get_required_film_class(w_nom, testing_class, material, source, kv=input_kv)
             max_srb_req = None
             detector_quality_str = f"{film_class_req} Film"
         else:
@@ -1270,12 +1298,27 @@ class CalculationEngine:
                 warnings.append("NOTE: Film diagonal (df) not provided; the SFD >= 1.4*df check could not be performed (e.g. 300x400 mm film -> df=500 mm).")
 
         if is_digital:
-            annex_f_needed, annex_f_ratio = calc.check_annex_f_compensation(ug, max_srb_req)
-            if annex_f_needed:
+            srb_for_annex_f = f.get("app_srb") or max_srb_req or 0.0
+            annex_f_req = calc.calculate_annex_f_fmin(
+                d, geo["b_dist"], srb_for_annex_f, testing_class)
+            if annex_f_req is None:
                 if trans.language == "tr":
-                    warnings.append(f"BİLGİ (Annex F): Ug/SRb ({annex_f_ratio:.1f}) > 2. IQI görünürlüğü için f_min artırılmalı veya SNR yükseltilmelidir.")
+                    warnings.append(
+                        "BİLGİ (Annex F): Dedektör bulanıklığı bu nesne-dedektör mesafesinde (b) telafi edilemez; "
+                        "b artırılmalıdır (bkz. ISO 17636-2 Tablo F.1).")
                 else:
-                    warnings.append(f"NOTE (Annex F): Ug/SRb ({annex_f_ratio:.1f}) > 2. Increase f_min or SNR for IQI visibility.")
+                    warnings.append(
+                        "NOTE (Annex F): Detector unsharpness cannot be compensated at this "
+                        "object-to-detector distance (b); increase b (see ISO 17636-2 Table F.1).")
+            elif annex_f_req > f_min + 1e-9:
+                if trans.language == "tr":
+                    warnings.append(
+                        f"BİLGİ (Annex F): Dedektör bulanıklığını telafi için f_min {f_min:.1f} mm → "
+                        f"{annex_f_req:.1f} mm değerine yükseltilmelidir (SRb={srb_for_annex_f:.0f} µm).")
+                else:
+                    warnings.append(
+                        f"NOTE (Annex F): To compensate detector unsharpness, increase f_min from "
+                        f"{f_min:.1f} mm to {annex_f_req:.1f} mm (SRb={srb_for_annex_f:.0f} µm).")
 
         if geo["dwsi_physical_min"] > 0.0:
             if sfd < geo["dwsi_physical_min"]:
@@ -1403,7 +1446,7 @@ class CalculationEngine:
                         warnings.append(trans.get("warn_input_kv_limit", input_kv, u_max))
 
         if tech == "analog":
-            film_comp, film_msg = calc.check_film_class_compliance(film_class_used, testing_class, w_nom, material, source)
+            film_comp, film_msg = calc.check_film_class_compliance(film_class_used, testing_class, w_nom, material, source, kv=input_kv)
             if not film_comp:
                 if trans.language == "tr":
                     warnings.append(f"UYARI: Kullanılan film sınıfı ({film_class_used}) standart gereksinimini karşılamıyor! Asgari gereken: {film_class_req}")

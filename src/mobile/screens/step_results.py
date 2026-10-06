@@ -4,7 +4,7 @@ from kivymd.uix.menu import MDDropdownMenu
 from kivymd.uix.dialog import MDDialog
 from kivymd.uix.label import MDLabel
 
-DEFECT_TYPES = ["crack", "ip", "if", "ic", "porosity", "slag", "undercut", "burn_through"]
+DEFECT_TYPES = ["defect_crack", "defect_ip", "defect_if", "defect_ic", "defect_porosity", "defect_slag", "defect_undercut", "defect_burn_through"]
 DEFECT_STANDARDS = ["api1104", "iso5817", "b31_3", "viii"]
 
 
@@ -133,7 +133,7 @@ class StepResults(MDScreen):
             pass
 
     def evaluate_defect(self):
-        dt = self.state.get("defect_type", "crack")
+        dt = self.state.get("defect_type", "defect_crack")
         length = self.state.get("defect_length", 0)
         width = self.state.get("defect_width", 0)
         accum = self.state.get("defect_accum", 0)

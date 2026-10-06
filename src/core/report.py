@@ -343,7 +343,8 @@ class PDFReportGenerator:
             [Paragraph(lang_obj.get("cap_height"), label_style), Paragraph(f"{inputs.get('cap', 0.0):.1f} mm", value_style),
              Paragraph(lang_obj.get("focal_size"), label_style), Paragraph(f"{inputs.get('d', 0.0):.2f} mm", value_style)],
             [Paragraph(lang_obj.get("geometry"), label_style), Paragraph(inputs.get("geometry_text", ""), value_style),
-             Paragraph(lang_obj.get("actual_sfd"), label_style), Paragraph(f"{inputs.get('sfd', 0.0):.1f} mm", value_style)]
+             Paragraph(lang_obj.get("actual_sdd") if inputs.get("tech") == "digital" else lang_obj.get("actual_sfd"), label_style),
+             Paragraph(f"{inputs.get('sfd', 0.0):.1f} mm", value_style)]
         ]
 
         # Add Tube Voltage (kV) if X-Ray or Activity (Ci) if Isotope
@@ -451,7 +452,8 @@ class PDFReportGenerator:
             [Paragraph(lang_obj.get("sfd_min"), label_style), Paragraph(f"{outputs.get('sfd_min', 0.0):.1f} mm", value_style),
              Paragraph(lang_obj.get("target_snr") if inputs.get("tech") == "digital" else lang_obj.get("optical_density"), label_style),
              Paragraph(_esc(outputs.get('quality_target', "")), value_style)],
-            [Paragraph(lang_obj.get("detector_quality"), label_style), Paragraph(_esc(outputs.get('detector_quality', "")), value_style),
+            [Paragraph(lang_obj.get("detector_quality") if inputs.get("tech") == "digital" else lang_obj.get("film_class_req"), label_style),
+             Paragraph(_esc(outputs.get('detector_quality', "")), value_style),
              Paragraph(lang_obj.get("filter_recommendation"), label_style), Paragraph(_esc(outputs.get('filter_recommendation', "")), value_style)],
             [Paragraph(lang_obj.get("base_multiplier"), label_style), Paragraph(f"{outputs.get('base_multiplier', 1.0):.2f}", value_style),
              Paragraph("", label_style), Paragraph("", value_style)]

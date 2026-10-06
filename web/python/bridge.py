@@ -91,11 +91,13 @@ def _build_report_inputs(form, calculated, display, lang, report_info):
     }
 
 
-def _build_report_outputs(calculated, display):
+def _build_report_outputs(calculated, display, source="x_ray"):
     return {
         "w_nom": calculated.get("w_nom"),
         "w_eff": calculated.get("w_eff"),
-        "u_max": calculated.get("u_max"),
+        # u_max is an X-ray tube-voltage limit; for gamma sources report N/A
+        # (matches the desktop report).
+        "u_max": calculated.get("u_max") if source == "x_ray" else None,
         "f_min": calculated.get("f_min_iso"),
         "f_min_asme": calculated.get("f_min_asme"),
         "sfd_min": calculated.get("sfd_min"),
@@ -201,16 +203,16 @@ def handle(request_json):
         if tech == "digital":
             if geometry == "swsi":
                 if curved:
-                    figures = ["fig5a", "fig2a", "fig8a"]
+                    figures = ["fig2a", "fig5a", "fig8a"]
                 else:
-                    figures = ["fig5b", "fig2b", "fig8b"]
+                    figures = ["fig2b", "fig5b", "fig8b"]
             elif geometry in ("dwdi_elliptic", "dwdi_super"):
                 figures = ["fig11", "fig12"]
             else:  # dwsi
                 figures = ["fig13a", "fig14a"] if curved else ["fig13b", "fig14b"]
         else:
             if geometry == "swsi":
-                figures = ["fig5", "fig2", "fig8"]
+                figures = ["fig2", "fig5", "fig8"]
             elif geometry in ("dwdi_elliptic", "dwdi_super"):
                 figures = ["fig11", "fig12"]
             else:  # dwsi
@@ -234,7 +236,7 @@ def handle(request_json):
         display = payload.get("display") or {}
 
         inputs = _build_report_inputs(form, calculated, display, lang, payload.get("report_info"))
-        outputs = _build_report_outputs(calculated, display)
+        outputs = _build_report_outputs(calculated, display, form.get("source", "x_ray"))
 
         defect = payload.get("defect")
         if not defect:

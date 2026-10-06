@@ -23,6 +23,7 @@ import {
 } from "./components/SketchView";
 import { WeldSetup3D } from "./components/WeldSetup3D";
 import { makeTranslator } from "./i18n";
+import { dataUrlToBase64 } from "./lib/dataUrl";
 import { pyClient } from "./pyodide/client";
 import {
   DEFAULT_BASE_E_BY_SOURCE,
@@ -172,13 +173,6 @@ function loadPersisted(): PersistedState {
         parsed.form.b_object <= (parsed.form.t ?? 6.02) + (parsed.form.cap ?? 0)
       ) {
         parsed.form.b_object = null;
-      }
-      if (
-        parsed.form.geometry === "swsi" &&
-        parsed.form.std_figure &&
-        ["fig2", "fig2a", "fig2b"].includes(parsed.form.std_figure)
-      ) {
-        parsed.form.std_figure = null;
       }
       const validCharts = getActiveChartKeys(
         parsed.form.tech ?? "analog",
@@ -517,6 +511,9 @@ export default function App() {
     if (prov.method === "dwdi_rule") {
       return t("exp_prov_dwdi", prov.ratio, prov.n);
     }
+    if (prov.method === "out_of_chart") {
+      return t("exp_prov_out_of_chart", prov.n);
+    }
     return t("exp_prov_fallback", prov.n);
   })();
 
@@ -828,7 +825,10 @@ export default function App() {
                       if (preset) {
                         setForm((previous) => {
                           const nextSource = preset.source ?? previous.source;
-                          return {
+                          const nextTech = preset.tech ?? previous.tech;
+                          const nextDetector =
+                            preset.detector_type ?? previous.detector_type;
+                          const next = {
                             ...previous,
                             ...preset,
                             base_e:
@@ -836,6 +836,23 @@ export default function App() {
                               DEFAULT_BASE_E_BY_SOURCE[nextSource] ??
                               previous.base_e,
                           };
+                          // A preset may change tech/source/detector without
+                          // changing chart_source; re-validate so an incompatible
+                          // chart is never sent to the engine.
+                          const validCharts = getActiveChartKeys(
+                            nextTech,
+                            nextDetector,
+                            nextSource,
+                          );
+                          if (!validCharts.includes(next.chart_source)) {
+                            next.chart_source =
+                              nextTech !== "digital"
+                                ? nextSource === "x_ray"
+                                  ? "type_x"
+                                  : "AA400"
+                                : validCharts[0] ?? "model";
+                          }
+                          return next;
                         });
                         setNotice(
                           lang === "tr"
@@ -1677,7 +1694,7 @@ export default function App() {
                 </>
               ) : (
                 <SliderField
-                  label={`${t("activity")} (${activityUnit})`}
+                  label={`${t("activity")} (${activityUnit}):`}
                   value={Number((form.output_val * activityFactor).toFixed(2))}
                   min={0.01}
                   max={37000}
@@ -1904,7 +1921,7 @@ export default function App() {
                   <SelectField
                     label={t("applied_duplex")}
                     value={String(form.app_duplex)}
-                    options={Array.from({ length: 13 }, (_, index) => ({
+                    options={Array.from({ length: 14 }, (_, index) => ({
                       value: String(index + 1),
                       label: `D${index + 1}`,
                     }))}
@@ -2271,25 +2288,33 @@ export default function App() {
               ))}
             </Group>
             <Group title={t("procedure_section")}>
-              <div
-                className={
-                  compliance?.is_compliant
-                    ? "badge compliant"
-                    : "badge non-compliant"
-                }
-              >
-                {compliance?.is_compliant ? t("compliant") : t("non_compliant")}
-              </div>
-              <ul className="check-list">
-                {compliance?.checks.map((check) => (
-                  <li key={check.name} className={check.status ? "ok" : "fail"}>
-                    {check.status ? "✓" : "✗"} {check.details}
-                  </li>
-                ))}
-                {compliance?.activity_warning && (
-                  <li className="warn">⚠ {compliance.activity_warning}</li>
-                )}
-              </ul>
+              {error ? (
+                <div className="badge non-compliant" role="alert">
+                  ⚠ {error}
+                </div>
+              ) : (
+                <>
+                  <div
+                    className={
+                      compliance?.is_compliant
+                        ? "badge compliant"
+                        : "badge non-compliant"
+                    }
+                  >
+                    {compliance?.is_compliant ? t("compliant") : t("non_compliant")}
+                  </div>
+                  <ul className="check-list">
+                    {compliance?.checks.map((check) => (
+                      <li key={check.name} className={check.status ? "ok" : "fail"}>
+                        {check.status ? "✓" : "✗"} {check.details}
+                      </li>
+                    ))}
+                    {compliance?.activity_warning && (
+                      <li className="warn">⚠ {compliance.activity_warning}</li>
+                    )}
+                  </ul>
+                </>
+              )}
             </Group>
           </div>
 
@@ -2701,9 +2726,7 @@ async function svgToPngBase64(containerId: string): Promise<string | null> {
     styles.getPropertyValue("--bg-alt").trim() || "#ffffff";
   context.fillRect(0, 0, canvas.width, canvas.height);
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL("image/png").split(",", 1)[0] === "data:image/png"
-    ? canvas.toDataURL("image/png").split(",", 2)[1]
-    : null;
+  return dataUrlToBase64(canvas.toDataURL("image/png"));
 }
 
 function downloadBase64(base64: string, filename: string) {

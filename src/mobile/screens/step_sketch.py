@@ -356,7 +356,7 @@ class WeldCanvas(RelativeLayout):
             Rectangle(pos=(cx - branch_inner / 2, cy + ph * 0.08), size=(branch_inner, ph * 0.55))
 
             Color(0.85, 0.65, 0.15, 1)
-            Line(circle=(cx, cy + ph * 0.08), radius=pw * 0.22, width=3)
+            Line(circle=(cx, cy + ph * 0.08, pw * 0.22), width=3)
             Color(0.85, 0.65, 0.15, 0.3)
             Ellipse(pos=(cx - pw * 0.22, cy + ph * 0.08 - pw * 0.22), size=(pw * 0.44, pw * 0.44))
 

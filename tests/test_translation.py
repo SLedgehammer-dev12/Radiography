@@ -150,6 +150,21 @@ class TestTranslationContent(unittest.TestCase):
         self.assertIn("base_multiplier_note", self.trans.translations["tr"])
         self.assertIn("base_multiplier_note", self.trans.translations["en"])
 
+    def test_web_app_literal_keys_exist(self):
+        """Every literal ``t("key")`` used by the web app must exist in the
+        translations, otherwise the UI renders the raw key. Regression:
+        tt_bed/tt_bgap/tt_f_source/tt_b_object were missing."""
+        import pathlib
+        import re
+
+        app = pathlib.Path(__file__).resolve().parents[1] / "web" / "src" / "App.tsx"
+        if not app.exists():
+            self.skipTest("web front-end not present")
+        source = app.read_text(encoding="utf-8")
+        keys = set(re.findall(r'\bt\(\s*"([A-Za-z0-9_]+)"', source))
+        missing = sorted(k for k in keys if k not in self.trans.translations["tr"])
+        self.assertEqual(missing, [], f"Keys used in App.tsx but missing: {missing}")
+
     def test_owner_contact_disclaimer_keys(self):
         for lang in ("tr", "en"):
             d = self.trans.translations[lang]

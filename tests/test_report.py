@@ -74,6 +74,30 @@ class TestPDFReportGenerator(unittest.TestCase):
         self.assertTrue(os.path.exists(filepath))
         self.assertGreater(os.path.getsize(filepath), 1000)
 
+    def test_distance_and_detector_labels_follow_tech(self):
+        import pypdf
+
+        # Digital -> SDD distance label + Detector Class label
+        p_dig = os.path.join(self.tmpdir, "dig.pdf")
+        self.gen.generate_report(
+            p_dig, self._make_inputs(tech="digital"), self._make_outputs(),
+            [], None, False, None, self.lang)
+        t_dig = "\n".join(
+            (pg.extract_text() or "") for pg in pypdf.PdfReader(p_dig).pages)
+        self.assertIn("(SDD) (mm)", t_dig)
+        self.assertIn("Detector Class", t_dig)
+
+        # Analog -> SFD distance label + Film Class label
+        p_ana = os.path.join(self.tmpdir, "ana.pdf")
+        self.gen.generate_report(
+            p_ana, self._make_inputs(tech="analog", speed="C5"),
+            self._make_outputs(detector_quality="C3 Film"),
+            [], None, False, None, self.lang)
+        t_ana = "\n".join(
+            (pg.extract_text() or "") for pg in pypdf.PdfReader(p_ana).pages)
+        self.assertIn("(SFD) (mm)", t_ana)
+        self.assertIn("Film Class", t_ana)
+
     def test_generate_report_with_warnings(self):
         filepath = os.path.join(self.tmpdir, "test_warn.pdf")
         warnings = ["Warning 1: Test warning message", "Warning 2: Another warning"]

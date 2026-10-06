@@ -389,6 +389,16 @@ jobs:
               with open('release_notes.txt', 'w') as out:
                   out.write('See CHANGELOG.md for details.')
           "
+      - name: Append SHA-256 checksums to release notes
+        run: |
+          echo "" >> release_notes.txt
+          echo "## Artifact checksums (SHA-256)" >> release_notes.txt
+          for f in release-artifacts/*; do
+            [ -f "$f" ] || continue
+            h=$(sha256sum "$f" | awk '{print $1}')
+            echo "sha256: $h  $(basename "$f")" >> release_notes.txt
+          done
+          cat release_notes.txt
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:

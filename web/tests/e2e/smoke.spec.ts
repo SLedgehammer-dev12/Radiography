@@ -69,6 +69,39 @@ test("evaluates a defect with the shared engine", async ({ page }) => {
   await expect(page.locator(".defect-reason")).toBeVisible({ timeout: 30_000 });
 });
 
+test("applying an isotope preset re-validates the exposure chart", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.locator(".layout")).toBeVisible({ timeout: 150_000 });
+
+  // Analog + X-ray + Type X chart
+  await page
+    .locator(".field", { hasText: "RT Teknolojisi" })
+    .getByRole("radio")
+    .first()
+    .check();
+  await page
+    .locator(".field", { hasText: "Radyasyon Kaynağı" })
+    .locator("select")
+    .selectOption("x_ray");
+  const chart = page.locator(".field", { hasText: "Chart Kaynağı" }).locator("select");
+  await chart.selectOption("type_x");
+  await expect(chart).toHaveValue("type_x");
+
+  // Apply an Ir-192 preset from the File menu
+  await page.getByRole("button", { name: /Dosya|File/i }).click();
+  await page
+    .locator("select.menu-select")
+    .selectOption({ label: "16 inç DWSI Ir-192 Saha" });
+
+  // The chart must be sanitized to a valid analog-isotope chart, not type_x.
+  const chartValue = await chart.inputValue();
+  expect(["model", "AA400", "MX125", "T200", "HS800", "M100"]).toContain(
+    chartValue,
+  );
+});
+
 test("round-trips a desktop-compatible preset", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator(".layout")).toBeVisible({ timeout: 150_000 });
@@ -135,6 +168,25 @@ test("renders the dynamic sketch for every geometry and all figures", async ({
   }
 });
 
+test("SWSI defaults to the film-inside figure (fig2), not panoramic fig5", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.locator(".layout")).toBeVisible({ timeout: 150_000 });
+  const geometry = page
+    .locator(".field", { hasText: "Geometri" })
+    .locator("select")
+    .first();
+  await geometry.selectOption("swsi");
+  const figure = page
+    .locator(".field", { hasText: "Standart ISO Şekli" })
+    .locator("select")
+    .first();
+  await expect
+    .poll(async () => figure.inputValue(), { timeout: 30_000 })
+    .toMatch(/^fig2/);
+});
+
 test("updates outputs when the geometry changes", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator(".layout")).toBeVisible({ timeout: 150_000 });
@@ -148,6 +200,21 @@ test("updates outputs when the geometry changes", async ({ page }) => {
   await expect(page.getByTestId("output-w_nom")).toContainText("6.02 mm");
 });
 
+
+test("activity label does not duplicate the unit", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator(".layout")).toBeVisible({ timeout: 150_000 });
+  await page
+    .locator(".field", { hasText: "Radyasyon Kaynağı" })
+    .locator("select")
+    .selectOption("isotope_ir192");
+  await page.getByRole("button", { name: /Ci\s*→\s*GBq/ }).click();
+  const label = page
+    .locator(".field", { hasText: "Kaynak Aktivitesi" })
+    .locator(".field-label");
+  await expect(label).toContainText("(GBq)");
+  await expect(label).not.toContainText("(Ci):");
+});
 
 test("shows the SFD_min/SDD_min calculation provenance", async ({ page }) => {
   await page.goto("/");

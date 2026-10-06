@@ -330,3 +330,41 @@ def test_digital_exposure_methods_and_dda_frame_display(engine):
         "od": 114.3, "t": 6.02, "sfd": 600.0, "app_srb": 50.0,
     })
     assert res_srb_50["values"]["calc_time"] > res_srb_100["values"]["calc_time"]
+
+
+def test_out_of_chart_film_inside_uses_conservative_cap(engine):
+    """Regression: an operating point outside the Annex A chart returned N=1
+    (film inside) / N=3 (film outside), grossly under-counting exposures. It
+    must fall back to the chart cap and warn."""
+    result = engine.calculate({
+        "source": "x_ray", "tech": "analog", "geometry": "swsi",
+        "std_figure": "fig2", "testing_class": "class_b",
+        "od": 323.9, "t": 8.56, "sfd": 600.0, "f_source": 80.0,
+        "app_kv": 120.0, "app_time": 1.0,
+    })
+    assert result["calculated"]["exposures_graph"] == 24
+    prov = result["calculated"]["exposures_provenance"]
+    assert prov["method"] == "out_of_chart"
+    assert any("Annex A" in w for w in result["warnings"])
+
+
+def test_zero_panel_width_is_flagged_not_exploded(engine):
+    """Regression: panel_width=0 floored the coverage angle at 1e-6 and produced
+    ~3.5 million required exposures."""
+    result = engine.calculate({
+        "tech": "digital", "geometry": "dwsi", "panel_width": 0.0,
+        "t": 6.02, "od": 114.3, "sfd": 600.0, "app_kv": 150.0,
+    }, {}, "en")
+    assert result["calculated"]["exposures_graph"] < 100
+    assert any("invalid" in w.lower() for w in result["warnings"]), result["warnings"]
+
+
+@pytest.mark.parametrize("bad_kv", [0.0, -50.0])
+def test_invalid_xray_kv_does_not_crash_and_warns(engine, bad_kv):
+    """Regression: app_kv <= 0 divided by zero in the kVp^5 sanity check,
+    crashing the shared engine (web showed stale results, mobile errored)."""
+    result = engine.calculate({
+        "source": "x_ray", "tech": "analog", "app_kv": bad_kv, "app_time": 1.0,
+    })
+    assert result["calculated"]["calc_time_raw"] > 0
+    assert any("120" in w for w in result["warnings"]), result["warnings"]

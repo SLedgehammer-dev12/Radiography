@@ -40,6 +40,146 @@ class TestMainWindowInit(unittest.TestCase):
     def test_grp_compliance_exists(self):
         self.assertTrue(hasattr(self.win, "grp_compliance"))
 
+    def test_activity_unit_toggle_converts_both_ways_and_keeps_signals(self):
+        # Isotope source so the activity field is active.
+        self.win.cmb_source.setCurrentIndex(1)  # Ir-192
+        self.win.txt_app_activity.setText("40.0")
+
+        self.win.cmb_activity_unit.setCurrentIndex(1)  # -> GBq
+        self.assertAlmostEqual(float(self.win.txt_app_activity.text()), 1480.0, places=1)
+
+        self.win.cmb_activity_unit.setCurrentIndex(0)  # -> Ci
+        self.assertAlmostEqual(float(self.win.txt_app_activity.text()), 40.0, places=1)
+        # Regression: the old handler leaked blockSignals(True), freezing the field.
+        self.assertFalse(self.win.txt_app_activity.signalsBlocked())
+
+    def test_settings_persist_method_and_inputs(self):
+        from src.ui.main_window import MainWindow
+
+        self.win.rad_analog.setChecked(True)
+        self.win.chk_source_side_iqi.setChecked(True)
+        self.win.txt_app_kv.setText("200.0")
+        self.win.txt_bed.setText("12.0")
+        self.win.txt_bgap.setText("7.0")
+        self.win._save_settings()
+
+        other = MainWindow()
+        try:
+            self.assertTrue(other.rad_analog.isChecked())
+            self.assertTrue(other.chk_source_side_iqi.isChecked())
+            self.assertAlmostEqual(float(other.txt_app_kv.text()), 200.0, places=1)
+            self.assertAlmostEqual(float(other.txt_bed.text()), 12.0, places=1)
+            self.assertAlmostEqual(float(other.txt_bgap.text()), 7.0, places=1)
+        finally:
+            other.close()
+            other.deleteLater()
+
+    def test_unit_mode_persisted(self):
+        from src.ui.main_window import MainWindow
+
+        self.win.toggle_units()  # mm -> inch
+        self.win._save_settings()
+
+        other = MainWindow()
+        try:
+            self.assertTrue(other.use_inch)
+            self.assertEqual(other.btn_units.text(), "inç")
+        finally:
+            other.close()
+            other.deleteLater()
+
+    def test_pdf_defect_matches_screen_after_inch_toggle(self):
+        """Regression: PDF re-evaluated defects with raw inch values, so the
+        report could show ACCEPT while the screen showed REJECT."""
+        import os
+        import tempfile
+        from unittest.mock import patch
+
+        import pypdf
+        from PyQt6.QtWidgets import QFileDialog, QMessageBox
+
+        win = self.win
+        win.toggle_units()  # mm -> inch
+        win.cmb_defect_type.setCurrentIndex(0)  # defect_ip
+        win.txt_defect_length.setText("1.5")   # 38.1 mm > 25.4 mm limit
+        win.txt_defect_width.setText("0.1")
+        win.txt_defect_accum.setText("0.0")
+        with patch.object(QMessageBox, "information", return_value=None):
+            win.evaluate_defect()
+        self.assertIn("REDDED", win.lbl_defect_result.text())
+
+        tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+        tmp.close()
+        try:
+            with patch.object(QFileDialog, "getSaveFileName", return_value=(tmp.name, "")), \
+                 patch.object(QMessageBox, "information", return_value=None), \
+                 patch.object(QMessageBox, "critical", return_value=None):
+                win.export_pdf_report()
+            text = "\n".join(
+                (p.extract_text() or "") for p in pypdf.PdfReader(tmp.name).pages
+            )
+        finally:
+            os.unlink(tmp.name)
+        self.assertIn("REDDEDİLDİ", text)
+        self.assertNotIn("KABUL EDİLEBİLİR", text)
+
+    def test_preset_state_is_canonical_mm(self):
+        from src.ui.main_window import MainWindow
+
+        # Values chosen as exact multiples of 25.4 so the inch toggle's 2-dp
+        # formatting does not introduce rounding noise.
+        self.win.txt_custom_od.setText("114.3")
+        self.win.txt_custom_t.setText("12.7")
+        self.win.toggle_units()  # mm -> inch (114.3 -> 4.50, 12.7 -> 0.50)
+
+        state = self.win.collect_form_state()
+        self.assertAlmostEqual(float(state["txt_custom_od"]), 114.3, places=3)
+        self.assertAlmostEqual(float(state["txt_custom_t"]), 12.7, places=3)
+
+        # Imported in mm mode -> exact mm values restored.
+        mm_window = MainWindow()
+        try:
+            mm_window.apply_form_state(state)
+            self.assertAlmostEqual(float(mm_window.txt_custom_od.text()), 114.3, places=2)
+            self.assertAlmostEqual(float(mm_window.txt_custom_t.text()), 12.7, places=2)
+        finally:
+            mm_window.close()
+            mm_window.deleteLater()
+
+        # Imported while the target is in inch mode -> shown in inches.
+        inch_window = MainWindow()
+        try:
+            inch_window.use_inch = True
+            inch_window.apply_form_state(state)
+            self.assertAlmostEqual(float(inch_window.txt_custom_od.text()), 4.5, places=2)
+        finally:
+            inch_window.close()
+            inch_window.deleteLater()
+
+    def test_activity_unit_persisted_with_value(self):
+        from src.ui.main_window import MainWindow
+
+        self.win.cmb_source.setCurrentIndex(1)  # Ir-192
+        self.win.cmb_activity_unit.setCurrentIndex(1)  # GBq
+        self.win.txt_app_activity.setText("1480.0")
+        self.win._save_settings()
+
+        other = MainWindow()
+        try:
+            self.assertEqual(other.cmb_activity_unit.currentText(), "GBq")
+            self.assertAlmostEqual(float(other.txt_app_activity.text()), 1480.0, places=0)
+            self.assertEqual(other._activity_unit, "GBq")
+        finally:
+            other.close()
+            other.deleteLater()
+
+    def test_applied_duplex_selector_reaches_d14(self):
+        # ISO 17636-2 Table B.14 requires D 14 for Class B w <= 1.5 mm; if the
+        # selector cannot reach D 14 the compliance check can never pass.
+        count = self.win.cmb_app_duplex.count()
+        self.assertGreaterEqual(count, 14)
+        self.assertEqual(self.win.cmb_app_duplex.itemData(count - 1), 14)
+
     def test_tab_extra_exists(self):
         self.assertTrue(hasattr(self.win, "tab_extra"))
 

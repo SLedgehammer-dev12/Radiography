@@ -3,6 +3,8 @@ from kivy.metrics import dp
 from kivymd.uix.screen import MDScreen
 from kivymd.uix.menu import MDDropdownMenu
 
+from lib.parsing import parse_number
+
 
 FILM_CLASSES = ["C1", "C2", "C3", "C4", "C5", "C6"]
 DETECTOR_TYPES = [
@@ -36,7 +38,11 @@ class StepExposure(MDScreen):
         self.ids.detector_area.opacity = 1 if is_digital else 0
         self.ids.detector_area.disabled = not is_digital
         self.ids.film_class_btn.text = self.state.film_class
-        self.ids.detector_btn.text = self.state.get_text(DETECTOR_TYPES[0][1])
+        detector_label = next(
+            (self.state.get_text(d[1]) for d in DETECTOR_TYPES if d[0] == self.state.detector_type),
+            self.state.detector_type,
+        )
+        self.ids.detector_btn.text = detector_label
 
         # X-Ray vs Isotope
         self.ids.xray_area.opacity = 1 if is_xray else 0
@@ -48,48 +54,41 @@ class StepExposure(MDScreen):
         self.ids.isotope_area.height = 0 if is_xray else dp(60)
 
     def on_kv(self, text):
-        try:
-            self.state.set("kv", float(text))
-            self.state.set("app_kv", float(text))
-        except ValueError:
-            pass
+        value = parse_number(text)
+        if value is not None:
+            self.state.set("kv", value)
+            self.state.set("app_kv", value)
 
     def on_ma(self, text):
-        try:
-            self.state.set("ma", float(text))
-        except ValueError:
-            pass
+        value = parse_number(text)
+        if value is not None:
+            self.state.set("ma", value)
 
     def on_activity(self, text):
-        try:
-            self.state.set("app_activity", float(text))
-        except ValueError:
-            pass
+        value = parse_number(text)
+        if value is not None:
+            self.state.set("app_activity", value)
 
     def on_slider_activity(self, value):
         self.state.set("app_activity", round(value, 1))
         self.ids.activity_input.text = str(round(value, 1))
 
     def on_time(self, text):
-        try:
-            self.state.set("exposure_time", float(text))
-            self.state.set("app_time", float(text))
-        except ValueError:
-            pass
+        value = parse_number(text)
+        if value is not None:
+            self.state.set("exposure_time", value)
+            self.state.set("app_time", value)
 
     def on_multiplier(self, text):
-        try:
-            self.state.set("base_multiplier", float(text))
-        except ValueError:
-            pass
+        value = parse_number(text)
+        if value is not None:
+            self.state.set("base_multiplier", value)
 
     def on_sfd(self, text):
-        try:
-            val = float(text)
-            self.state.set("sfd", val)
-            self.state.set("app_sfd", val)
-        except ValueError:
-            pass
+        value = parse_number(text)
+        if value is not None:
+            self.state.set("sfd", value)
+            self.state.set("app_sfd", value)
 
     def on_slider_kv(self, value):
         self.state.set("kv", round(value, 1))

@@ -9,10 +9,10 @@ application is compared against the standards, not against itself:
   ISO 17636-2:2022  Clause 7.3.1, Clause 7.6, Annex B Tables B.1-B.14, Tables 3/4
   ASME Sec V Art 2 T-274.2
 
-Known deviations of the current implementation (wire-IQI table transcription
-for B.1/B.3/B.9/B.11, film-system-class model, Yb-169/Tm-170 thin-section SNR)
-are classified as `known` so the matrix stays green while still reporting them;
-anything else is a hard mismatch.
+Every requirement is enforced exactly (hard mismatch on any deviation): the
+single-wire IQI tables (B.1/B.3/B.9/B.11), the Table 3/4 SNR_N targets and the
+Table 3/4 minimum film system classes. The `known` list returned by `compare()`
+is retained for forward compatibility and is currently always empty.
 """
 
 import math
@@ -125,26 +125,8 @@ B11_2022 = [(1.5, 19), (2.5, 18), (4.0, 17), (6.0, 16), (12.0, 15), (18.0, 14),
             (30.0, 13), (45.0, 12), (55.0, 11), (70.0, 10), (100.0, 9),
             (180.0, 8), (300.0, 7), (math.inf, 6)]
 
-# Current implementation tables (calculator.py)
-B1_PROG = [(1.2, 18), (2.0, 17), (3.5, 16), (5.0, 15), (7.0, 14), (10.0, 13),
-           (15.0, 12), (25.0, 11), (40.0, 10), (60.0, 9), (80.0, 8), (100.0, 7),
-           (150.0, 6), (200.0, 5), (250.0, 4), (math.inf, 3)]
-B3_PROG = [(1.5, 19), (2.5, 18), (4.0, 17), (6.0, 16), (8.0, 15), (12.0, 14),
-           (20.0, 13), (30.0, 12), (40.0, 11), (60.0, 10), (85.0, 9), (125.0, 8),
-           (175.0, 7), (250.0, 6), (math.inf, 5)]
-B5_PROG = B5_2022
-B7_PROG = B7_2022
-B9_PROG = [(1.2, 18), (2.0, 17), (3.5, 16), (5.0, 15), (10.0, 14), (15.0, 13),
-           (22.0, 12), (38.0, 11), (54.0, 10), (70.0, 9), (100.0, 8), (170.0, 7),
-           (250.0, 6), (math.inf, 5)]
-B11_PROG = [(1.5, 19), (2.5, 18), (4.0, 17), (6.0, 16), (8.0, 15), (12.0, 14),
-            (20.0, 13), (30.0, 12), (45.0, 11), (65.0, 10), (100.0, 9),
-            (170.0, 8), (250.0, 7), (math.inf, 6)]
-
 WIRE_2022 = {"B1": B1_2022, "B3": B3_2022, "B5": B5_2022, "B7": B7_2022,
              "B9": B9_2022, "B11": B11_2022}
-WIRE_PROG = {"B1": B1_PROG, "B3": B3_PROG, "B5": B5_PROG, "B7": B7_PROG,
-             "B9": B9_PROG, "B11": B11_PROG}
 
 
 def _wire_table_key(testing_class, geometry, film_side):
@@ -156,18 +138,17 @@ def _wire_table_key(testing_class, geometry, film_side):
 
 
 def expected_wire_iqi(t, testing_class, geometry, film_side):
-    """Returns (table_key, ref_2022, wire_2022, wire_program, ref_program)."""
-    if geometry == "dwsi":
-        ref = t          # B.13/B.14 footnote a: single-image uses t
-    elif geometry in ("dwdi_elliptic", "dwdi_super"):
-        ref = 2.0 * t    # double-image: penetrated thickness w = 2t
-    else:
-        ref = t
-    # Current implementation uses 2t for DWSI as well
-    ref_prog = 2.0 * t if geometry == "dwsi" else ref
+    """Returns (table_key, ref, wire).
+
+    Double-wall techniques penetrate two walls, so the penetrated thickness is
+    w = 2t. ISO 17636-2:2022, 6.9 lists the single-wire tables B.1-B.4/B.9-B.12
+    for "single-wall single-image and double-wall (w = 2t) single-image"
+    techniques. The "use t for single-image" rule is a footnote to the
+    duplex/SRb Tables B.13/B.14 only and does not apply to these tables.
+    """
+    ref = 2.0 * t if geometry in ("dwsi", "dwdi_elliptic", "dwdi_super") else t
     key = _wire_table_key(testing_class, geometry, film_side)
-    return (key, ref, _lookup(WIRE_2022[key], ref),
-            _lookup(WIRE_PROG[key], ref_prog), ref_prog)
+    return (key, ref, _lookup(WIRE_2022[key], ref))
 
 
 # ---------------------------------------------------------------------------
@@ -228,35 +209,37 @@ def expected_snr(material, source, kv, w_nom, testing_class):
 
 
 # ---------------------------------------------------------------------------
-# ISO 17636-1:2022 Tables 3/4 — film system class (isotope rows are kV-free)
+# ISO 17636-1:2022 Tables 3/4 — minimum film system class (kV- and source-aware)
 # ---------------------------------------------------------------------------
-def expected_film_class_isotope(material, source, w_nom, testing_class):
-    """2022 standard value for isotope sources, or None if not comparable
-    (X-ray rows are kV-dependent and the app model has no kV input)."""
-    if source == "x_ray":
-        return None
-    if testing_class == "class_a":
-        return "C5"
+def expected_film_class(material, source, w_nom, testing_class, kv=None):
+    """Minimum ISO 11699-1 film system class from Table 3 (steel/copper/nickel)
+    or Table 4 (aluminium/titanium), plus the Clause 6.9 Se-75 thin-section rule."""
     if material in ("aluminum", "titanium"):
-        return "C4"
-    if source == "isotope_se75":
-        return "C4"
-    if source == "isotope_ir192":
-        return "C4"
-    if source == "isotope_co60":
-        return "C4" if w_nom <= 100.0 else "C5"
-    # Yb-169 / Tm-170
-    return "C3" if w_nom <= 5.0 else "C4"
-
-
-def program_film_class_known(material, source, w_nom, testing_class):
-    """The current implementation's rule (for known-deviation classification)."""
-    if material in ("steel", "copper_nickel"):
-        base = "C5" if testing_class == "class_a" else ("C4" if w_nom <= 50.0 else "C3")
-        if source == "isotope_se75" and w_nom < 12.0 and testing_class == "class_b":
-            return {"C5": "C4", "C4": "C3", "C3": "C2", "C2": "C1", "C1": "C1"}.get(base, base)
-        return base
-    return "C5" if testing_class == "class_a" else "C4"
+        # Table 4: class A C5, class B C3 (single merged cell for all rows)
+        return "C5" if testing_class == "class_a" else "C3"
+    if testing_class == "class_a":
+        # Table 3: class A is C5 for every supported (<= 1 MV) source
+        return "C5"
+    if source == "x_ray":
+        kv_eff = 120.0 if kv is None else kv
+        if kv_eff <= 150.0:
+            base = "C3"
+        elif kv_eff <= 250.0:
+            base = "C4"
+        elif kv_eff <= 500.0:
+            base = "C4" if w_nom <= 50.0 else "C5"
+        else:
+            base = "C4" if w_nom <= 75.0 else "C5"
+    elif source in ("isotope_yb169", "isotope_tm170"):
+        base = "C3" if w_nom <= 5.0 else "C4"
+    elif source == "isotope_co60":
+        base = "C4" if w_nom <= 100.0 else "C5"
+    else:
+        base = "C4"  # Se-75, Ir-192, other isotopes
+    if source == "isotope_se75" and w_nom < 12.0:
+        base = {"C6": "C5", "C5": "C4", "C4": "C3",
+                "C3": "C2", "C2": "C1", "C1": "C1"}.get(base, base)
+    return base
 
 
 # ---------------------------------------------------------------------------
@@ -286,12 +269,16 @@ def expected_f_min_iso(b, t, d, testing_class, use_star):
 
 
 def expected_asme_f_min(d, b, t):
-    limits = [(50.8, 0.51), (76.2, 0.76), (101.6, 1.02)]
-    ug = 1.78
-    for bound, val in limits:
-        if t <= bound:
-            ug = val
-            break
+    # ASME Sec V Art 2 Table T-274.2 — metric boundaries 50/75/100 mm;
+    # the exact 50/75 boundaries fall in the higher (more permissive) band.
+    if t < 50.0:
+        ug = 0.51
+    elif t <= 75.0:
+        ug = 0.76
+    elif t <= 100.0:
+        ug = 1.02
+    else:
+        ug = 1.78
     return d * b / ug
 
 
@@ -525,22 +512,18 @@ def expected_values(sc):
     }
     # Wire IQI (skip DWSI source side: invalid placement per 7.1.8)
     if sc["effective_geometry"] == "dwsi" and not sc["film_side"]:
-        out["wire_key"] = out["required_wire_no"] = out["required_wire_no_prog"] = None
+        out["wire_key"] = out["required_wire_no"] = None
     else:
-        key, ref, wire22, wireprog, _ref_prog = expected_wire_iqi(
+        key, ref, wire22 = expected_wire_iqi(
             t, sc["testing_class"], sc["effective_geometry"], sc["film_side"])
         out["wire_key"] = key
         out["required_wire_no"] = wire22
-        out["required_wire_no_prog"] = wireprog
-    # Film class (analog only)
+    # Film class (analog only) — ISO 17636-1:2022 Tables 3/4
     if sc["tech"] == "analog":
-        out["required_film_class"] = expected_film_class_isotope(
-            sc["material"], sc["source"], w_nom, sc["testing_class"])
-        out["required_film_class_prog"] = program_film_class_known(
-            sc["material"], sc["source"], w_nom, sc["testing_class"])
+        out["required_film_class"] = expected_film_class(
+            sc["material"], sc["source"], w_nom, sc["testing_class"], sc["kv"])
     else:
         out["required_film_class"] = None
-        out["required_film_class_prog"] = None
     # Table 2
     defined, valid, note = expected_table2(
         sc["source"], sc["material"], w_nom, sc["testing_class"], sc["kv"])
@@ -548,7 +531,7 @@ def expected_values(sc):
     out["table2_valid"] = valid
     out["table2_note"] = note
     # Exposures — ISO 17636-1/2:2022 Annex A (digitized charts).
-    from src.core.annex_a import minimum_exposures
+    from src.core.annex_a import chart_cap, minimum_exposures
 
     eg = sc["effective_geometry"]
     figure = sc.get("std_figure")
@@ -562,11 +545,18 @@ def expected_values(sc):
             n = minimum_exposures(
                 t, od, max(sc["sfd"] - b_dist, 1.0),
                 sc["testing_class"], film_inside=True)
-            out["exposures_graph"] = int(n) if n is not None else 1
+            if n is not None:
+                out["exposures_graph"] = int(n)
+            else:
+                # Outside the chart: conservative cap (highest N curve)
+                out["exposures_graph"] = chart_cap(sc["testing_class"], film_inside=True) or 1
         elif figure in ("fig8", "fig8a", "fig8b"):
             n = minimum_exposures(
                 t, od, sc["sfd"], sc["testing_class"], film_inside=False)
-            out["exposures_graph"] = max(3, int(n)) if n is not None else 3
+            if n is not None:
+                out["exposures_graph"] = max(3, int(n))
+            else:
+                out["exposures_graph"] = max(3, chart_cap(sc["testing_class"], film_inside=False) or 3)
         else:
             out["exposures_graph"] = 1
     elif eg in ("dwdi_elliptic", "dwdi_super"):
@@ -611,38 +601,25 @@ def compare(sc, program):
     cmp("max_srb")
     cmp("required_duplex_no")
 
-    # SNR: known deviation for Yb/Tm thin class B (Table 3 gives 120)
+    # SNR_N (ISO 17636-2:2022 Tables 3/4) — enforced exactly
     if exp["required_snr"] is not None:
         p = program.get("required_snr")
         if p is not None and abs(exp["required_snr"] - p) > 1e-9:
-            if (sc["material"] in ("steel", "copper_nickel")
-                    and sc["source"] in ("isotope_yb169", "isotope_tm170")
-                    and sc["testing_class"] == "class_b" and 0 < exp["w_nom"] <= 5.0):
-                known.append(f"required_snr: expected {exp['required_snr']} != program {p} (Yb/Tm thin-section Table 3 row not implemented)")
-            else:
-                hard.append(f"required_snr: expected {exp['required_snr']} != program {p}")
+            hard.append(f"required_snr: expected {exp['required_snr']} != program {p}")
 
-    # Wire IQI: known deviation when the program value equals its own legacy table
+    # Wire IQI: 2022 tables are enforced exactly (B.1/B.3/B.9/B.11 corrected)
     if exp["required_wire_no"] is not None:
         p = program.get("required_wire_no")
         if p is not None and exp["required_wire_no"] != p:
-            if p == exp["required_wire_no_prog"]:
-                known.append(
-                    f"wire IQI [{exp['wire_key']}]: 2022 W{exp['required_wire_no']} != program W{p} (table transcription)")
-            else:
-                hard.append(
-                    f"wire IQI [{exp['wire_key']}]: expected W{exp['required_wire_no']} != program W{p}")
+            hard.append(
+                f"wire IQI [{exp['wire_key']}]: expected W{exp['required_wire_no']} != program W{p}")
 
-    # Film class: known deviation when program matches its own rule
+    # Film class (ISO 17636-1:2022 Tables 3/4) — enforced exactly
     if exp["required_film_class"] is not None:
         p = program.get("required_film_class")
         if p is not None and exp["required_film_class"] != p:
-            if p == exp["required_film_class_prog"]:
-                known.append(
-                    f"film class: 2022 {exp['required_film_class']} != program {p} (Table 3/4 model)")
-            else:
-                hard.append(
-                    f"film class: expected {exp['required_film_class']} != program {p}")
+            hard.append(
+                f"film class: expected {exp['required_film_class']} != program {p}")
 
     # Table 2 validity via warning text
     warnings = program.get("warnings", "")

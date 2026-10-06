@@ -68,6 +68,41 @@ class TestUpdater(unittest.TestCase):
         finally:
             platform.system = orig_sys
 
+    def test_get_download_asset_returns_name_and_url(self):
+        checker = self.UpdateChecker()
+        release_data = {
+            "assets": [
+                {"name": "Radiography-1.4.0-Windows-x64.exe", "browser_download_url": "https://github.com/exe"},
+                {"name": "Radiography-1.4.0-macOS.dmg", "browser_download_url": "https://github.com/dmg"},
+            ]
+        }
+        import platform
+        orig_sys = platform.system
+        try:
+            platform.system = lambda: "Windows"
+            asset = checker.get_download_asset(release_data)
+            self.assertEqual(asset["name"], "Radiography-1.4.0-Windows-x64.exe")
+            self.assertEqual(asset["url"], "https://github.com/exe")
+            platform.system = lambda: "Darwin"
+            self.assertEqual(checker.get_download_asset(release_data)["url"], "https://github.com/dmg")
+        finally:
+            platform.system = orig_sys
+        self.assertIsNone(checker.get_download_asset({"assets": []}))
+
+    def test_extract_sha256_from_release(self):
+        checker = self.UpdateChecker()
+        digest = "a" * 64
+        release_data = {
+            "body": f"## Artifact checksums (SHA-256)\nsha256: {digest}  Radiography-1.4.0-Windows-x64.exe\n"
+        }
+        self.assertEqual(
+            checker._extract_sha256_from_release(release_data, "Radiography-1.4.0-Windows-x64.exe"),
+            digest,
+        )
+        self.assertIsNone(
+            checker._extract_sha256_from_release(release_data, "Radiography-1.4.0-Android.apk")
+        )
+
     def test_sha256_file_and_verify(self):
         from src.core.updater import _sha256_file, _verify_sha256
         import hashlib, tempfile

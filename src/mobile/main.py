@@ -84,6 +84,106 @@ class RadiographyApp(MDApp):
         self.state.language = "en" if self.state.language == "tr" else "tr"
         self.state.trans.set_language(self.state.language)
 
+    # ------------------------------------------------------------------
+    # Update management
+    # ------------------------------------------------------------------
+    def _close_update_dialog(self):
+        dialog = getattr(self, "_update_dialog", None)
+        if dialog is not None:
+            dialog.dismiss()
+
+    def _update_ok_buttons(self):
+        from kivymd.uix.button import MDFlatButton
+        return [MDFlatButton(text=self.state.get_text("dialog_ok"),
+                             on_release=lambda *_a: self._close_update_dialog())]
+
+    def check_for_updates(self):
+        from kivymd.uix.dialog import MDDialog
+        self._pending_release = None
+        self._update_dialog = MDDialog(
+            title=self.state.get_text("check_updates_btn"),
+            text=self.state.get_text("checking_updates"),
+        )
+        self._update_dialog.open()
+
+        def _worker():
+            from core.updater import UpdateChecker
+            res = UpdateChecker().check()
+            Clock.schedule_once(lambda dt: self._on_update_check(res), 0)
+
+        import threading
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _on_update_check(self, res):
+        from kivymd.uix.dialog import MDDialog
+        from kivymd.uix.button import MDFlatButton, MDRaisedButton
+        self._close_update_dialog()
+        title = self.state.get_text("check_updates_btn")
+        if res.get("available"):
+            self._pending_release = res
+            text = (f"{self.state.trans.get('update_available', str(res.get('version', '?')))}\n\n"
+                    f"{str(res.get('release_notes') or '')[:400]}")
+            self._update_dialog = MDDialog(
+                title=title, text=text,
+                buttons=[
+                    MDFlatButton(text=self.state.get_text("dialog_cancel"),
+                                 on_release=lambda *_a: self._close_update_dialog()),
+                    MDRaisedButton(text=self.state.get_text("update_download"),
+                                   on_release=lambda *_a: self._download_update()),
+                ],
+            )
+        elif res.get("error"):
+            self._update_dialog = MDDialog(title=title, text=str(res["error"]),
+                                           buttons=self._update_ok_buttons())
+        else:
+            self._update_dialog = MDDialog(
+                title=title,
+                text=self.state.trans.get("up_to_date", str(res.get("version", ""))),
+                buttons=self._update_ok_buttons())
+        self._update_dialog.open()
+
+    def _download_update(self):
+        from kivymd.uix.dialog import MDDialog
+        release = getattr(self, "_pending_release", None)
+        self._close_update_dialog()
+        self._update_dialog = MDDialog(
+            title=self.state.get_text("check_updates_btn"),
+            text=self.state.get_text("checking_updates"))
+        self._update_dialog.open()
+
+        def _worker():
+            from core.updater import UpdateChecker
+            checker = UpdateChecker()
+            try:
+                asset = checker.get_download_asset(release) if release else None
+                if not asset or not asset.get("url"):
+                    raise RuntimeError("No compatible download found for this platform.")
+                digest = checker._extract_sha256_from_release(release, asset["name"])
+                path = checker.download_update(asset["url"], expected_sha256=digest)
+                Clock.schedule_once(lambda dt: self._on_download_done(path, checker), 0)
+            except Exception as exc:  # noqa: BLE001
+                Clock.schedule_once(lambda dt: self._on_download_done(exc, checker), 0)
+
+        import threading
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _on_download_done(self, path, checker):
+        from kivymd.uix.dialog import MDDialog
+        self._close_update_dialog()
+        if path is None:
+            return
+        if isinstance(path, Exception):
+            self._update_dialog = MDDialog(title=self.state.get_text("check_updates_btn"),
+                                           text=str(path), buttons=self._update_ok_buttons())
+            self._update_dialog.open()
+            return
+        try:
+            checker.launch_installer(path)
+        except Exception as exc:  # noqa: BLE001
+            self._update_dialog = MDDialog(title=self.state.get_text("check_updates_btn"),
+                                           text=str(exc), buttons=self._update_ok_buttons())
+            self._update_dialog.open()
+
 
 if __name__ == "__main__":
     RadiographyApp().run()

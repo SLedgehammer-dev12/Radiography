@@ -100,6 +100,13 @@ def test_panoramic_and_out_of_range():
     assert annex_a.minimum_exposures(5, 100, 40, "class_b", False) is None
 
 
+def test_chart_cap_matches_highest_curve():
+    assert annex_a.chart_cap("class_b", film_inside=True) == 24
+    assert annex_a.chart_cap("class_a", film_inside=True) == 18
+    assert annex_a.chart_cap("class_b", film_inside=False) == 10
+    assert annex_a.chart_cap("class_a", film_inside=False) == 8
+
+
 def test_known_chart_floor():
     # A.1/A.3 (film inside) never go below 8/6 exposures in the charts.
     assert annex_a.minimum_exposures(

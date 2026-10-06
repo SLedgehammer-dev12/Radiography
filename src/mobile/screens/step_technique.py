@@ -29,6 +29,10 @@ class StepTechnique(MDScreen):
 
     def _update_ui(self):
         self.ids.tech_segment.opacity = 1
+        # Kivy data bindings on plain Python state attributes are not reactive,
+        # so refresh both selector labels when the screen is shown.
+        self.ids.technique_btn.text = self.state.technique.upper()
+        self.ids.geometry_btn.text = self.state.get_text(self.state.geometry)
 
     def set_tech(self, value):
         self.state.set("tech", value)
@@ -64,8 +68,13 @@ class StepTechnique(MDScreen):
         self._show_menu("geometry", items, self.ids.geometry_btn)
 
     def _select_technique(self, value):
+        # "Technique" and "Geometry" denote the same ISO 17636 test arrangement
+        # (SWSI/DWSI/DWDI). The engine reads `geometry`, so writing both keeps
+        # this control functional and the two selectors consistent.
         self.state.set("technique", value)
+        self.state.set("geometry", value)
         self.ids.technique_btn.text = value.upper()
+        self.ids.geometry_btn.text = self.state.get_text(value)
         self._close_menu("technique")
 
     def _select_material(self, value):
@@ -85,7 +94,9 @@ class StepTechnique(MDScreen):
 
     def _select_geometry(self, value):
         self.state.set("geometry", value)
+        self.state.set("technique", value)
         self.ids.geometry_btn.text = self.state.get_text(value)
+        self.ids.technique_btn.text = value.upper()
         self._close_menu("geometry")
 
     def _show_menu(self, name, items, caller):

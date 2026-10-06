@@ -239,13 +239,14 @@ def test_exposure_comparison_governing_value(calc):
 # Group L — edge cases / guards
 # ---------------------------------------------------------------------------
 def test_asme_ug_limit_boundaries(calc):
+    # ASME Sec V Art 2 Table T-274.2, metric column: 50/75/100 mm bounds.
     assert calc.get_asme_ug_limit(10.0) == 0.51
-    assert calc.get_asme_ug_limit(50.8) == 0.51
-    assert calc.get_asme_ug_limit(50.81) == 0.76
-    assert calc.get_asme_ug_limit(76.2) == 0.76
-    assert calc.get_asme_ug_limit(76.21) == 1.02
-    assert calc.get_asme_ug_limit(101.6) == 1.02
-    assert calc.get_asme_ug_limit(101.61) == 1.78
+    assert calc.get_asme_ug_limit(50.0) == 0.76
+    assert calc.get_asme_ug_limit(50.1) == 0.76
+    assert calc.get_asme_ug_limit(75.0) == 0.76
+    assert calc.get_asme_ug_limit(75.1) == 1.02
+    assert calc.get_asme_ug_limit(100.0) == 1.02
+    assert calc.get_asme_ug_limit(100.1) == 1.78
     assert calc.get_asme_ug_limit(0.0) == 0.51
     assert calc.get_asme_ug_limit(None) == 0.51
 

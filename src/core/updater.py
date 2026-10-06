@@ -46,6 +46,18 @@ def _open_url(req, timeout=10):
     return urllib.request.urlopen(req, timeout=timeout, context=ctx)
 
 
+def _is_android():
+    """True on Android. ``platform.system()`` returns 'Linux' there, so prefer
+    Kivy's platform detector when available."""
+    try:
+        from kivy.utils import platform as kivy_platform
+        if kivy_platform == "android":
+            return True
+    except Exception:
+        pass
+    return "android" in platform.system().lower()
+
+
 def _sha256_file(filepath):
     """Returns SHA-256 hex digest of a file."""
     h = hashlib.sha256()
@@ -104,25 +116,41 @@ class UpdateChecker:
             }
         return {"available": False, "error": None, "data": data}
 
-    def get_download_url(self, release_data):
+    def get_download_asset(self, release_data):
+        """Returns ``{"name", "url"}`` for the best asset for this platform.
+
+        The asset name is needed to look up its published SHA-256 checksum.
+        Returns ``None`` when no compatible asset exists.
+        """
         system = platform.system().lower()
+        android = _is_android()
         assets = release_data.get("assets", []) if release_data else []
+
+        def matches(name, substring=False):
+            if android:
+                return (".apk" in name) if substring else name.endswith(".apk")
+            if system in ("windows", "win32"):
+                return (".exe" in name) if substring else name.endswith(".exe")
+            if system in ("darwin", "mac", "macos"):
+                return (".dmg" in name) if substring else name.endswith(".dmg")
+            if system == "linux":
+                return (".apk" in name) if substring else name.endswith(".apk")
+            return False
+
         for asset in assets:
             name = asset.get("name", "")
-            if system in ("windows", "win32") and name.endswith(".exe"):
-                return asset.get("browser_download_url")
-            elif system in ("darwin", "mac", "macos") and name.endswith(".dmg"):
-                return asset.get("browser_download_url")
-            elif ("android" in system or system == "linux") and name.endswith(".apk"):
-                return asset.get("browser_download_url")
-        # Generic fallback
+            if matches(name):
+                return {"name": name, "url": asset.get("browser_download_url")}
+        # Generic (substring) fallback
         for asset in assets:
             name = asset.get("name", "")
-            if system in ("windows", "win32") and ".exe" in name:
-                return asset.get("browser_download_url")
-            elif system in ("darwin", "mac", "macos") and ".dmg" in name:
-                return asset.get("browser_download_url")
+            if matches(name, substring=True):
+                return {"name": name, "url": asset.get("browser_download_url")}
         return None
+
+    def get_download_url(self, release_data):
+        asset = self.get_download_asset(release_data)
+        return asset["url"] if asset else None
 
     def _extract_sha256_from_release(self, release_data, asset_name):
         """
@@ -150,12 +178,12 @@ class UpdateChecker:
                 downloaded = 0
                 chunk_size = 8192
                 system = platform.system().lower()
-                if system in ("windows", "win32"):
+                if _is_android() or url.endswith(".apk"):
+                    suffix = ".apk"
+                elif system in ("windows", "win32"):
                     suffix = ".exe"
                 elif system in ("darwin", "mac", "macos"):
                     suffix = ".dmg"
-                elif "android" in system or url.endswith(".apk"):
-                    suffix = ".apk"
                 else:
                     suffix = ".bin"
                 fd, tmp_path = tempfile.mkstemp(suffix=suffix, prefix="Radiography_")
@@ -199,18 +227,45 @@ class UpdateChecker:
             raise RuntimeError(f"Download failed: {e}")
 
     def launch_installer(self, filepath):
-        system = platform.system().lower()
         try:
-            if system in ("windows", "win32"):
+            if _is_android():
+                self._install_android_apk(filepath)
+            elif platform.system().lower() in ("windows", "win32"):
                 os.startfile(filepath)
-            elif system in ("darwin", "mac", "macos"):
+            elif platform.system().lower() in ("darwin", "mac", "macos"):
                 import subprocess
                 subprocess.Popen(["open", filepath])
-            elif "android" in system:
-                import webbrowser
-                webbrowser.open(filepath)
         except Exception as e:
             raise RuntimeError(f"Failed to launch installer: {e}")
+
+    def _install_android_apk(self, filepath):
+        """Launches the Android package installer for a downloaded APK.
+
+        The APK is shared through the app's FileProvider (the same authority
+        used by pdf_helper.share_pdf) so Android 7+ grants read access.
+        """
+        from jnius import autoclass
+
+        Intent = autoclass("android.content.Intent")
+        Uri = autoclass("android.net.Uri")
+        File = autoclass("java.io.File")
+        PythonActivity = autoclass("org.kivy.android.PythonActivity")
+        FileProvider = autoclass("androidx.core.content.FileProvider")
+        BuildVersion = autoclass("android.os.Build$VERSION")
+
+        activity = PythonActivity.mActivity
+        authority = f"{activity.getPackageName()}.fileprovider"
+        target = File(filepath)
+        if BuildVersion.SDK_INT >= 24:
+            uri = FileProvider.getUriForFile(activity, authority, target)
+        else:
+            uri = Uri.fromFile(target)
+
+        intent = Intent(Intent.ACTION_VIEW)
+        intent.setDataAndType(uri, "application/vnd.android.package-archive")
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        activity.startActivity(intent)
 
 
 def compare_versions(v1, v2):

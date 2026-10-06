@@ -62,6 +62,21 @@ def figure_for(testing_class, film_inside):
     return "A4" if testing_class == "class_a" else "A2"
 
 
+def chart_cap(testing_class="class_b", film_inside=False, figure=None):
+    """Highest N curve plotted in the relevant Annex A figure.
+
+    Used as a conservative minimum when an operating point falls outside the
+    digitized chart (e.g. very thick wall relative to the diameter, or a very
+    short source-to-object distance): on A.1/A.3 N grows with the query
+    coordinates, so the chart cap is a safe lower bound.
+    """
+    key = figure or figure_for(testing_class, film_inside)
+    data = _load().get(key)
+    if not data or not data.get("curves"):
+        return None
+    return max(int(n) for n in data["curves"])
+
+
 def _interpolate(x_values, curve_values, x):
     """Linear interpolation along one digitized curve (None outside range)."""
     points = [(xv, cv) for xv, cv in zip(x_values, curve_values) if cv is not None]

@@ -78,6 +78,8 @@ def generate_mobile_pdf(filepath, state, results, compliance, defect_eval, sketc
     elif not isinstance(filter_rec, str):
         filter_rec = str(filter_rec)
 
+    display = results.get("display") or {}
+
     outputs = {
         "w_nom": results.get("w_nom", 0),
         "w_eff": results.get("w_eff", 0),
@@ -85,12 +87,17 @@ def generate_mobile_pdf(filepath, state, results, compliance, defect_eval, sketc
         "f_min": results.get("f_min", 0),
         "sfd_min": results.get("sfd_min", 0),
         "exposures": results.get("req_exposures", 0),
+        "exposures_panel": results.get("exposures_panel"),
+        "exposures_applied": results.get("exposures_applied"),
+        "exposures_check": results.get("exposures_ok"),
         "single_wire_iqi": single_iqi[0] if isinstance(single_iqi, tuple) else "",
         "duplex_iqi": duplex_iqi[0] if isinstance(duplex_iqi, tuple) else "",
-        "calc_time": f"{calc_time:.1f} sn" if isinstance(calc_time, (int, float)) else str(calc_time),
-        "detector_quality": "",
-        "filter_recommendation": filter_rec,
-        "quality_target": str(results.get("target_snr", "")),
+        "calc_time": display.get("calc_time")
+        or (f"{calc_time:.1f} sn" if isinstance(calc_time, (int, float)) else str(calc_time)),
+        "detector_quality": display.get("detector_quality", ""),
+        "filter_recommendation": display.get("filter_recommendation") or filter_rec,
+        "base_multiplier": results.get("base_multiplier", 1.0),
+        "quality_target": display.get("quality_target", str(results.get("target_snr", ""))),
         "f_min_provenance_text": format_f_min_provenance(
             results.get("f_min_provenance"), trans),
         "sfd_min_provenance_text": format_sfd_provenance(
@@ -109,7 +116,7 @@ def generate_mobile_pdf(filepath, state, results, compliance, defect_eval, sketc
         defect_eval_data = {
             "active": True,
             "status": defect_eval.get("status"),
-            "type_text": state.get_text(state.get("defect_type", "crack")),
+            "type_text": state.get_text(state.get("defect_type", "defect_crack")),
             "len": state.get("defect_length", 0),
             "width": state.get("defect_width", 0),
             "accum": state.get("defect_accum", 0),

@@ -130,15 +130,19 @@ class TestRTCalculator(unittest.TestCase):
         b = self.calc.calculate_b_panoramic(10.0, 5.0, 10.0)
         self.assertAlmostEqual(b, 25.0)
 
-        # check_annex_f_compensation: Ug=0.2mm, SRb=100µm -> Ug/SRb = 0.2/0.1 = 2.0 -> not needed
-        needed, ratio = self.calc.check_annex_f_compensation(0.2, 100)
-        self.assertFalse(needed)
-        self.assertAlmostEqual(ratio, 2.0)
-
-        # Ug=0.3mm, SRb=100µm -> Ug/SRb = 3.0 > 2 -> needed
-        needed, ratio = self.calc.check_annex_f_compensation(0.3, 100)
-        self.assertTrue(needed)
-        self.assertAlmostEqual(ratio, 3.0)
+        # Annex F (F.4/F.5): SRb = 0 -> required f_min equals the Clause 7.6 base
+        foc_d, obj_b = 2.0, 50.0
+        base_fmin = 15.0 * foc_d * obj_b ** (2.0 / 3.0)
+        self.assertAlmostEqual(
+            self.calc.calculate_annex_f_fmin(foc_d, obj_b, 0.0, "class_b"),
+            base_fmin, places=3)
+        # Non-zero detector unsharpness increases the required f_min
+        req_fmin = self.calc.calculate_annex_f_fmin(foc_d, obj_b, 100.0, "class_b")
+        self.assertIsNotNone(req_fmin)
+        self.assertGreater(req_fmin, base_fmin)
+        # b below b_min (Table F.1) -> not compensable
+        self.assertIsNone(
+            self.calc.calculate_annex_f_fmin(2.0, 10.0, 100.0, "class_b"))
 
     def test_single_wire_iqi(self):
         # Class A, SWSI, t = 5mm -> ref=5 -> Table B.1 -> W15
@@ -165,9 +169,9 @@ class TestRTCalculator(unittest.TestCase):
         txt, wire_no = self.calc.get_single_wire_iqi(10.0, 0.0, "class_a", "swsi", tech="analog", film_side=True)
         self.assertEqual(wire_no, 14)
 
-        # Film-side Class B, SWSI, t=10mm -> ref=10 -> Table B.11 -> W14 (<=12mm)
+        # Film-side Class B, SWSI, t=10mm -> ref=10 -> Table B.11 -> W15 (<=12mm)
         txt, wire_no = self.calc.get_single_wire_iqi(10.0, 0.0, "class_b", "swsi", tech="analog", film_side=True)
-        self.assertEqual(wire_no, 14)
+        self.assertEqual(wire_no, 15)
 
         # Check Turkish and English table reference descriptions
         txt_tr, _ = self.calc.get_single_wire_iqi(10.0, 0.0, "class_a", "swsi", tech="analog", lang="tr")
@@ -183,21 +187,24 @@ class TestRTCalculator(unittest.TestCase):
         self.assertIn("2 * t = 10.00 mm", txt_dwsi_tr)
 
     def test_detector_quality_film_class(self):
-        # Steel, Class A -> C5
+        # Steel, Class A -> C5 (all supported sources)
         film = self.calc.get_required_film_class(10.0, "class_a", "steel")
         self.assertEqual(film, "C5")
 
-        # Steel, Class B, w_nom = 10.0 -> C4
-        film = self.calc.get_required_film_class(10.0, "class_b", "steel")
-        self.assertEqual(film, "C4")
+        # ISO 17636-1:2022 Table 3, Class B steel X-ray by kV band
+        self.assertEqual(self.calc.get_required_film_class(20.0, "class_b", "steel", "x_ray", kv=100.0), "C3")
+        self.assertEqual(self.calc.get_required_film_class(20.0, "class_b", "steel", "x_ray", kv=150.0), "C3")
+        self.assertEqual(self.calc.get_required_film_class(20.0, "class_b", "steel", "x_ray", kv=200.0), "C4")
+        # 250 < U <= 500: w <= 50 -> C4, w > 50 -> C5
+        self.assertEqual(self.calc.get_required_film_class(40.0, "class_b", "steel", "x_ray", kv=300.0), "C4")
+        self.assertEqual(self.calc.get_required_film_class(60.0, "class_b", "steel", "x_ray", kv=300.0), "C5")
+        # 500 < U <= 1000: w <= 75 -> C4, w > 75 -> C5
+        self.assertEqual(self.calc.get_required_film_class(70.0, "class_b", "steel", "x_ray", kv=900.0), "C4")
+        self.assertEqual(self.calc.get_required_film_class(90.0, "class_b", "steel", "x_ray", kv=900.0), "C5")
 
-        # Steel, Class B, w_nom = 60.0 -> C3
-        film = self.calc.get_required_film_class(60.0, "class_b", "steel")
-        self.assertEqual(film, "C3")
-
-        # Aluminum, Class B -> C4
+        # Aluminium / Titanium (Table 4): Class B -> C3
         film = self.calc.get_required_film_class(10.0, "class_b", "aluminum")
-        self.assertEqual(film, "C4")
+        self.assertEqual(film, "C3")
 
     def test_detector_quality_max_srb(self):
         # Class A, w_nom = 5.0, SWSI -> ref=5 -> B.13: 2<w<=5 -> 100 µm
@@ -234,6 +241,16 @@ class TestRTCalculator(unittest.TestCase):
         # Class B, DWDI, w_nom=10mm -> ref=10mm -> B.14: 8<w<=12 -> D11 (0.080mm)
         d_str, d_num = self.calc.get_duplex_iqi(10.0, "class_b", "dwdi_elliptic")
         self.assertEqual(d_num, 11)
+
+        # Class B, SWSI, w_nom=1.0mm -> ref=1.0 <= 1.5 -> D14 (0.040mm)
+        d_str, d_num = self.calc.get_duplex_iqi(1.0, "class_b", "swsi")
+        self.assertEqual(d_num, 14)
+        self.assertIn("0.040", d_str)
+
+        # Class A, SWSI, w_nom=300mm -> ref > 250 -> D4 (0.400mm), not 0.000
+        d_str, d_num = self.calc.get_duplex_iqi(300.0, "class_a", "swsi")
+        self.assertEqual(d_num, 4)
+        self.assertIn("0.400", d_str)
 
         # Check Turkish and English table reference descriptions
         d_tr, _ = self.calc.get_duplex_iqi(10.0, "class_b", "swsi", lang="tr")
@@ -554,6 +571,54 @@ class TestRTCalculator(unittest.TestCase):
         self.assertIn("Table B.12", txt)
         self.assertEqual(val, 3)
 
+    def test_annex_b_wire_tables_2022_boundaries(self):
+        # ISO 17636-1:2022 Annex B single-wire tables (B.1/B.3/B.9/B.11) were
+        # transcribed from a wrong edition and under-required (coarser wire)
+        # above ~25-38 mm. Each key here is a table boundary from the standard.
+        cases = {
+            ("class_a", "swsi", False): {  # B.1
+                25.0: 11, 32.0: 10, 40.0: 9, 55.0: 8, 85.0: 7,
+                150.0: 6, 250.0: 5, 300.0: 4,
+            },
+            ("class_b", "swsi", False): {  # B.3
+                30.0: 12, 35.0: 11, 45.0: 10, 65.0: 9, 120.0: 8,
+                200.0: 7, 350.0: 6, 400.0: 5,
+            },
+            ("class_a", "swsi", True): {  # B.9
+                38.0: 11, 48.0: 10, 60.0: 9, 85.0: 8, 125.0: 7,
+                225.0: 6, 375.0: 5, 400.0: 4,
+            },
+            ("class_b", "swsi", True): {  # B.11
+                6.0: 16, 12.0: 15, 18.0: 14, 30.0: 13, 45.0: 12,
+                55.0: 11, 70.0: 10, 100.0: 9, 180.0: 8, 300.0: 7, 310.0: 6,
+            },
+        }
+        for (cls, geom, fs), table in cases.items():
+            for thickness, expected in table.items():
+                _, wire = self.calc.get_single_wire_iqi(
+                    thickness, 0.0, cls, geom, tech="analog", film_side=fs
+                )
+                self.assertEqual(
+                    wire, expected,
+                    f"{cls} {geom} film_side={fs} t={thickness} -> W{wire}, expected W{expected}",
+                )
+
+    def test_weld_cap_not_in_iqi_reference(self):
+        # ISO 17636-1/2:2022 Annex B tables use the nominal thickness t (or
+        # penetrated w = 2t); weld reinforcement (cap) must not coarsen the
+        # required IQI. Regression for cap being added when cap/t > 0.20.
+        for film_side in (False, True):
+            wire_flat = self.calc.get_single_wire_iqi(
+                10.0, 0.0, "class_b", "swsi", tech="analog", film_side=film_side)[1]
+            wire_cap = self.calc.get_single_wire_iqi(
+                10.0, 4.0, "class_b", "swsi", tech="analog", film_side=film_side)[1]
+            self.assertEqual(wire_flat, wire_cap)
+            hole_flat = self.calc.get_step_hole_iqi(
+                10.0, 0.0, "class_b", "swsi", tech="analog", film_side=film_side)[1]
+            hole_cap = self.calc.get_step_hole_iqi(
+                10.0, 4.0, "class_b", "swsi", tech="analog", film_side=film_side)[1]
+            self.assertEqual(hole_flat, hole_cap)
+
     def test_calculator_target_snr(self):
         # Steel/copper_nickel -> Table 3
         # X-ray: U <= 50 -> Class A: 100, Class B: 150
@@ -586,18 +651,44 @@ class TestRTCalculator(unittest.TestCase):
         base_snr, _, _ = self.calc.get_target_snr("aluminum", "x_ray", 160.0, 5.0, "class_b", lang="en")
         self.assertEqual(base_snr, 100)
 
-    def test_film_class_upgrade_isotope(self):
-        # Steel Class B: w_nom <= 50 -> normally C4
-        film = self.calc.get_required_film_class(10.0, "class_b", "steel", source="x_ray")
-        self.assertEqual(film, "C4")
+        # Yb-169/Tm-170 (Table 3): w <= 5 -> Class A 70, Class B 120
+        base_snr, _, desc = self.calc.get_target_snr("steel", "isotope_tm170", None, 3.0, "class_b", lang="en")
+        self.assertEqual(base_snr, 120)
+        self.assertIn("Tm-170", desc)
+        base_snr, _, _ = self.calc.get_target_snr("steel", "isotope_yb169", None, 4.0, "class_b", lang="en")
+        self.assertEqual(base_snr, 120)
+        base_snr, _, _ = self.calc.get_target_snr("steel", "isotope_tm170", None, 3.0, "class_a", lang="en")
+        self.assertEqual(base_snr, 70)
 
-        # Steel Class B Se-75 w_nom < 12mm -> upgraded from C4 to C3
+        # Yb-169/Tm-170 (Table 3): w > 5 -> Class A 70, Class B 100
+        base_snr, _, desc = self.calc.get_target_snr("steel", "isotope_yb169", None, 10.0, "class_b", lang="en")
+        self.assertEqual(base_snr, 100)
+        self.assertIn("Yb-169", desc)
+
+    def test_film_class_upgrade_isotope(self):
+        # Steel Class B X-ray <= 150 kV -> C3 (Table 3)
+        film = self.calc.get_required_film_class(10.0, "class_b", "steel", source="x_ray", kv=100.0)
+        self.assertEqual(film, "C3")
+
+        # Steel Class B Se-75 w_nom < 12mm -> upgraded from C4 to C3 (Clause 6.9)
         film = self.calc.get_required_film_class(10.0, "class_b", "steel", source="isotope_se75")
         self.assertEqual(film, "C3")
 
+        # Steel Class B Yb-169/Tm-170: w <= 5 -> C3, w > 5 -> C4 (Table 3)
+        film = self.calc.get_required_film_class(4.0, "class_b", "steel", source="isotope_yb169")
+        self.assertEqual(film, "C3")
+        film = self.calc.get_required_film_class(10.0, "class_b", "steel", source="isotope_tm170")
+        self.assertEqual(film, "C4")
+
+        # Steel Class B Co-60: w <= 100 -> C4, w > 100 -> C5 (Table 3)
+        film = self.calc.get_required_film_class(80.0, "class_b", "steel", source="isotope_co60")
+        self.assertEqual(film, "C4")
+        film = self.calc.get_required_film_class(120.0, "class_b", "steel", source="isotope_co60")
+        self.assertEqual(film, "C5")
+
     def test_film_class_check_with_source(self):
         # check_film_class_compliance with source parameter (Se-75 upgrade)
-        # C4 is sufficient for Se-75 Class B (upgraded requirement is C3)
+        # C4 is insufficient for Se-75 Class B < 12mm (upgraded requirement is C3)
         comp, msg = self.calc.check_film_class_compliance("C4", "class_b", 10.0, "steel", source="isotope_se75")
         self.assertFalse(comp)
 
@@ -605,8 +696,8 @@ class TestRTCalculator(unittest.TestCase):
         comp, msg = self.calc.check_film_class_compliance("C3", "class_b", 10.0, "steel", source="isotope_se75")
         self.assertTrue(comp)
 
-        # Without source parameter (default), C4 is sufficient for Class B
-        comp, msg = self.calc.check_film_class_compliance("C4", "class_b", 10.0, "steel")
+        # X-ray 200 kV (150 < U <= 250) Class B requires C4 -> C4 sufficient
+        comp, msg = self.calc.check_film_class_compliance("C4", "class_b", 10.0, "steel", source="x_ray", kv=200.0)
         self.assertTrue(comp)
 
     def test_target_snr_light_metal_isotopes(self):
@@ -783,17 +874,27 @@ class TestRTCalculator(unittest.TestCase):
         f_star, _ = self.calc.calculate_f_min_star(2.0, 10.0, 8.0, "class_b")
         self.assertIsNotNone(f_star)
 
-    def test_check_annex_f_compensation_false(self):
-        should_warn, ratio = self.calc.check_annex_f_compensation(0.1, 100.0)
-        self.assertFalse(should_warn)
-        self.assertGreater(ratio, 0)
+    def test_check_annex_f_compensation(self):
+        foc_d, obj_b = 2.0, 50.0
+        base_fmin = 15.0 * foc_d * obj_b ** (2.0 / 3.0)
 
-    def test_check_annex_f_compensation_true(self):
-        ug = 100.0
-        max_srb = 50.0
-        should_warn, ratio = self.calc.check_annex_f_compensation(ug, max_srb)
-        self.assertTrue(should_warn)
-        self.assertGreater(ratio, 0)
+        # Detector unsharpness negligible -> no compensation, ratio 1.0
+        needed, ratio = self.calc.check_annex_f_compensation(
+            foc_d, obj_b, 0.0, base_fmin, "class_b")
+        self.assertFalse(needed)
+        self.assertAlmostEqual(ratio, 1.0, places=4)
+
+        # Real detector unsharpness -> compensation needed
+        needed, ratio = self.calc.check_annex_f_compensation(
+            foc_d, obj_b, 100.0, base_fmin, "class_b")
+        self.assertTrue(needed)
+        self.assertGreater(ratio, 1.0)
+
+        # Not compensable at small b -> flagged with infinite ratio
+        needed, ratio = self.calc.check_annex_f_compensation(
+            2.0, 10.0, 100.0, 0.0, "class_b")
+        self.assertTrue(needed)
+        self.assertEqual(ratio, float("inf"))
 
 
 class TestRTCalculatorEdgeCases(unittest.TestCase):
@@ -924,6 +1025,13 @@ class TestRTCalculatorEdgeCases(unittest.TestCase):
         n_large = self.calc.calculate_panel_exposures(114.3, 8.56, "dwsi", "class_b", 400.0)["n_panel"]
         self.assertLessEqual(n_large, n_small)
 
+    def test_panel_exposures_zero_width_is_invalid(self):
+        # Zero active width used to floor theta at 1e-6 -> n ~ 3.5 million.
+        r = self.calc.calculate_panel_exposures(
+            114.3, 6.02, "dwsi", "class_b", 0.0, panel_height=200.0, cap=3.0)
+        self.assertEqual(r["limiting_factor"], "invalid_panel_geometry")
+        self.assertEqual(r["n_panel"], 1)
+
     def test_panel_exposures_overlap_increases_n(self):
         n_none = self.calc.calculate_panel_exposures(114.3, 8.56, "dwsi", "class_b", 200.0, overlap_percent=0.0)["n_panel"]
         n_20 = self.calc.calculate_panel_exposures(114.3, 8.56, "dwsi", "class_b", 200.0, overlap_percent=20.0)["n_panel"]
@@ -1037,16 +1145,15 @@ class TestRTCalculatorEdgeCases(unittest.TestCase):
     # --- Faz 2: ASME Sec V Art 2 / ASTM / radiation safety -------------------
 
     def test_asme_ug_limits(self):
-        # ASME V T-274.2 inch-based boundaries: 2/3/4 in = 50.8/76.2/101.6 mm
+        # ASME V T-274.2 metric boundaries: 50/75/100 mm (2/3/4 in.)
         self.assertEqual(self.calc.get_asme_ug_limit(30.0), 0.51)
-        self.assertEqual(self.calc.get_asme_ug_limit(50.8), 0.51)
-        self.assertEqual(self.calc.get_asme_ug_limit(51.0), 0.76)
+        self.assertEqual(self.calc.get_asme_ug_limit(49.9), 0.51)
+        self.assertEqual(self.calc.get_asme_ug_limit(50.0), 0.76)
         self.assertEqual(self.calc.get_asme_ug_limit(60.0), 0.76)
-        self.assertEqual(self.calc.get_asme_ug_limit(76.2), 0.76)
-        self.assertEqual(self.calc.get_asme_ug_limit(76.3), 1.02)
+        self.assertEqual(self.calc.get_asme_ug_limit(75.0), 0.76)
+        self.assertEqual(self.calc.get_asme_ug_limit(75.1), 1.02)
         self.assertEqual(self.calc.get_asme_ug_limit(100.0), 1.02)
-        self.assertEqual(self.calc.get_asme_ug_limit(101.6), 1.02)
-        self.assertEqual(self.calc.get_asme_ug_limit(102.0), 1.78)
+        self.assertEqual(self.calc.get_asme_ug_limit(100.1), 1.78)
         self.assertEqual(self.calc.get_asme_ug_limit(200.0), 1.78)
 
     def test_check_ug_compliance(self):

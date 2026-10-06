@@ -59,7 +59,13 @@ export function useEngine(
         setCompliance(complianceResult);
         setError(null);
       } catch (caught) {
-        if (sequence.current === current) setError(String(caught));
+        if (sequence.current === current) {
+          // Clear stale outputs so the UI cannot keep showing the previous
+          // successful result alongside an error indicator.
+          setError(String(caught));
+          setResult(null);
+          setCompliance(null);
+        }
       } finally {
         if (sequence.current === current) setBusy(false);
       }

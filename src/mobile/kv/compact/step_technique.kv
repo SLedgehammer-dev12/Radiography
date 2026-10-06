@@ -7,7 +7,7 @@
 
         MDTopAppBar:
             title: "Radiography"
-            right_action_items: [["weather-night", lambda x: app.toggle_theme()]]
+            right_action_items: [["update", lambda x: app.check_for_updates()], ["weather-night", lambda x: app.toggle_theme()]]
             elevation: 0
 
         MDLabel:

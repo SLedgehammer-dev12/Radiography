@@ -438,38 +438,65 @@ class RTCalculator:
         """
         return bed + bgap + t
 
-    def check_annex_f_compensation(self, ug, max_srb):
+    def calculate_annex_f_fmin(self, d, b, srb_um, testing_class="class_b"):
         """
-        Checks if Annex F IQI visibility compensation is needed.
-        Ug / SRb_detector <= 2 -> no compensation needed.
-        Ug / SRb_detector > 2 -> compensation needed (increase f_min or SNR).
-        Returns (needs_compensation, ratio).
+        ISO 17636-2:2022 Annex F (informative), Formulae (F.4)/(F.5): the
+        source-to-object distance f_min required so that the total unsharpness
+        (geometric + inherent detector u_d = 2·SRb_detector) stays equivalent
+        to film radiography:
+
+            f_min = d · sqrt( b² / ( b^(2/3)/C² − (2·SRb_detector)² ) )
+
+        with C = 7.5 for class A and 15 for class B. Returns the required f_min
+        in mm, or ``None`` when the detector unsharpness cannot be compensated
+        at this object-to-detector distance b (b below the b_min of Formulae
+        F.2/F.3, i.e. the denominator is non-positive).
         """
-        if max_srb <= 0:
-            return False, 0.0
-        ratio = ug / (max_srb / 1000.0)  # max_srb in µm -> mm
-        return ratio > 2.0, ratio
+        c = 7.5 if testing_class == "class_a" else 15.0
+        try:
+            d = float(d)
+            b = float(b)
+            srb = max(0.0, float(srb_um)) / 1000.0  # µm -> mm
+        except (TypeError, ValueError):
+            return None
+        if d <= 0.0 or b <= 0.0:
+            return None
+        denom = (b ** (2.0 / 3.0)) / (c * c) - (2.0 * srb) ** 2
+        if denom <= 0.0:
+            return None
+        return d * math.sqrt((b * b) / denom)
+
+    def check_annex_f_compensation(self, d, b, srb_um, f_min_base, testing_class="class_b"):
+        """
+        ISO 17636-2:2022 Annex F (informative): is the Clause 7.6 f_min still
+        sufficient once the inherent detector unsharpness u_d = 2·SRb_detector
+        is included? Returns (needs_compensation, ratio) where
+        ratio = required f_min / base f_min (inf when not compensable).
+        """
+        required = self.calculate_annex_f_fmin(d, b, srb_um, testing_class)
+        if required is None:
+            return True, float("inf")
+        try:
+            base = float(f_min_base)
+        except (TypeError, ValueError):
+            base = 0.0
+        if base <= 0.0:
+            return required > 0.0, float("inf")
+        return required > base + 1e-9, required / base
 
     def get_single_wire_iqi(self, t, cap, testing_class, geometry, tech="digital", film_side=False, lang="tr"):
         """
         Determines target single wire IQI number (Step 8)
         Based on ISO 17636-1 Annex B for Analog, ISO 17636-2 Annex B for Digital.
         """
-        # Cap ratio control
-        ratio = cap / t if t > 0 else 0.0
-        include_cap = ratio > 0.20
-
-        # Reference thickness calculation (ref_thickness)
-        if geometry == "dwsi":
-            # DWSI: ref = 2 * t (+ cap if ratio > 0.20)
-            # Both analog and digital use double-wall thickness for single wire IQI
-            ref_thickness = 2 * t + cap if include_cap else 2 * t
-        elif geometry in ["dwdi_elliptic", "dwdi_super"]:
-            # DWDI: ref = 2 * t (+ cap if ratio > 0.20)
-            ref_thickness = 2 * t + cap if include_cap else 2 * t
+        # ISO 17636-1/2:2022 Annex B tables are indexed by the nominal wall
+        # thickness t (single-wall) or the penetrated thickness w = 2t
+        # (double-wall). Definitions 3.1/3.3 exclude weld reinforcement (cap),
+        # so the cap is not added to the IQI reference thickness.
+        if geometry in ["dwsi", "dwdi_elliptic", "dwdi_super"]:
+            ref_thickness = 2 * t
         else:
-            # SWSI: ref = t (+ cap if ratio > 0.20)
-            ref_thickness = t + cap if include_cap else t
+            ref_thickness = t
 
         if film_side:
             # Film-side (detector-side) tables: Table B.9 (Class A) / Table B.11 (Class B)
@@ -491,18 +518,20 @@ class RTCalculator:
                     wire = 12
                 elif ref_thickness <= 38.0:
                     wire = 11
-                elif ref_thickness <= 54.0:
+                elif ref_thickness <= 48.0:
                     wire = 10
-                elif ref_thickness <= 70.0:
+                elif ref_thickness <= 60.0:
                     wire = 9
-                elif ref_thickness <= 100.0:
+                elif ref_thickness <= 85.0:
                     wire = 8
-                elif ref_thickness <= 170.0:
+                elif ref_thickness <= 125.0:
                     wire = 7
-                elif ref_thickness <= 250.0:
+                elif ref_thickness <= 225.0:
                     wire = 6
-                else:
+                elif ref_thickness <= 375.0:
                     wire = 5
+                else:
+                    wire = 4
             else:
                 # Table B.11 — Class B, film side
                 if ref_thickness <= 1.5:
@@ -513,23 +542,23 @@ class RTCalculator:
                     wire = 17
                 elif ref_thickness <= 6.0:
                     wire = 16
-                elif ref_thickness <= 8.0:
-                    wire = 15
                 elif ref_thickness <= 12.0:
+                    wire = 15
+                elif ref_thickness <= 18.0:
                     wire = 14
-                elif ref_thickness <= 20.0:
-                    wire = 13
                 elif ref_thickness <= 30.0:
-                    wire = 12
+                    wire = 13
                 elif ref_thickness <= 45.0:
+                    wire = 12
+                elif ref_thickness <= 55.0:
                     wire = 11
-                elif ref_thickness <= 65.0:
+                elif ref_thickness <= 70.0:
                     wire = 10
                 elif ref_thickness <= 100.0:
                     wire = 9
-                elif ref_thickness <= 170.0:
+                elif ref_thickness <= 180.0:
                     wire = 8
-                elif ref_thickness <= 250.0:
+                elif ref_thickness <= 300.0:
                     wire = 7
                 else:
                     wire = 6
@@ -556,22 +585,20 @@ class RTCalculator:
                         wire = 12
                     elif ref_thickness <= 25.0:
                         wire = 11
-                    elif ref_thickness <= 40.0:
+                    elif ref_thickness <= 32.0:
                         wire = 10
-                    elif ref_thickness <= 60.0:
+                    elif ref_thickness <= 40.0:
                         wire = 9
-                    elif ref_thickness <= 80.0:
+                    elif ref_thickness <= 55.0:
                         wire = 8
-                    elif ref_thickness <= 100.0:
+                    elif ref_thickness <= 85.0:
                         wire = 7
                     elif ref_thickness <= 150.0:
                         wire = 6
-                    elif ref_thickness <= 200.0:
-                        wire = 5
                     elif ref_thickness <= 250.0:
-                        wire = 4
+                        wire = 5
                     else:
-                        wire = 3
+                        wire = 4
                 else:
                     # Table B.5 — Class A, source side, DWDI
                     if ref_thickness <= 1.2:
@@ -625,17 +652,17 @@ class RTCalculator:
                         wire = 13
                     elif ref_thickness <= 30.0:
                         wire = 12
-                    elif ref_thickness <= 40.0:
+                    elif ref_thickness <= 35.0:
                         wire = 11
-                    elif ref_thickness <= 60.0:
+                    elif ref_thickness <= 45.0:
                         wire = 10
-                    elif ref_thickness <= 85.0:
+                    elif ref_thickness <= 65.0:
                         wire = 9
-                    elif ref_thickness <= 125.0:
+                    elif ref_thickness <= 120.0:
                         wire = 8
-                    elif ref_thickness <= 175.0:
+                    elif ref_thickness <= 200.0:
                         wire = 7
-                    elif ref_thickness <= 250.0:
+                    elif ref_thickness <= 350.0:
                         wire = 6
                     else:
                         wire = 5
@@ -712,19 +739,14 @@ class RTCalculator:
         Determines target step-and-hole IQI number (designator H1-H18)
         Based on ISO 17636-1/2 Annex B tables B.2, B.4, B.6, B.8, B.10, B.12.
         """
-        # Cap ratio control
-        ratio = cap / t if t > 0 else 0.0
-        include_cap = ratio > 0.20
-
-        # Reference thickness calculation (ref_thickness)
-        if geometry == "dwsi":
-            # DWSI: ref = 2 * t (+ cap if ratio > 0.20)
-            # Both analog and digital use double-wall thickness for single IQI
-            ref_thickness = 2 * t + cap if include_cap else 2 * t
-        elif geometry in ["dwdi_elliptic", "dwdi_super"]:
-            ref_thickness = 2 * t + cap if include_cap else 2 * t
+        # ISO 17636-1/2:2022 Annex B tables are indexed by the nominal wall
+        # thickness t (single-wall) or the penetrated thickness w = 2t
+        # (double-wall). Definitions 3.1/3.3 exclude weld reinforcement (cap),
+        # so the cap is not added to the IQI reference thickness.
+        if geometry in ["dwsi", "dwdi_elliptic", "dwdi_super"]:
+            ref_thickness = 2 * t
         else:
-            ref_thickness = t + cap if include_cap else t
+            ref_thickness = t
 
         if film_side:
             # Film-side (detector-side) tables: Table B.10 (Class A) / Table B.12 (Class B)
@@ -955,6 +977,15 @@ class RTCalculator:
                 else:
                     base_snr = 70 if testing_class == "class_a" else 70
                     desc = f"Co-60 (w > 100 mm)"
+            elif source in ("isotope_yb169", "isotope_tm170"):
+                # ISO 17636-2:2022 Table 3: Yb-169/Tm-170, w <= 5 mm -> Class B = 120
+                src_name = "Yb-169" if source == "isotope_yb169" else "Tm-170"
+                if w_nom <= 5.0:
+                    base_snr = 70 if testing_class == "class_a" else 120
+                    desc = f"{src_name} (w <= 5 mm)"
+                else:
+                    base_snr = 70 if testing_class == "class_a" else 100
+                    desc = f"{src_name} (w > 5 mm)"
             else: # generic fallback
                 base_snr = 70 if testing_class == "class_a" else 100
                 desc = f"{source}"
@@ -992,7 +1023,7 @@ class RTCalculator:
         - DWDI: double wall, ref = w_nom = 2t
         D-wire diameters per ISO 19232-5:
           D14=0.040mm, D13=0.050mm, D12=0.063mm, D11=0.080mm, D10=0.100mm,
-          D9=0.125mm, D8=0.160mm, D7=0.200mm, D6=0.250mm, D5=0.320mm
+          D9=0.125mm, D8=0.160mm, D7=0.200mm, D6=0.250mm, D5=0.320mm, D4=0.400mm
         Returns tuple of (display_string, integer_number)
         """
         # Select reference thickness per ISO footnote a
@@ -1004,7 +1035,7 @@ class RTCalculator:
         # D-wire diameters per ISO 19232-5
         d_wire_diameters = {
             14: 0.040, 13: 0.050, 12: 0.063, 11: 0.080, 10: 0.100,
-            9: 0.125, 8: 0.160, 7: 0.200, 6: 0.250, 5: 0.320
+            9: 0.125, 8: 0.160, 7: 0.200, 6: 0.250, 5: 0.320, 4: 0.400
         }
 
         if testing_class == "class_a":
@@ -1063,6 +1094,11 @@ class RTCalculator:
                 thickness_desc = f"ışınlanan w = {ref:.2f} mm"
 
         d_str = f"{d_val} ({dia:.3f} mm) [{table_name}, {thickness_desc}]"
+        if d_num == 14:
+            # Table B.14 note d: D 13+ (D 13 resolved with a >20 % dip) is
+            # equivalent to D 14.
+            d_str += (" — or D 13+ (dip > 20 %)" if lang == "en"
+                      else " — veya D13+ (çukur > %20)")
         return d_str, d_num
 
     def _density_correction_factor(self, testing_class, film_class=None, ref_density=2.0, target_density=None):
@@ -1418,6 +1454,17 @@ class RTCalculator:
             )
         if geometry == "dwdi_super":
             return self._panel_result_fixed(3, od, t, cap, "dwdi_super", panel_height)
+
+        # A non-positive panel width makes the coverage angle zero, which would
+        # otherwise yield an absurd exposure count (ceil(pi / 1e-6)). Treat it
+        # as invalid input so the graph-based count governs instead.
+        try:
+            panel_width = float(panel_width)
+        except (TypeError, ValueError):
+            panel_width = 0.0
+        if panel_width <= 0.0:
+            return self._panel_result_fixed(
+                1, od, t, cap, "invalid_panel_geometry", panel_height)
 
         re = od / 2.0
         t_wall = max(float(t), 0.1)
@@ -2199,6 +2246,8 @@ class RTCalculator:
 
     def _check_kvp5(self, kv, time_minutes, material, tech, film_class, testing_class):
         kv_ref = 200.0
+        if kv <= 0.0:
+            return
         if abs(kv - kv_ref) / kv_ref < 0.05:
             return
         mu_ref = self.get_mu_from_kv(kv_ref, material)
@@ -2215,34 +2264,49 @@ class RTCalculator:
             )
 
 
-    def get_required_film_class(self, w_nom, testing_class, material, source=None):
+    # ISO 17636-1:2022 Clause 6.9 — one film system class better (Se-75, w < 12 mm)
+    _SE75_FILM_UPGRADE = {
+        "C6": "C5", "C5": "C4", "C4": "C3", "C3": "C2", "C2": "C1", "C1": "C1",
+    }
+
+    def get_required_film_class(self, w_nom, testing_class, material, source=None, kv=None):
         """
         Determines the minimum required ISO 11699-1 film system class (Step 7)
-        Based on ISO 17636-1 Table 2
+        based on ISO 17636-1:2022 Table 3 (steel/copper/nickel-based alloys) and
+        Table 4 (aluminium/titanium), plus the Clause 6.9 Se-75 thin-section rule.
         """
         if material in ["steel", "copper_nickel"]:
             if testing_class == "class_a":
-                # For Class A steel, minimum is C5 for all thicknesses
-                base_film = "C5"
-            else: # class_b
-                # For Class B steel: C4 for w_nom <= 50mm, C3 for w_nom > 50mm
-                if w_nom <= 50.0:
-                    base_film = "C4"
-                else:
+                # Table 3: testing class A is C5 for every supported (<= 1 MV) source
+                return "C5"
+            # Table 3: testing class B (source- and kV-dependent)
+            if source == "x_ray":
+                kv_eff = float(kv) if kv is not None else 120.0
+                if kv_eff <= 150.0:
                     base_film = "C3"
-            
-            # Clause 6.9 exception: Se-75 source with w_nom < 12mm Class B on steel/copper_nickel
-            # requires upgrading the film class by one level (e.g. C4 to C3).
-            if source == "isotope_se75" and w_nom < 12.0 and testing_class == "class_b":
-                upgrade_map = {"C5": "C4", "C4": "C3", "C3": "C2", "C2": "C1", "C1": "C1"}
-                return upgrade_map.get(base_film, base_film)
+                elif kv_eff <= 250.0:
+                    base_film = "C4"
+                elif kv_eff <= 500.0:
+                    base_film = "C4" if w_nom <= 50.0 else "C5"
+                else:
+                    # 500 kV < U <= 1 000 kV (app has no > 1 MV rows)
+                    base_film = "C4" if w_nom <= 75.0 else "C5"
+            elif source in ("isotope_yb169", "isotope_tm170"):
+                base_film = "C3" if w_nom <= 5.0 else "C4"
+            elif source == "isotope_co60":
+                base_film = "C4" if w_nom <= 100.0 else "C5"
+            else:
+                # Se-75, Ir-192 and any other isotope
+                base_film = "C4"
+
+            # Clause 6.9 exception: Se-75 with w_nom < 12 mm Class B requires
+            # at least one film system class better than Table 3.
+            if source == "isotope_se75" and w_nom < 12.0:
+                return self._SE75_FILM_UPGRADE.get(base_film, base_film)
             return base_film
         else:
-            # Aluminum, Titanium
-            if testing_class == "class_a":
-                return "C5"
-            else:
-                return "C4"
+            # Aluminium / titanium — Table 4: class A C5, class B C3
+            return "C5" if testing_class == "class_a" else "C3"
 
     def get_max_srb(self, w_nom, testing_class, geometry="swsi"):
         """
@@ -2352,12 +2416,12 @@ class RTCalculator:
                 return math.exp(ln_mu)
         return pts[0][1]
 
-    def check_film_class_compliance(self, film_class_used, testing_class, w_nom, material, source=None):
+    def check_film_class_compliance(self, film_class_used, testing_class, w_nom, material, source=None, kv=None):
         """
-        Verifies if the film class meets the minimum requirements of ISO 17636-1 Table 2.
-        Returns (is_compliant, message)
+        Verifies if the film class meets the minimum requirements of ISO 17636-1:2022
+        Tables 3/4. Returns (is_compliant, message)
         """
-        req_film = self.get_required_film_class(w_nom, testing_class, material, source)
+        req_film = self.get_required_film_class(w_nom, testing_class, material, source, kv=kv)
         ranks = {"C1": 1, "C2": 2, "C3": 3, "C4": 4, "C5": 5, "C6": 6}
         app_rank = ranks.get(film_class_used, 5)
         req_rank = ranks.get(req_film, 5)
@@ -2483,17 +2547,20 @@ class RTCalculator:
     #   t > 100 mm       -> Ug <= 1.78 mm
     # -----------------------------------------------------------------------
     def get_asme_ug_limit(self, t):
-        """Returns the maximum allowed geometric unsharpness (mm) for a material
-        thickness t (mm) per ASME Section V Article 2, T-274.2 (inch-based):
-        t <= 2 in (50.8 mm) -> 0.51 mm; <= 3 in (76.2 mm) -> 0.76 mm;
-        <= 4 in (101.6 mm) -> 1.02 mm; > 4 in -> 1.78 mm."""
+        """Maximum allowed geometric unsharpness (mm) for material thickness
+        t (mm) per ASME Sec V Art 2, Table T-274.2. The table's metric column
+        uses 50/75/100 mm boundaries:
+          t < 50          -> 0.51 mm  (less than 2 in.)
+          50 <= t <= 75   -> 0.76 mm  (2 through 3 in.)
+          75 < t <= 100   -> 1.02 mm  (over 3 through 4 in.)
+          t > 100         -> 1.78 mm  (over 4 in.)"""
         if t is None or t <= 0.0:
             return 0.51
-        if t <= 50.8:
+        if t < 50.0:
             return 0.51
-        if t <= 76.2:
+        if t <= 75.0:
             return 0.76
-        if t <= 101.6:
+        if t <= 100.0:
             return 1.02
         return 1.78
 

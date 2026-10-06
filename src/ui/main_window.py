@@ -106,9 +106,10 @@ class MainWindow(QMainWindow,
         self.lbl_b_object.setVisible(True)
         self.txt_b_object.setVisible(True)
 
-        # Trigger initial calculations
-        if not self._restored_settings:
-            self.update_calculations()
+        # Trigger initial calculations. Always run: restored radios/combos are
+        # applied with signals blocked, so the engine must be refreshed once the
+        # full restored state is in place.
+        self.update_calculations()
 
     def closeEvent(self, event):
         self._save_settings()
@@ -150,6 +151,12 @@ class MainWindow(QMainWindow,
             "cmb_collimator": None,
             "cmb_gamma_convention": None,
             "cmb_asme_sensitivity": None,
+            "cmb_activity_unit": None,
+            "cmb_iqi_type": None,
+            "cmb_snr_location": None,
+            "cmb_app_wire": None,
+            "cmb_app_duplex": None,
+            "cmb_film_size": None,
         }
         for combo_name in combo_map:
             w = getattr(self, combo_name, None)
@@ -189,6 +196,15 @@ class MainWindow(QMainWindow,
             "txt_base_multiplier": "1.0",
             "txt_f_source": "",
             "txt_b_object": "",
+            "txt_app_kv": "120.0",
+            "txt_app_time": "120.0",
+            "txt_app_overlap": "10.0",
+            "txt_app_srb": "80.0",
+            "txt_app_quality": "140",
+            "txt_film_width": "100.0",
+            "txt_film_height": "400.0",
+            "txt_bed": "0.0",
+            "txt_bgap": "5.0",
         }
         for le_name, default_val in line_edits.items():
             w = getattr(self, le_name, None)
@@ -196,6 +212,17 @@ class MainWindow(QMainWindow,
                 val = w.text()
                 if val != default_val or s.contains(f"form/{le_name}"):
                     s.setValue(f"form/{le_name}", val)
+
+        # Radio buttons / checkboxes (technology mode, detector shape, IQI side)
+        for name in ("rad_analog", "rad_digital", "rad_detector_flat",
+                     "rad_detector_curved", "chk_source_side_iqi"):
+            w = getattr(self, name, None)
+            if w is not None:
+                s.setValue(f"form/{name}", bool(w.isChecked()))
+
+        # Unit mode — required so saved dimensional values are read back in the
+        # same unit they were entered.
+        s.setValue("ui/use_inch", bool(self.use_inch))
 
     def _restore_settings(self):
         self._restored_settings = False
@@ -238,7 +265,9 @@ class MainWindow(QMainWindow,
             "cmb_t", "cmb_geometry", "cmb_film_class_used",
             "cmb_detector_type", "cmb_chart_source",
             "cmb_standard", "cmb_collimator", "cmb_gamma_convention",
-            "cmb_asme_sensitivity",
+            "cmb_asme_sensitivity", "cmb_activity_unit",
+            "cmb_iqi_type", "cmb_snr_location", "cmb_app_wire",
+            "cmb_app_duplex", "cmb_film_size",
         ]
         for combo_name in combo_map:
             idx = s.value(f"form/{combo_name}", type=int)
@@ -248,6 +277,27 @@ class MainWindow(QMainWindow,
                     w.blockSignals(True)
                     w.setCurrentIndex(idx)
                     w.blockSignals(False)
+
+        # Keep the tracked activity unit in sync with the restored selection so
+        # the next toggle converts from the correct unit.
+        if hasattr(self, "cmb_activity_unit"):
+            self._activity_unit = self.cmb_activity_unit.currentText()
+
+        # Radio buttons / checkboxes (technology mode, detector shape, IQI side)
+        for name in ("rad_analog", "rad_digital", "rad_detector_flat",
+                     "rad_detector_curved", "chk_source_side_iqi"):
+            w = getattr(self, name, None)
+            if w is None or not s.contains(f"form/{name}"):
+                continue
+            w.blockSignals(True)
+            w.setChecked(s.value(f"form/{name}", type=bool))
+            w.blockSignals(False)
+
+        # Unit mode (set before line edits so conversion uses the right mode)
+        use_inch = s.value("ui/use_inch")
+        if use_inch is not None:
+            self.use_inch = str(use_inch).lower() in ("true", "1")
+            self.btn_units.setText("inç" if self.use_inch else "mm")
 
         # Form line edits
         line_edits = [
@@ -260,6 +310,9 @@ class MainWindow(QMainWindow,
             "txt_panel_width", "txt_panel_height", "txt_panel_overlap",
             "txt_app_exposures", "txt_base_multiplier", "txt_f_source",
             "txt_b_object",
+            "txt_app_kv", "txt_app_time", "txt_app_overlap", "txt_app_srb",
+            "txt_app_quality", "txt_film_width", "txt_film_height",
+            "txt_bed", "txt_bgap",
         ]
         for le_name in line_edits:
             val = s.value(f"form/{le_name}")
@@ -413,6 +466,7 @@ class MainWindow(QMainWindow,
         self.txt_app_activity.textChanged.connect(self.update_calculations)
         self.cmb_activity_unit = QComboBox()
         self.cmb_activity_unit.addItems(["Ci", "GBq"])
+        self._activity_unit = "Ci"  # tracks the currently displayed unit
         self.cmb_activity_unit.currentIndexChanged.connect(self.on_activity_unit_changed)
         act_layout.addWidget(self.txt_app_activity)
         act_layout.addWidget(self.cmb_activity_unit)
@@ -534,7 +588,7 @@ class MainWindow(QMainWindow,
         # Applied Duplex IQI
         self.lbl_app_duplex = QLabel(self.trans.get("applied_duplex"))
         self.cmb_app_duplex = QComboBox()
-        for d in range(1, 14):
+        for d in range(1, 15):
             self.cmb_app_duplex.addItem(str(d), d)
         self.cmb_app_duplex.setCurrentIndex(5)
         self.cmb_app_duplex.currentIndexChanged.connect(self.update_calculations)
@@ -798,19 +852,28 @@ class MainWindow(QMainWindow,
         self._update_timer.start(2000)
 
     def on_activity_unit_changed(self):
-        unit = self.cmb_activity_unit.currentText()
-        try:
-            val = float(self.txt_app_activity.text().replace(",", "."))
-            if unit == "GBq":
-                # Changed from Ci to GBq (1 Ci = 37 GBq)
+        """Converts the displayed activity when the unit toggles Ci <-> GBq.
+
+        The combo reports only the new unit, so the previous unit is tracked in
+        ``self._activity_unit``. Both directions must convert (1 Ci = 37 GBq),
+        and signal blocking must always be paired with an unblock.
+        """
+        new_unit = self.cmb_activity_unit.currentText()
+        prev_unit = getattr(self, "_activity_unit", new_unit)
+        if new_unit != prev_unit:
+            try:
+                val = float(self.txt_app_activity.text().replace(",", "."))
+            except ValueError:
+                val = None
+            if val is not None:
+                if prev_unit == "Ci" and new_unit == "GBq":
+                    val *= 37.0
+                elif prev_unit == "GBq" and new_unit == "Ci":
+                    val /= 37.0
                 self.txt_app_activity.blockSignals(True)
-                self.txt_app_activity.setText(f"{val * 37.0:.1f}")
+                self.txt_app_activity.setText(f"{val:.1f}")
                 self.txt_app_activity.blockSignals(False)
-            else:
-                # Changed from GBq to Ci
-                self.txt_app_activity.blockSignals(True)
-        except ValueError:
-            pass
+        self._activity_unit = new_unit
         self.update_calculations()
 
     def on_detector_type_changed(self):
@@ -1624,7 +1687,8 @@ class MainWindow(QMainWindow,
             (self.txt_custom_od, 1.0, 5000.0),
             (self.txt_custom_t, 0.1, 500.0),
             (self.txt_app_kv, 1.0, 1000.0),
-            (self.txt_app_activity, 0.01, 1000.0),
+            # Range matches the field validator; the field may hold Ci or GBq
+            (self.txt_app_activity, 0.01, 100000.0),
             (self.txt_app_sfd, 10.0, 5000.0),
             (self.txt_d, 0.01, 20.0),
             (self.txt_cap, 0.0, 50.0),
@@ -1905,8 +1969,20 @@ class MainWindow(QMainWindow,
                 state[attr] = w.currentData() if attr == "cmb_std_figure" else w.currentIndex()
         for attr in self._PRESET_EDITS:
             w = getattr(self, attr, None)
-            if w is not None:
-                state[attr] = w.text()
+            if w is None:
+                continue
+            text = w.text()
+            if attr in self._MM_FIELDS and text.strip():
+                # Persist dimensional fields in canonical mm so a preset saved
+                # in inch mode round-trips correctly on any platform/unit mode.
+                try:
+                    mm = self._to_mm(float(text.replace(",", ".")))
+                except ValueError:
+                    state[attr] = text
+                else:
+                    state[attr] = round(mm, 4)
+            else:
+                state[attr] = text
         return state
 
     def apply_form_state(self, state):
@@ -1949,8 +2025,23 @@ class MainWindow(QMainWindow,
                 w.blockSignals(False)
         for attr in self._PRESET_EDITS:
             w = getattr(self, attr, None)
-            if w is not None and attr in state:
-                w.setText(str(state[attr]))
+            if w is None or attr not in state:
+                continue
+            raw = state[attr]
+            if attr in self._MM_FIELDS and raw not in (None, ""):
+                # State is canonical mm; convert to the current display unit.
+                try:
+                    mm = float(str(raw).replace(",", "."))
+                except ValueError:
+                    w.setText(str(raw))
+                else:
+                    display = mm / 25.4 if self.use_inch else mm
+                    text_out = f"{display:.4f}".rstrip("0")
+                    if text_out.endswith("."):
+                        text_out += "0"
+                    w.setText(text_out)
+            else:
+                w.setText(str(raw))
         self.retranslate_ui()
         self.update_calculations()
 
@@ -2493,18 +2584,21 @@ class MainWindow(QMainWindow,
             defect_types = ["defect_ip", "defect_if", "defect_ic", "defect_porosity", "defect_crack", "defect_slag", "defect_undercut", "defect_burn_through"]
             defect_type = defect_types[self.cmb_defect_type.currentIndex()]
             
+            # Defect dimensions must be converted to mm exactly like the
+            # on-screen evaluation, otherwise inch mode makes the PDF verdict
+            # contradict the screen.
             try:
-                def_len = float(self.txt_defect_length.text().replace(",", "."))
+                def_len = self._to_mm(float(self.txt_defect_length.text().replace(",", ".")))
             except ValueError:
                 def_len = 0.0
-            
+
             try:
-                def_width = float(self.txt_defect_width.text().replace(",", "."))
+                def_width = self._to_mm(float(self.txt_defect_width.text().replace(",", ".")))
             except ValueError:
                 def_width = 0.0
-            
+
             try:
-                def_accum = float(self.txt_defect_accum.text().replace(",", "."))
+                def_accum = self._to_mm(float(self.txt_defect_accum.text().replace(",", ".")))
             except ValueError:
                 def_accum = 0.0
 
@@ -2723,11 +2817,23 @@ class MainWindow(QMainWindow,
 
     def _download_and_install(self, release_data):
         checker = UpdateChecker()
-        url = checker.get_download_url(release_data)
-        if not url:
+        asset = checker.get_download_asset(release_data)
+        if not asset or not asset.get("url"):
             QMessageBox.warning(self, "Download Error",
                                 "No compatible download found for your platform.")
             return
+        url = asset["url"]
+        expected_sha256 = checker._extract_sha256_from_release(release_data, asset["name"])
+        if not expected_sha256:
+            reply = QMessageBox.warning(
+                self, "Unverified Update",
+                "No SHA-256 checksum was published for this release, so the "
+                "download cannot be integrity-verified.\n\n"
+                "Download and run it anyway?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
 
         self.progress = QProgressDialog("Downloading update...", "Cancel", 0, 100, self)
         self.progress.setWindowTitle("Update")
@@ -2754,7 +2860,8 @@ class MainWindow(QMainWindow,
                         url,
                         # Emit a signal instead of touching Qt widgets from the
                         # worker thread (Qt thread-safety -> crash otherwise).
-                        progress_callback=lambda pct: self.progress.emit(int(pct * 100))
+                        progress_callback=lambda pct: self.progress.emit(int(pct * 100)),
+                        expected_sha256=expected_sha256,
                     )
                     self.finished.emit(filepath)
                 except Exception as e:

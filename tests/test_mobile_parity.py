@@ -47,6 +47,7 @@ def test_applied_sfd_drives_ug_and_exposure_time(state):
 
 
 def test_ug_uses_f_equals_sfd_minus_b(state):
+    state.tech = "analog"  # film model: b = t for SWSI
     state.geometry = "swsi"
     state.pipe_wall = 6.02
     state.d = 2.0
@@ -82,6 +83,7 @@ def test_required_density_by_class(state):
 
 def test_required_density_se75_thin_class_b(state):
     state.tech = "analog"
+    state.geometry = "swsi"  # w_nom = t < 12 mm triggers the Clause 6.9 density
     state.material = "steel"
     state.source = "isotope_se75"
     state.testing_class = "class_b"
@@ -91,6 +93,7 @@ def test_required_density_se75_thin_class_b(state):
 
 
 def test_exposure_count_check_runs_when_applied_set(state):
+    state.tech = "analog"  # single panoramic exposure for SWSI
     state.geometry = "swsi"
     state.app_exposures = 1
     state.run_calculations()
@@ -168,4 +171,43 @@ def test_defect_evaluation_all_standards_normalized(state, standard):
     state.defect_standard = standard
     r = state.evaluate_defect("defect_porosity", 2.0, 1.0, 0.0)
     assert isinstance(r, dict)
+
+
+def test_mobile_defect_types_use_prefixed_keys():
+    """Regression: the mobile Results screen sent bare keys ("crack") that no
+    evaluator recognizes, so every defect was silently accepted. DEFECT_TYPES
+    must use the same `defect_*` namespace as desktop and web.
+
+    Parsed via AST so the test does not import Kivy (headless CI)."""
+    import ast
+    import pathlib
+
+    source = (
+        pathlib.Path(__file__).resolve().parents[1]
+        / "src" / "mobile" / "screens" / "step_results.py"
+    )
+    tree = ast.parse(source.read_text(encoding="utf-8"))
+    defect_types = None
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id == "DEFECT_TYPES"
+            for target in node.targets
+        ):
+            defect_types = ast.literal_eval(node.value)
+            break
+    assert defect_types is not None, "DEFECT_TYPES not found in step_results.py"
+    assert defect_types == [
+        "defect_crack", "defect_ip", "defect_if", "defect_ic",
+        "defect_porosity", "defect_slag", "defect_undercut", "defect_burn_through",
+    ]
+
+
+@pytest.mark.parametrize("standard", ["api1104", "iso5817", "b31_3", "viii"])
+def test_crack_is_rejected_across_all_standards(state, standard):
+    """Safety regression: a crack must never be reported acceptable on any
+    standard (the bare-key bug returned ACCEPT for every defect)."""
+    state.defect_standard = standard
+    r = state.evaluate_defect("defect_crack", 5.0, 1.0, 0.0)
+    assert isinstance(r, dict)
+    assert r["status"] is False, f"crack accepted under {standard}: {r}"
     assert isinstance(r.get("status"), bool)

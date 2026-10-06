@@ -44,6 +44,17 @@ def test_asme_ug_at_asme_f_min_is_exactly_the_limit(calc, d, b, t, limit):
     assert calc.calculate_geometric_unsharpness_from_sfd(d, b, sfd) == pytest.approx(limit)
 
 
+def test_asme_ug_limit_metric_boundaries(calc):
+    # ASME Sec V Art 2 Table T-274.2: metric bounds 50/75/100 mm (2/3/4 in.);
+    # the exact 50/75 boundaries belong to the higher band.
+    assert calc.get_asme_ug_limit(49.9) == 0.51
+    assert calc.get_asme_ug_limit(50.0) == 0.76
+    assert calc.get_asme_ug_limit(75.0) == 0.76
+    assert calc.get_asme_ug_limit(75.1) == 1.02
+    assert calc.get_asme_ug_limit(100.0) == 1.02
+    assert calc.get_asme_ug_limit(100.1) == 1.78
+
+
 # ---------------------------------------------------------------------------
 # Desktop UI
 # ---------------------------------------------------------------------------

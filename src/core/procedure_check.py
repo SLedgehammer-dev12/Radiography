@@ -291,16 +291,12 @@ class ProcedureComplianceChecker:
                     is_compliant = False
                     checks.append({"name": "srb", "status": False, "details": l_msgs["srb_fail"].format(applied_srb, max_srb)})
 
-        # 10. Annex F Ug/SRb Check (Digital only - SRb does not exist for film)
-        if tech == "digital":
-            max_srb = calculated.get("max_srb", 0)
-            if ug > 0 and max_srb and max_srb > 0:
-                ratio = ug / (max_srb / 1000.0)
-                if ratio <= 2.0:
-                    checks.append({"name": "annex_f", "status": True, "details": l_msgs["annex_f_pass"].format(ratio)})
-                else:
-                    is_compliant = False
-                    checks.append({"name": "annex_f", "status": False, "details": l_msgs["annex_f_fail"].format(ratio)})
+        # 10. Annex F (ISO 17636-2, informative) detector-unsharpness f_min
+        # compensation is no longer a compliance gate here: the annex is
+        # informative, and the previous "Ug/SRb > 2" test was non-standard and
+        # inverted (it failed good detectors). The engine reports the required
+        # f_min from Formulae (F.4)/(F.5) as a warning instead. The normative
+        # digital IQI requirements (SRb, SNR, duplex wire) are enforced above.
 
         # 11. Exposure Time Check (Warning warning if difference > 25%)
         applied_time = applied.get("applied_time", 0.0) # in seconds

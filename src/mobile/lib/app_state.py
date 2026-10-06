@@ -28,13 +28,16 @@ class AppState:
         self.trans = Translation()
         self.engine = CalculationEngine(calc=self.calc, proc_checker=self.proc_checker)
 
-        self.tech = "analog"
-        self.technique = "swsi"
+        # Defaults aligned with the desktop and web front-ends (digital, DWSI,
+        # Class B, IQI on the source side) so the same pipe yields the same
+        # technique/result on every platform.
+        self.tech = "digital"
+        self.technique = "dwsi"
         self.material = "steel"
-        self.testing_class = "class_a"
+        self.testing_class = "class_b"
         self.source = "x_ray"
-        self.geometry = "swsi"
-        self.source_side_iqi = False
+        self.geometry = "dwsi"
+        self.source_side_iqi = True
 
         self.pipe_od_std = '4" (NPS 4)'
         self.pipe_od = 114.3
@@ -225,6 +228,13 @@ class AppState:
             "f_min_provenance": values.get("f_min_provenance"),
             "exposure_time_provenance": values.get("exposure_time_provenance"),
             "exposure_time_provenance_text": values.get("exposure_time_provenance_text"),
+            # Engine-formatted strings (quality_target, detector_quality,
+            # filter_recommendation, ...) and exposure-count comparison fields
+            # used by the PDF report helper.
+            "display": result["display"],
+            "exposures_panel": calculated.get("exposures_panel"),
+            "exposures_applied": calculated.get("exposures_applied"),
+            "exposures_ok": calculated.get("exposures_ok"),
         }
 
         self.compliance = self.engine.check_compliance(form, calculated, {}, self.language)
