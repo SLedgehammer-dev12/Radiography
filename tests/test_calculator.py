@@ -223,6 +223,36 @@ class TestRTCalculator(unittest.TestCase):
         srb = self.calc.get_max_srb(20.0, "class_b", "dwsi")
         self.assertEqual(srb, 80)
 
+    def test_max_srb_boundaries_match_b13_b14(self):
+        # ISO 17636-2:2022 Table B.13 (Class A) SRb_detector ladder (µm)
+        class_a = {
+            1.0: 50, 1.5: 63, 2.0: 80, 5.0: 100, 10.0: 130,
+            25.0: 160, 55.0: 200, 150.0: 250, 250.0: 320, 300.0: 400,
+        }
+        for ref, expected in class_a.items():
+            self.assertEqual(
+                self.calc.get_max_srb(ref, "class_a", "swsi"), expected,
+                f"B.13 class A ref={ref}")
+        self.assertEqual(self.calc.get_max_srb(1.01, "class_a", "swsi"), 63)
+        self.assertEqual(self.calc.get_max_srb(250.01, "class_a", "swsi"), 400)
+
+        # ISO 17636-2:2022 Table B.14 (Class B) SRb_detector ladder (µm)
+        class_b = {
+            1.5: 40, 4.0: 50, 8.0: 63, 12.0: 80,
+            40.0: 100, 120.0: 130, 200.0: 160, 250.0: 200,
+        }
+        for ref, expected in class_b.items():
+            self.assertEqual(
+                self.calc.get_max_srb(ref, "class_b", "swsi"), expected,
+                f"B.14 class B ref={ref}")
+        self.assertEqual(self.calc.get_max_srb(1.51, "class_b", "swsi"), 50)
+
+        # Footnote a: DWSI uses the nominal thickness t (= w_nom / 2)
+        self.assertEqual(self.calc.get_max_srb(2.0 * 2.0, "class_b", "dwsi"), 50)
+        self.assertEqual(self.calc.get_max_srb(2.0 * 6.0, "class_b", "dwsi"), 63)
+        # DWDI uses the penetrated thickness w = 2t
+        self.assertEqual(self.calc.get_max_srb(2.0 * 6.0, "class_b", "dwdi_elliptic"), 80)
+
     def test_duplex_wire_iqi(self):
         # Class A, SWSI, w_nom=5mm -> ref=5 -> B.13: 2<w<=5 -> D10 (0.100mm)
         d_str, d_num = self.calc.get_duplex_iqi(5.0, "class_a", "swsi")
