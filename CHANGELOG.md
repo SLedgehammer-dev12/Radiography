@@ -1,5 +1,48 @@
 # Changelog
 
+## [2.0.0] - 2026-10-06
+
+### Fixed (calculation accuracy — ISO 17636-1/2:2022)
+- **Single-wire IQI tables B.1/B.3/B.9/B.11** corrected to the 2022 edition (previously under-specified image quality above ~25–38 mm); the matrix oracle now enforces them exactly and the DWSI reference thickness (`w = 2t`, Clause 6.9) is corrected in the oracle.
+- **SNR_N for Yb-169/Tm-170** added per Table 3 (`w ≤ 5 mm` Class B = 120), fixing an exposure time that was ~31% too short; parity fixture re-locked.
+- **Film-system class model** is now source/kV aware per Tables 3/4 (X-ray ≤150 kV Class B = C3; Al/Ti Class B = C3; Co-60 thick = C5; Yb/Tm thin = C3) with the Clause 6.9 Se-75 upgrade.
+- **IQI reference thickness** now uses the nominal thickness `t` / penetrated `w = 2t`; weld reinforcement (cap) is no longer added (it under-specified the required wire/hole).
+- **Annex A exposure count**: out-of-chart operating points now use the conservative chart cap (was N=1/N=3) and emit a warning.
+- **Annex F f_min compensation** implemented correctly (Formulae F.4/F.5, `u_d = 2·SRb`); the non-standard inverted `Ug/SRb > 2` compliance gate was removed (Annex F is informative).
+- **ASME Sec V T-274.2** geometric-unsharpness limits use the table's metric 50/75/100 mm boundaries (was 50.8/76.2/101.6 with an off-by-one at the boundary).
+- **Robustness**: non-positive panel width no longer yields an absurd exposure count; invalid X-ray kV (≤ 0) no longer divides by zero.
+
+### Fixed (desktop)
+- Activity unit toggle now converts **Ci ↔ GBq** both ways and no longer leaves the field's signals permanently blocked (previously a silent ~37× exposure error and a frozen input).
+- PDF defect evaluation applies the inch→mm conversion, so the report verdict matches the screen.
+- Persist technology mode, detector shape, IQI side, applied kV/time/overlap/srb/quality, bed/bgap and the mm/inch unit mode (previously reverted on restart).
+- Applied-duplex selector reaches **D 14**; D 4 wire diameter displayed correctly.
+
+### Fixed (mobile)
+- Defect evaluator key namespace (`defect_*`) so cracks/defects are no longer silently accepted.
+- T-joint sketch `Line(circle=…)` crash fixed; technique/geometry selectors are functional and in sync; detector label reflects the selected detector.
+- Locale-tolerant numeric parsing (comma decimals) on the exposure screen.
+
+### Fixed (web)
+- PDF reports now embed the geometry/standard sketches.
+- Stale results/compliance cleared on calculation error (error shown instead).
+- SWSI standard-figure catalogue matches the desktop (`fig2` first), so the default is the film-inside figure, not panoramic `fig5`.
+- Applying a named preset re-validates `chart_source` for the new source/technology.
+- Isotope PDF reports no longer print a fabricated `u_max` (kV).
+- Exposure-count provenance handles `out_of_chart`; activity label no longer duplicates the unit.
+
+### Added
+- **Update management**: SHA-256 verification wired into desktop update downloads, with CI publishing per-artifact checksums in the release notes; missing checksums require explicit user confirmation.
+- **Mobile update UI** (check/download/install) with real Android APK installation via `FileProvider`.
+
+### Changed
+- **Cross-platform unit safety**: preset/project/CSV export now writes canonical **mm**, and import converts to the active display unit (fixes 25.4× round-trip errors).
+- **Default state parity**: mobile defaults aligned with desktop/web (digital, DWSI, Class B, source-side IQI).
+- Version bumped to **2.0.0**.
+
+### Tests
+- 779 pytest (827 subtests) + 21 Playwright e2e green.
+
 ## [1.10.2] - 2026-10-01
 
 ### Added

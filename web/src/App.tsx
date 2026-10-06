@@ -637,14 +637,14 @@ export default function App() {
   const exportPreset = () =>
     downloadJson("rt_preset.json", {
       type: "radiography_preset",
-      version: pyClient.version ?? "1.8.3",
+      version: pyClient.version ?? "2.0.0",
       state: formToDesktopState(form, reportInfo, pipeData, lang),
     });
 
   const exportProject = () =>
     downloadJson("rt_project.json", {
       type: "radiography_project",
-      version: pyClient.version ?? "1.8.3",
+      version: pyClient.version ?? "2.0.0",
       state: formToDesktopState(form, reportInfo, pipeData, lang),
       calculated: result?.calculated ?? {},
       warnings: (result?.warnings ?? []).join("\n"),
@@ -2669,14 +2669,14 @@ export default function App() {
         {showAbout && (
           <AboutModal
             t={t}
-            currentVersion={pyClient.version ?? "1.10.4"}
+            currentVersion={pyClient.version ?? "2.0.0"}
             onClose={() => setShowAbout(false)}
           />
         )}
         {showUpdates && (
           <UpdateModal
             t={t}
-            currentVersion={pyClient.version ?? "1.10.4"}
+            currentVersion={pyClient.version ?? "2.0.0"}
             onClose={() => setShowUpdates(false)}
           />
         )}
@@ -2897,7 +2897,7 @@ interface AboutModalProps {
   currentVersion?: string;
 }
 
-function AboutModal({ t, onClose, currentVersion = "1.10.4" }: AboutModalProps) {
+function AboutModal({ t, onClose, currentVersion = "2.0.0" }: AboutModalProps) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal about-modal" onClick={(e) => e.stopPropagation()}>
@@ -2969,7 +2969,7 @@ interface UpdateModalProps {
   currentVersion?: string;
 }
 
-function UpdateModal({ t, onClose, currentVersion = "1.10.4" }: UpdateModalProps) {
+function UpdateModal({ t, onClose, currentVersion = "2.0.0" }: UpdateModalProps) {
   const [updateState, setUpdateState] = useState<{
     status: "checking" | "up_to_date" | "available" | "error";
     latestVersion?: string;
