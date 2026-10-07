@@ -55,6 +55,23 @@ class TestASMEVIII(unittest.TestCase):
         self.assertTrue(ok)
         self.assertIn("UW-52", reason)
 
+    def test_messages_have_no_double_uw_prefix_and_are_localized(self):
+        # Regression: templates contained "UW-{}" while the mode already had the
+        # "UW-" prefix -> "UW-UW-51"; and the reject labels were Turkish-only.
+        _, en_crack = self.eval.evaluate("defect_crack", 10.0, 2.0, 1.0, 0.0, mode="UW-51", lang="en")
+        self.assertIn("UW-51", en_crack)
+        self.assertNotIn("UW-UW", en_crack)
+        self.assertIn("Crack", en_crack)
+
+        _, en_por = self.eval.evaluate("defect_porosity", 10.0, 5.0, 5.0, 0.0, mode="UW-52", lang="en")
+        self.assertIn("UW-52", en_por)
+        self.assertNotIn("UW-UW", en_por)
+
+        _, tr_crack = self.eval.evaluate("defect_crack", 10.0, 2.0, 1.0, 0.0, mode="UW-51", lang="tr")
+        self.assertIn("UW-51", tr_crack)
+        self.assertNotIn("UW-UW", tr_crack)
+        self.assertIn("Çatlak", tr_crack)
+
 
 if __name__ == "__main__":
     unittest.main()

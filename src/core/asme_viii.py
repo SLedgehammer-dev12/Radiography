@@ -16,17 +16,21 @@ class ASMEVIIIEvaluator:
 
     def _msg(self, lang, key, *args):
         table = {
-            "reject": ("{} UW-{} modunda kabul edilmez.", "{} is not permitted in UW-{} mode."),
-            "por_size": ("Gözenek çapı ({:.1f} mm) UW-{} limitini ({:.1f} mm) aşıyor.",
-                         "Pore size ({:.1f} mm) exceeds the UW-{} limit ({:.1f} mm)."),
-            "por_accum": ("Gözenek yığılma ({:.1f} mm) UW-{} limitini ({:.1f} mm) aşıyor.",
-                          "Porosity accumulation ({:.1f} mm) exceeds the UW-{} limit ({:.1f} mm)."),
-            "slag_w": ("Cüruf genişliği ({:.1f} mm) UW-{} limitini ({:.1f} mm) aşıyor.",
-                       "Slag width ({:.1f} mm) exceeds the UW-{} limit ({:.1f} mm)."),
-            "undercut_d": ("Yanma oluğu derinliği ({:.2f} mm) UW-{} limitini ({:.2f} mm) aşıyor.",
-                           "Undercut depth ({:.2f} mm) exceeds the UW-{} limit ({:.2f} mm)."),
-            "accept": ("Kusur ebatları ASME VIII UW-{} kriterleri dahilindedir. KABUL EDİLEBİLİR.",
-                       "Defect dimensions are within ASME VIII UW-{} criteria. ACCEPTABLE."),
+            # {0} is the mode designator ("UW-51"/"UW-52"), already prefixed.
+            "reject": ("{} {} modunda kabul edilmez.", "{} is not permitted in {} mode."),
+            "por_size": ("Gözenek çapı ({:.1f} mm) {} limitini ({:.1f} mm) aşıyor.",
+                         "Pore size ({:.1f} mm) exceeds the {} limit ({:.1f} mm)."),
+            "por_accum": ("Gözenek yığılma ({:.1f} mm) {} limitini ({:.1f} mm) aşıyor.",
+                          "Porosity accumulation ({:.1f} mm) exceeds the {} limit ({:.1f} mm)."),
+            "slag_w": ("Cüruf genişliği ({:.1f} mm) {} limitini ({:.1f} mm) aşıyor.",
+                       "Slag width ({:.1f} mm) exceeds the {} limit ({:.1f} mm)."),
+            "undercut_d": ("Yanma oluğu derinliği ({:.2f} mm) {} limitini ({:.2f} mm) aşıyor.",
+                           "Undercut depth ({:.2f} mm) exceeds the {} limit ({:.2f} mm)."),
+            "accept": ("Kusur ebatları ASME VIII {} kriterleri dahilindedir. KABUL EDİLEBİLİR.",
+                       "Defect dimensions are within ASME VIII {} criteria. ACCEPTABLE."),
+            "label_reject_common": ("Çatlak / yetersiz ergime / yetersiz nüfuziyet",
+                                    "Crack / incomplete fusion / incomplete penetration"),
+            "label_burn": ("Kök yanması (Burn-through)", "Burn-through"),
         }
         text = table.get(key, ("", ""))[0 if lang == "tr" else 1]
         return text.format(*args) if args else text
@@ -41,7 +45,7 @@ class ASMEVIIIEvaluator:
         # Full RT (UW-51): essentially no unacceptable indications.
         if mode == "UW-51":
             if defect_type in ("defect_crack", "defect_if", "defect_ic", "defect_ip"):
-                return False, self._msg(lang, "reject", "Çatlak / yetersiz ergime / yetersiz nüfuziyet", mode)
+                return False, self._msg(lang, "reject", self._msg(lang, "label_reject_common"), mode)
             max_pore = 1.0
             max_slag = 1.0
             max_under = 0.4
@@ -68,7 +72,7 @@ class ASMEVIIIEvaluator:
                 reasons.append(self._msg(lang, "undercut_d", width, mode, max_under))
         elif defect_type == "defect_burn_through":
             if mode == "UW-51":
-                return False, self._msg(lang, "reject", "Kök yanması (Burn-through)", mode)
+                return False, self._msg(lang, "reject", self._msg(lang, "label_burn"), mode)
             if width > 2.0:
                 is_accepted = False
                 reasons.append(self._msg(lang, "undercut_d", width, mode, 2.0))

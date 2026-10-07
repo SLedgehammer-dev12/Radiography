@@ -1794,10 +1794,16 @@ class MainWindow(QMainWindow,
             except ValueError:
                 output_val = 40.0
 
+        # Default exposure-chart constant E per source (index order matches cmb_source).
+        default_base_e = (3.0, 30.0, 40.0, 20.0, 150.0, 500.0)
         try:
             base_e = float(self.txt_base_e.text().replace(",", "."))
         except ValueError:
-            base_e = 0.005
+            base_e = 0.0
+        if base_e <= 0.0:
+            # Empty/invalid field: fall back to the per-source default E instead
+            # of a tiny value that would massively under-expose.
+            base_e = default_base_e[source_idx] if 0 <= source_idx < len(default_base_e) else 3.0
 
         # Detector type (digital) or film class (analog)
         detector_type = self._det_keys[self.cmb_detector_type.currentIndex()]

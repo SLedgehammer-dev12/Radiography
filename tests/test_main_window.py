@@ -40,6 +40,19 @@ class TestMainWindowInit(unittest.TestCase):
     def test_grp_compliance_exists(self):
         self.assertTrue(hasattr(self.win, "grp_compliance"))
 
+    def test_empty_base_e_falls_back_to_source_default(self):
+        # X-ray default E = 3.0 (previously an empty field fell back to 0.005)
+        self.win.cmb_source.setCurrentIndex(0)
+        self.win.txt_base_e.setText("")
+        self.assertAlmostEqual(self.win.get_form_values()[7], 3.0, places=4)
+        # Ir-192 default E = 30.0
+        self.win.cmb_source.setCurrentIndex(1)
+        self.win.txt_base_e.setText("")
+        self.assertAlmostEqual(self.win.get_form_values()[7], 30.0, places=4)
+        # Zero is also invalid -> default
+        self.win.txt_base_e.setText("0")
+        self.assertAlmostEqual(self.win.get_form_values()[7], 30.0, places=4)
+
     def test_activity_unit_toggle_converts_both_ways_and_keeps_signals(self):
         # Isotope source so the activity field is active.
         self.win.cmb_source.setCurrentIndex(1)  # Ir-192
