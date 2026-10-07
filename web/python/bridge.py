@@ -275,6 +275,7 @@ def handle(request_json):
             _trans,
             dynamic_img_path=image_paths[0],
             standard_img_path=image_paths[1],
+            lvl3=payload.get("lvl3"),
         )
         for filename in image_paths:
             if filename and os.path.exists(filename):

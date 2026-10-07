@@ -2693,7 +2693,8 @@ class MainWindow(QMainWindow,
             lvl3_active,
             sfd_comp_val, self.trans,
             dynamic_img_path=dynamic_img_path,
-            standard_img_path=standard_img_path
+            standard_img_path=standard_img_path,
+            lvl3=getattr(self, "lvl3_settings", None),
         )
 
         # Clean up temporary image files

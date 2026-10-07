@@ -98,6 +98,22 @@ class TestPDFReportGenerator(unittest.TestCase):
         self.assertIn("(SFD) (mm)", t_ana)
         self.assertIn("Film Class", t_ana)
 
+    def test_level3_section_lists_all_active_overrides(self):
+        import pypdf
+
+        p = os.path.join(self.tmpdir, "lvl3.pdf")
+        self.gen.generate_report(
+            p, self._make_inputs(), self._make_outputs(), [], None,
+            True, 150.0, self.lang,
+            lvl3={"voltage_override": True, "central_proj_reduction": True,
+                  "approval_note": "Client approved per letter 2026-01"})
+        text = "\n".join(
+            (pg.extract_text() or "") for pg in pypdf.PdfReader(p).pages)
+        self.assertIn("Level 3", text)
+        self.assertIn("Voltage", text)
+        self.assertIn("Central Projection", text)
+        self.assertIn("Client approved per letter 2026-01", text)
+
     def test_iqi_type_and_position_rows(self):
         import pypdf
 

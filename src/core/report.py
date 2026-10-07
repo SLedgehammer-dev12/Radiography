@@ -197,10 +197,13 @@ class PDFReportGenerator:
         except Exception:
             return None
 
-    def generate_report(self, filepath, inputs, outputs, warnings_list, defect_eval, lvl3_active, sfd_comp_val, lang_obj, dynamic_img_path=None, standard_img_path=None):
+    def generate_report(self, filepath, inputs, outputs, warnings_list, defect_eval, lvl3_active, sfd_comp_val, lang_obj, dynamic_img_path=None, standard_img_path=None, lvl3=None):
         """
         Generates the PDF report. Never raises: returns True on success and
         False on any build/formatting error (the caller shows an error dialog).
+
+        ``lvl3`` is the optional Level-3 settings dict used to document every
+        active exception and the approval note in the report.
         """
         try:
             return self._generate_report_impl(
@@ -208,12 +211,13 @@ class PDFReportGenerator:
                 lvl3_active, sfd_comp_val, lang_obj,
                 dynamic_img_path=dynamic_img_path,
                 standard_img_path=standard_img_path,
+                lvl3=lvl3,
             )
         except Exception:
             logger.exception("PDF report generation failed")
             return False
 
-    def _generate_report_impl(self, filepath, inputs, outputs, warnings_list, defect_eval, lvl3_active, sfd_comp_val, lang_obj, dynamic_img_path=None, standard_img_path=None):
+    def _generate_report_impl(self, filepath, inputs, outputs, warnings_list, defect_eval, lvl3_active, sfd_comp_val, lang_obj, dynamic_img_path=None, standard_img_path=None, lvl3=None):
         """
         Generates a professional PDF report of the RT calculation and defect evaluation.
         """
@@ -607,6 +611,27 @@ class PDFReportGenerator:
                 [Paragraph(f"<b>{lang_obj.get('level3_active')}</b>", label_style), Paragraph(lang_obj.get("success"), value_style)],
                 [Paragraph(lang_obj.get("sfd_comp_label"), label_style), Paragraph(f"SNR_N = {sfd_comp_val:.1f}" if sfd_comp_val else "N/A", value_style)]
             ]
+            # Document every active exception (not just SFD compensation) and the
+            # captured client approval note, so the report substantiates them.
+            if isinstance(lvl3, dict):
+                for key, label_key in (
+                    ("voltage_override", "lvl3_voltage_override"),
+                    ("isotope_flex", "lvl3_isotope_flex"),
+                    ("source_flex", "lvl3_source_flex"),
+                    ("central_proj_reduction", "lvl3_central_proj"),
+                    ("dw_reduction", "lvl3_dw_reduction"),
+                ):
+                    if lvl3.get(key):
+                        lvl3_data.append([
+                            Paragraph(lang_obj.get(label_key), label_style),
+                            Paragraph("✓", value_style),
+                        ])
+                note = str(lvl3.get("approval_note") or "").strip()
+                if note:
+                    lvl3_data.append([
+                        Paragraph(lang_obj.get("level3_approval_note"), label_style),
+                        Paragraph(_esc(note), value_style),
+                    ])
             lvl3_table = Table(lvl3_data, colWidths=[250, 250])
             lvl3_table.setStyle(TableStyle([
                 ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#ffcc80')),

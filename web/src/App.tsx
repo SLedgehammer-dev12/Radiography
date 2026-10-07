@@ -726,6 +726,7 @@ export default function App() {
         warnings: result.warnings,
         defect: defectPayload,
         lvl3_active: lvl3Active,
+        lvl3,
         sfd_comp_val: calculated.sfd_comp_target ?? null,
         lang,
         report_info: reportInfo,
