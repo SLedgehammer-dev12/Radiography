@@ -98,6 +98,29 @@ class TestPDFReportGenerator(unittest.TestCase):
         self.assertIn("(SFD) (mm)", t_ana)
         self.assertIn("Film Class", t_ana)
 
+    def test_iqi_type_and_position_rows(self):
+        import pypdf
+
+        p = os.path.join(self.tmpdir, "iqi.pdf")
+        self.gen.generate_report(
+            p, self._make_inputs(iqi_type="step_hole", film_side=True),
+            self._make_outputs(), [], None, False, None, self.lang)
+        text = "\n".join(
+            (pg.extract_text() or "") for pg in pypdf.PdfReader(p).pages)
+        self.assertIn("IQI Type", text)
+        self.assertIn("Step and Hole", text)
+        self.assertIn("IQI Position", text)
+        self.assertIn("Film/Detector Side", text)
+
+        # Source-side variant
+        p2 = os.path.join(self.tmpdir, "iqi_src.pdf")
+        self.gen.generate_report(
+            p2, self._make_inputs(iqi_type="wire", film_side=False),
+            self._make_outputs(), [], None, False, None, self.lang)
+        text2 = "\n".join(
+            (pg.extract_text() or "") for pg in pypdf.PdfReader(p2).pages)
+        self.assertIn("Source Side", text2)
+
     def test_generate_report_with_warnings(self):
         filepath = os.path.join(self.tmpdir, "test_warn.pdf")
         warnings = ["Warning 1: Test warning message", "Warning 2: Another warning"]

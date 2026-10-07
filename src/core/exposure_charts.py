@@ -175,6 +175,7 @@ class ExposureChartDatabase:
         }
         self.HVL = dict(self.__class__.HVL)
         self.GAMMA = dict(self.__class__.GAMMA)
+        self.FILM_TO_CHART_KEY = dict(self.__class__.FILM_TO_CHART_KEY)
         self.TYPE_X_CHART = {}
         if json_path is not None:
             if os.path.exists(json_path):
@@ -208,8 +209,13 @@ class ExposureChartDatabase:
         r_dig, spec = self.lookup_digital_r_factor(detector_type, source)
         if r_dig is None:
             return None
-        hvl = self.HVL.get(source, 13.2)
-        gamma = self.GAMMA.get(source, 0.48)
+        # Require explicit HVL/gamma data for the source; never silently reuse
+        # another isotope's constants (the caller then falls back to the physics
+        # model, which has its own per-source attenuation table).
+        if source not in self.HVL or source not in self.GAMMA:
+            return None
+        hvl = self.HVL[source]
+        gamma = self.GAMMA[source]
         if gamma <= 0 or activity <= 0:
             return None
         snr_val = max(10.0, float(target_snr if target_snr else 70.0))
@@ -466,25 +472,24 @@ class ExposureChartDatabase:
         with open(filepath, "r") as f:
             data = json.load(f)
 
+        # Merge into the built-in defaults instead of replacing them: the JSON
+        # may be a partial snapshot (the shipped file omits Yb-169/Tm-170), and
+        # clearing would silently drop those HVL/gamma constants, making the
+        # digital R-factor path fall back to Ir-192 values (gross under-exposure).
         if "r_factor_table" in data:
-            self.R_FACTOR_TABLE.clear()
             for film, sources in data["r_factor_table"].items():
-                self.R_FACTOR_TABLE[film] = dict(sources)
+                self.R_FACTOR_TABLE.setdefault(film, {}).update(sources)
 
         if "hvl" in data:
-            self.HVL.clear()
             self.HVL.update({str(k): float(v) for k, v in data["hvl"].items()})
 
         if "gamma" in data:
-            self.GAMMA.clear()
             self.GAMMA.update({str(k): float(v) for k, v in data["gamma"].items()})
 
         if "type_x_chart" in data:
-            self.TYPE_X_CHART.clear()
             for kv_str, kv_data in data["type_x_chart"].items():
                 kv = int(kv_str)
                 self.TYPE_X_CHART[kv] = {int(t_str): float(v) for t_str, v in kv_data.items()}
 
         if "film_to_chart_key" in data:
-            self.FILM_TO_CHART_KEY.clear()
             self.FILM_TO_CHART_KEY.update(data["film_to_chart_key"])

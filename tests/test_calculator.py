@@ -377,43 +377,59 @@ class TestRTCalculator(unittest.TestCase):
         self.assertFalse(comp)
 
     def test_get_filter_recommendations(self):
-        # X-ray on steel, 120 kV
-        recs = self.calc.get_filter_recommendations("x_ray", "steel", 120.0, "class_b")
-        self.assertEqual(recs["screen_table"]["front_mm"], "<=0.15")
+        # Table 3, U <= 100 kV: lead screens optional/absent; no metal filter
+        recs = self.calc.get_filter_recommendations("x_ray", "steel", 80.0, "class_b")
+        self.assertEqual(recs["screen_table"]["front_mm"], "<=0.03")
         self.assertEqual(recs["screen_table"]["front_optional"], True)
         self.assertEqual(recs["screen_table"]["back_absent"], True)
-        self.assertEqual(recs["metal_filter"]["options"],
-                         [{"material": "cu", "thickness": "0.5"},
-                          {"material": "al", "thickness": "1.0"}])
+        self.assertEqual(recs["metal_filter"]["options"], [{"material": None, "thickness": None}])
 
-        # Isotope Ir-192
+        # Table 3, 100 < U <= 150 kV
+        recs150 = self.calc.get_filter_recommendations("x_ray", "steel", 120.0, "class_b")
+        self.assertEqual(recs150["screen_table"]["front_mm"], "<=0.15")
+
+        # Table 3, 250 < U <= 500 kV depends on w (w > 50 -> asymmetric screens)
+        recs_thin = self.calc.get_filter_recommendations("x_ray", "steel", 300.0, "class_b", w_nom=40.0)
+        self.assertEqual(recs_thin["screen_table"]["front_mm"], "0.02-0.20")
+        recs_thick = self.calc.get_filter_recommendations("x_ray", "steel", 300.0, "class_b", w_nom=60.0)
+        self.assertEqual(recs_thick["screen_table"]["front_mm"], "0.10-0.20")
+        self.assertEqual(recs_thick["screen_table"]["back_mm"], "0.02-0.20")
+
+        # Isotope Ir-192: Class B front 0.1-0.2, back 0.02-0.2; Pb 0.5-2 filter
         recs_ir = self.calc.get_filter_recommendations("isotope_ir192", "steel", None, "class_b")
-        self.assertEqual(recs_ir["screen_table"]["front_mm"], "0.05-0.20")
-        self.assertEqual(recs_ir["screen_table"]["back_mm"], "0.05-0.20")
+        self.assertEqual(recs_ir["screen_table"]["front_mm"], "0.10-0.20")
+        self.assertEqual(recs_ir["screen_table"]["back_mm"], "0.02-0.20")
         self.assertEqual(recs_ir["metal_filter"]["options"],
-                         [{"material": "cu", "thickness": "1.0"},
-                          {"material": "pb", "thickness": "1.0"}])
+                         [{"material": "pb", "thickness": "0.5-2.0"},
+                          {"material": None, "thickness": None}])
 
-        # Isotope Co-60
+        # Isotope Co-60: 0.25-0.7 mm steel/copper screens (front is not lead)
         recs_co = self.calc.get_filter_recommendations("isotope_co60", "steel", None, "class_a")
-        self.assertEqual(recs_co["screen_table"]["front_mm"], "0.10-0.30")
-        self.assertEqual(recs_co["metal_filter"]["options"],
-                         [{"material": "pb", "thickness": "1.0-2.0"}])
+        self.assertEqual(recs_co["screen_table"]["front_mm"], "0.25-0.70")
+        self.assertEqual(recs_co["screen_table"]["front_material"], "fe")
+        self.assertEqual(recs_co["screen_table"]["front_is_filter"], True)
 
-        # X-ray at high voltage (> 250 kV, <= 450 kV)
-        recs_high = self.calc.get_filter_recommendations("x_ray", "steel", 300.0, "class_b")
-        self.assertEqual(recs_high["screen_table"]["front_mm"], "0.05-0.15")
-        self.assertEqual(recs_high["metal_filter"]["options"],
-                         [{"material": "cu", "thickness": "1.0"}])
+        # Se-75: 0.02-0.2 lead screens + Pb 0.5-2 filter (Clause 7.5.1)
+        recs_se = self.calc.get_filter_recommendations("isotope_se75", "steel", None, "class_b")
+        self.assertEqual(recs_se["screen_table"]["front_mm"], "0.02-0.20")
+        self.assertEqual(recs_se["metal_filter"]["options"][0],
+                         {"material": "pb", "thickness": "0.5-2.0"})
 
-        # Low-kV X-ray (< 120 kV): no-filter option is present
-        recs_low = self.calc.get_filter_recommendations("x_ray", "steel", 80.0, "class_b")
-        self.assertEqual(recs_low["metal_filter"]["options"][0]["material"], None)
+        # Yb-169/Tm-170: w <= 5 -> optional <=0.03; w > 5 -> 0.02-0.15
+        recs_yb_thin = self.calc.get_filter_recommendations("isotope_yb169", "steel", None, "class_b", w_nom=3.0)
+        self.assertEqual(recs_yb_thin["screen_table"]["front_mm"], "<=0.03")
+        recs_yb = self.calc.get_filter_recommendations("isotope_yb169", "steel", None, "class_b", w_nom=10.0)
+        self.assertEqual(recs_yb["screen_table"]["front_mm"], "0.02-0.15")
 
-        # Very high kV (> 1000): front screen is a copper filter, not Pb
+        # Table 4 (aluminium), U <= 150 kV: front <=0.03, back <=0.15
+        recs_al = self.calc.get_filter_recommendations("x_ray", "aluminum", 120.0, "class_b")
+        self.assertEqual(recs_al["screen_table"]["front_mm"], "<=0.03")
+        self.assertEqual(recs_al["screen_table"]["back_mm"], "<=0.15")
+
+        # 1 MV < U <= 4 MV: steel/copper screens (front is not lead)
         recs_mv = self.calc.get_filter_recommendations("x_ray", "steel", 2000.0, "class_b")
         self.assertEqual(recs_mv["screen_table"]["front_is_filter"], True)
-        self.assertEqual(recs_mv["screen_table"]["front_mm"], "1-2")
+        self.assertEqual(recs_mv["screen_table"]["front_mm"], "0.25-0.70")
 
     def test_calculate_dwsi_exposures(self):
         # Class A, OD=114.3, t=8.56, SFD=600.0

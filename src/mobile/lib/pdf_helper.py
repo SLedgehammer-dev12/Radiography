@@ -66,6 +66,8 @@ def generate_mobile_pdf(filepath, state, results, compliance, defect_eval, sketc
         "iqi_type": vals["iqi_type"],
         "snr_location": vals.get("snr_location", "weld"),
         "geometry": vals["geometry"],
+        # vals["film_side"] carries the *source-side* flag; convert to film side.
+        "film_side": not bool(vals.get("film_side")),
     }
 
     single_iqi = results.get("single_wire_iqi", ("", ""))

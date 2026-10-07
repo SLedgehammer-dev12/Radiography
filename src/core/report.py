@@ -347,6 +347,15 @@ class PDFReportGenerator:
              Paragraph(f"{inputs.get('sfd', 0.0):.1f} mm", value_style)]
         ]
 
+        # IQI type and position (ISO 17636-1:2022 Clause 8 k/l/s)
+        iqi_code = inputs.get("iqi_type", "wire")
+        inputs_data.append([
+            Paragraph(lang_obj.get("iqi_type"), label_style),
+            Paragraph(lang_obj.get("iqi_type_step_hole" if iqi_code == "step_hole" else "iqi_type_wire"), value_style),
+            Paragraph(lang_obj.get("iqi_position"), label_style),
+            Paragraph(lang_obj.get("iqi_pos_film") if inputs.get("film_side") else lang_obj.get("iqi_pos_source"), value_style),
+        ])
+
         # Add Tube Voltage (kV) if X-Ray or Activity (Ci) if Isotope
         if inputs.get("source") == "x_ray":
             inputs_data.append([

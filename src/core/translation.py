@@ -144,6 +144,9 @@ class Translation:
                 "iqi_type": "IQI Tipi:",
                 "iqi_type_wire": "Telli (Wire)",
                 "iqi_type_step_hole": "Step and Hole (Basamaklı Delikli)",
+                "iqi_position": "IQI Konumu:",
+                "iqi_pos_source": "Kaynak Tarafı",
+                "iqi_pos_film": "Film/Dedektör Tarafı",
                 "applied_step_hole": "Uygulanan Delik No (H-No):",
                 "standard_fig": "Standart ISO Şekli:",
                 "fig5_title": "ISO 17636-1 Şekil 5 (Panoramik - Odak Merkezde)",
@@ -568,6 +571,9 @@ class Translation:
                 "iqi_type": "IQI Type:",
                 "iqi_type_wire": "Wire",
                 "iqi_type_step_hole": "Step and Hole",
+                "iqi_position": "IQI Position:",
+                "iqi_pos_source": "Source Side",
+                "iqi_pos_film": "Film/Detector Side",
                 "applied_step_hole": "Applied Hole No (H-No):",
                 "standard_fig": "Standard ISO Figure:",
                 "fig5_title": "ISO 17636-1 Figure 5 (Panoramic - Central Source)",
@@ -871,8 +877,8 @@ class Translation:
 
 
 _FILTER_MATERIAL_NAMES = {
-    "tr": {"cu": "Cu", "pb": "Pb", "al": "Al", None: "Yok"},
-    "en": {"cu": "Cu", "pb": "Pb", "al": "Al", None: "None"},
+    "tr": {"cu": "Cu", "pb": "Pb", "al": "Al", "fe": "Fe", "ta": "Ta", None: "Yok"},
+    "en": {"cu": "Cu", "pb": "Pb", "al": "Al", "fe": "Fe", "ta": "Ta", None: "None"},
 }
 
 
@@ -889,13 +895,16 @@ def format_filter_recommendation(recs, lang="tr"):
     front = screen.get("front_mm", "")
     back = screen.get("back_mm", "")
 
-    if screen.get("front_is_filter"):
-        front_part = f"{front} mm Cu" if front else ""
-    else:
-        front_part = f"{front} mm Pb" if front else ""
+    front_mat = screen.get("front_material") or (
+        "cu" if screen.get("front_is_filter") else "pb")
+    back_mat = screen.get("back_material") or "pb"
+    front_label = names.get(front_mat, str(front_mat).upper())
+    back_label = names.get(back_mat, str(back_mat).upper())
+
+    front_part = f"{front} mm {front_label}" if front else ""
     if screen.get("front_optional"):
         front_part += " (opsiyonel)" if lang == "tr" else " (optional)"
-    back_part = f"{back} mm Pb" if back else ""
+    back_part = f"{back} mm {back_label}" if back else ""
     if screen.get("back_optional"):
         back_part += " (opsiyonel" if lang == "tr" else " (optional"
         if screen.get("back_absent"):

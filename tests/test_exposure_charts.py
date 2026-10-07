@@ -39,6 +39,29 @@ class TestExposureChartDatabase(unittest.TestCase):
         r = self.db.lookup_r_factor("UNKNOWN", "isotope_ir192")
         self.assertIsNone(r)
 
+    def test_shipped_json_load_preserves_yb_tm_constants(self):
+        # The shipped JSON only lists Ir-192 / Se-75 / Co-60; loading it must
+        # not drop the built-in Yb-169 / Tm-170 HVL/gamma. Regression: the
+        # digital R-factor path silently fell back to Ir-192 constants and was
+        # up to ~9600x short for Tm-170.
+        path = os.path.join(os.path.dirname(__file__), "..", "exposure_chart_dataset.json")
+        db = ExposureChartDatabase(path)
+        for src in ("isotope_yb169", "isotope_tm170"):
+            self.assertIn(src, db.HVL)
+            self.assertIn(src, db.GAMMA)
+
+        ref = ExposureChartDatabase()  # built-in constants
+        for src in ("isotope_yb169", "isotope_tm170"):
+            t_loaded = db.calculate_exposure_time_digital_rfactor(
+                700, 10, src, 40, "cr_standard", 70)
+            t_ref = ref.calculate_exposure_time_digital_rfactor(
+                700, 10, src, 40, "cr_standard", 70)
+            self.assertIsNotNone(t_loaded)
+            self.assertAlmostEqual(t_loaded, t_ref, places=6)
+        # Tm-170 correct exposure is ~995 min, not the buggy ~0.1 min.
+        self.assertGreater(db.calculate_exposure_time_digital_rfactor(
+            700, 10, "isotope_tm170", 40, "cr_standard", 70), 100.0)
+
     def test_get_available_films(self):
         films = self.db.get_available_films()
         self.assertIn("AA400", films)

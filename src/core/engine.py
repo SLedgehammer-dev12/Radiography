@@ -1501,7 +1501,8 @@ class CalculationEngine:
             convention = "r"
             r_controlled = 0.0
 
-        filter_recs = calc.get_filter_recommendations(source, material, input_kv, testing_class)
+        filter_recs = calc.get_filter_recommendations(
+            source, material, input_kv, testing_class, w_nom)
         filter_str = format_filter_recommendation(filter_recs, trans.language)
 
         # 15. Chart tag + display strings

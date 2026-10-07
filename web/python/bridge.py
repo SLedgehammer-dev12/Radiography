@@ -88,6 +88,7 @@ def _build_report_inputs(form, calculated, display, lang, report_info):
         "overlap": form.get("app_overlap"),
         "iqi_type": form.get("iqi_type", "wire"),
         "snr_location": form.get("snr_location", "weld"),
+        "film_side": bool(form.get("film_side", False)),
     }
 
 

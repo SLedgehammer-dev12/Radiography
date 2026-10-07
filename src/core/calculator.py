@@ -2430,112 +2430,113 @@ class RTCalculator:
         else:
             return False, f"Film class {film_class_used} is insufficient! Required minimum is {req_film}"
 
-    def get_filter_recommendations(self, source, material, kv, testing_class):
+    def get_filter_recommendations(self, source, material, kv, testing_class, w_nom=None):
         """
-        Determines recommended lead screen thickness and metal filter based on
-        ISO 17636-1:2022 Clause 7.3 (lead screens) and metal filters.
+        Recommended metal screens and scatter filter per ISO 17636-1:2022.
+
+        - Screens: Table 3 (steel / copper / nickel) and Table 4 (aluminium /
+          titanium), by radiation source, kV band, testing class and penetrated
+          thickness w (DWSI/DWDI use 2t, hence pass w_nom).
+        - Metal filter: Clause 7.5.1 — a 0.5–2 mm lead sheet between object and
+          cassette for Se-75, Ir-192 and Co-60 (no filter prescribed for X-ray).
 
         Returns LANGUAGE-NEUTRAL structural data only (no formatted strings):
             {
               "screen_table": {
-                  "front_mm": str,          # lead range, e.g. "0.02-0.15", "<=0.15"
-                  "back_mm": str,
-                  "front_optional": bool,   # front lead screen may be omitted
-                  "back_optional": bool,    # back lead screen may be omitted
-                  "back_absent": bool,      # back lead screen may be absent entirely
-                  "front_is_filter": bool,  # front is a metal filter, not Pb (high kV)
+                  "front_mm": str, "back_mm": str,   # e.g. "0.02-0.15", "<=0.03"
+                  "front_material": str, "back_material": str,  # "pb"|"fe"|"cu"|"ta"
+                  "front_optional": bool, "back_optional": bool,
+                  "back_absent": bool,
+                  "front_is_filter": bool,           # front screen is not lead
               },
-              "metal_filter": {
-                  "options": [              # ordered alternatives; material None => no filter
-                      {"material": "cu"|"pb"|"al"|None, "thickness": str|None},
-                      ...
-                  ],
-              },
+              "metal_filter": {"options": [{"material": str|None, "thickness": str|None}, ...]},
             }
-        Localization/formatting is the responsibility of the UI/i18n layer
-        (see src/core/translation.py::format_filter_recommendation).
+        Localization/formatting is handled by
+        src/core/translation.py::format_filter_recommendation.
         """
-        front = ""
-        back = ""
-        front_optional = False
-        back_optional = False
-        back_absent = False
-        front_is_filter = False
+        light = material in ("aluminum", "titanium")
+        front = back = ""
+        front_mat = back_mat = "pb"
+        front_optional = back_optional = back_absent = False
         options = [{"material": None, "thickness": None}]
 
         if source == "x_ray":
-            if kv is None:
-                kv = 120.0
-            # ISO 17636-1:2022 Clause 7.3.2 — lead screen thickness (mm)
-            if kv <= 120.0:
-                front = "<=0.15"
-                back = "<=0.15"
-                front_optional = True
-                back_optional = True
-                back_absent = True
-                if kv < 120.0:
-                    options = [
-                        {"material": None, "thickness": None},
-                        {"material": "al", "thickness": "0.1"},
-                    ]
-                else:
-                    options = [
-                        {"material": "cu", "thickness": "0.5"},
-                        {"material": "al", "thickness": "1.0"},
-                    ]
-            elif kv <= 250.0:
-                front = "0.02-0.15"
-                back = "0.02-0.15"
-                options = [
-                    {"material": "cu", "thickness": "0.5"},
-                    {"material": "al", "thickness": "1.0"},
-                ]
-            elif kv <= 450.0:
-                front = "0.05-0.15"
-                back = "0.05-0.15"
-                options = [{"material": "cu", "thickness": "1.0"}]
-            elif kv <= 1000.0:
-                front = "0.10-0.30"
-                back = "0.10-0.30"
-                options = [{"material": "cu", "thickness": "1.0-2.0"}]
+            kv = 120.0 if kv is None else float(kv)
+            if light:
+                # Table 4 — aluminium / titanium
+                if kv <= 150.0:
+                    front, back = "<=0.03", "<=0.15"
+                    front_optional = back_optional = True
+                elif kv <= 250.0:
+                    front = back = "0.02-0.15"
+                else:  # 250 < U <= 500
+                    front = back = "0.10-0.20"
             else:
-                front = "1-2"
-                front_is_filter = True   # front screen is copper, not lead
-                back = "0.10-0.30"
-                options = [{"material": "cu", "thickness": "1.0-2.0"}]
+                # Table 3 — steel / copper / nickel
+                if kv <= 100.0:
+                    front = back = "<=0.03"
+                    front_optional = back_optional = back_absent = True
+                elif kv <= 150.0:
+                    front = back = "<=0.15"
+                elif kv <= 250.0:
+                    front = back = "0.02-0.15"
+                elif kv <= 500.0:
+                    if w_nom is not None and w_nom > 50.0:
+                        front, back = "0.10-0.20", "0.02-0.20"
+                    else:
+                        front = back = "0.02-0.20"
+                elif kv <= 4000.0:  # 500 kV < U <= 4 MV: steel or copper screens
+                    front = back = "0.25-0.70"
+                    front_mat = back_mat = "fe"
+                else:  # > 4 MV
+                    front, back = "<=1.0", "<=1.0"
+                    front_mat, back_mat = "cu", "fe"
         else:
-            # Isotopes
-            if source == "isotope_se75":
-                front, back = "0.02-0.20", "0.02-0.20"
-                options = [{"material": "cu", "thickness": "0.5"}]
+            if source in ("isotope_yb169", "isotope_tm170"):
+                if light or (w_nom is not None and w_nom > 5.0):
+                    front = back = "0.02-0.15"
+                else:
+                    front = back = "<=0.03"
+                    front_optional = back_optional = back_absent = True
+            elif source == "isotope_se75":
+                if light:
+                    front, back = "0.20", "0.10-0.20"
+                else:
+                    front = back = "0.02-0.20"
             elif source == "isotope_ir192":
-                front, back = "0.05-0.20", "0.05-0.20"
-                options = [
-                    {"material": "cu", "thickness": "1.0"},
-                    {"material": "pb", "thickness": "1.0"},
-                ]
+                if light:
+                    front = back = "0.02-0.15"
+                else:
+                    back = "0.02-0.20"
+                    front = "0.02-0.20" if testing_class == "class_a" else "0.10-0.20"
             elif source == "isotope_co60":
-                front, back = "0.10-0.30", "0.10-0.30"
-                options = [{"material": "pb", "thickness": "1.0-2.0"}]
-            elif source in ("isotope_yb169", "isotope_tm170"):
-                front, back = "0.02-0.20", "0.02-0.20"
-                options = [{"material": "cu", "thickness": "0.5"}]
+                if light:
+                    front = back = "0.02-0.15"
+                else:
+                    front = back = "0.25-0.70"
+                    front_mat = back_mat = "fe"
             else:
-                front, back = "0.02-0.15", "0.02-0.15"
-                options = [{"material": None, "thickness": None}]
+                front = back = "0.02-0.15"
+
+            # Clause 7.5.1 — lead scatter filter (0.5-2 mm) for gamma sources
+            if source in ("isotope_se75", "isotope_ir192", "isotope_co60"):
+                options = [
+                    {"material": "pb", "thickness": "0.5-2.0"},
+                    {"material": None, "thickness": None},
+                ]
 
         return {
             "screen_table": {
                 "front_mm": front,
                 "back_mm": back,
+                "front_material": front_mat,
+                "back_material": back_mat,
                 "front_optional": front_optional,
                 "back_optional": back_optional,
                 "back_absent": back_absent,
-                "front_is_filter": front_is_filter,
+                "front_is_filter": front_mat != "pb",
             },
-            "metal_filter": {
-                "options": options,
-            },
+            "metal_filter": {"options": options},
         }
 
     # -----------------------------------------------------------------------

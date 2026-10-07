@@ -2508,7 +2508,8 @@ class MainWindow(QMainWindow,
             "input_kv": input_kv,
             "overlap": overlap,
             "iqi_type": self.cmb_iqi_type.currentData(),
-            "snr_location": self.cmb_snr_location.currentData()
+            "snr_location": self.cmb_snr_location.currentData(),
+            "film_side": not self.chk_source_side_iqi.isChecked()
         }
 
         # Gather outputs — use the same shared geometry block as the screen
