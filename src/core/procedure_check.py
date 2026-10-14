@@ -39,8 +39,9 @@ class ProcedureComplianceChecker:
                 "duplex_pass": "Duplex IQI Uygun: Çözülen D {} >= Gereken D {}.",
                 "duplex_fail": "DUBLEX IQI ÇÖZÜNÜRLÜĞÜ YETERSİZ! Çözülen D {} < Gereken D {}.",
                 
-                "density_pass": "Optik Yoğunluk Uygun: {:.2f} >= Standart Min. {:.2f}.",
+                "density_pass": "Optik Yoğunluk Uygun: {:.2f} (Standart Min. {:.2f}, Maks. {:.2f}).",
                 "density_fail": "OPTİK YOĞUNLUK YETERSİZ! Uygulanan: {:.2f} < Standart Min: {:.2f}.",
+                "density_max_fail": "OPTİK YOĞUNLUK AŞILDI! Uygulanan: {:.2f} > Standart Maks: {:.2f} (Film aşırı koyu/okunamaz).",
                 
                 "snr_pass": "SNR_N Değeri Uygun: {:.1f} >= Standart Min. {:.1f}.",
                 "snr_fail": "SNR_N DEĞERİ YETERSİZ! Uygulanan: {:.1f} < Standart Min: {:.1f}.",
@@ -80,8 +81,9 @@ class ProcedureComplianceChecker:
                 "duplex_pass": "Duplex IQI Compliant: Resolved D {} >= Required D {}.",
                 "duplex_fail": "DUPLEX RESOLUTION INSUFFICIENT! Resolved D {} < Required D {}.",
                 
-                "density_pass": "Optical Density Compliant: {:.2f} >= Standard Min. {:.2f}.",
+                "density_pass": "Optical Density Compliant: {:.2f} (Standard Min. {:.2f}, Max. {:.2f}).",
                 "density_fail": "OPTICAL DENSITY INSUFFICIENT! Applied: {:.2f} < Standard Min: {:.2f}.",
+                "density_max_fail": "OPTICAL DENSITY EXCEEDED! Applied: {:.2f} > Standard Max: {:.2f} (Film too dark/unreadable).",
                 
                 "snr_pass": "SNR_N Compliant: {:.1f} >= Standard Min. {:.1f}.",
                 "snr_fail": "SNR_N INSUFFICIENT! Applied: {:.1f} < Standard Min: {:.1f}.",
@@ -251,11 +253,15 @@ class ProcedureComplianceChecker:
         applied_quality = applied.get("applied_quality", 0.0)
         if tech == "analog":
             req_density = calculated.get("required_density", 2.3 if testing_class == "class_b" else 2.0)
-            if applied_quality >= req_density:
-                checks.append({"name": "quality", "status": True, "details": l_msgs["density_pass"].format(applied_quality, req_density)})
-            else:
+            max_density = calculated.get("max_density", 4.0)
+            if applied_quality < req_density:
                 is_compliant = False
                 checks.append({"name": "quality", "status": False, "details": l_msgs["density_fail"].format(applied_quality, req_density)})
+            elif applied_quality > max_density:
+                is_compliant = False
+                checks.append({"name": "quality", "status": False, "details": l_msgs["density_max_fail"].format(applied_quality, max_density)})
+            else:
+                checks.append({"name": "quality", "status": True, "details": l_msgs["density_pass"].format(applied_quality, req_density, max_density)})
         else: # digital
             base_snr = calculated.get("required_snr", 130.0 if testing_class == "class_b" else 70.0)
             if lvl3_settings.get("sfd_comp", False) and applied_sfd < sfd_min:
@@ -339,13 +345,13 @@ class ProcedureComplianceChecker:
                 if n_applied >= n_req:
                     checks.append({
                         "name": "exposures", "status": True,
-                        "details": l_msgs.get("exp_pass_analog", l_msgs["exp_pass"]).format(applied=n_applied, required=n_req)
+                        "details": l_msgs["exp_pass_analog"].format(applied=n_applied, required=n_req)
                     })
                 else:
                     is_compliant = False
                     checks.append({
                         "name": "exposures", "status": False,
-                        "details": l_msgs.get("exp_fail_analog", l_msgs["exp_fail"]).format(applied=n_applied, required=n_req)
+                        "details": l_msgs["exp_fail_analog"].format(applied=n_applied, required=n_req)
                     })
 
         return {

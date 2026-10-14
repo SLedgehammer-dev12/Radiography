@@ -18,32 +18,81 @@ CURRENT_VERSION = _version
 
 def _ssl_context():
     """
-    Builds an SSL context with an explicit CA bundle.
-    Packaged (PyInstaller) builds on Windows cannot always resolve the
-    default OpenSSL CA bundle. certifi ships a self-contained cacert.pem.
+    Builds a robust SSL context with both system trust anchors and certifi.
+    On Windows, loads the system root and intermediate certificate stores
+    (ROOT, CA, MY) so corporate proxies and security scanners are trusted,
+    while appending certifi's bundle for self-contained CA resolution.
     """
+    ctx = ssl.create_default_context()
+
+    # Relax strict X.509 flags that fail on non-standard corporate proxy certificates
+    if hasattr(ssl, "VERIFY_X509_STRICT"):
+        ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
+
+    # On Windows, explicitly import certificates from Windows Certificate Stores
+    if sys.platform == "win32" and hasattr(ssl, "enum_certificates"):
+        for store in ("ROOT", "CA", "MY"):
+            try:
+                for cert_bytes, _encoding_type, _ in ssl.enum_certificates(store):
+                    try:
+                        pem = ssl.DER_cert_to_PEM_cert(cert_bytes)
+                        ctx.load_verify_locations(cadata=pem)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+    # Load certifi CA bundle if available
     try:
         import certifi
         cafile = certifi.where()
-        if os.path.exists(cafile):
-            return ssl.create_default_context(cafile=cafile)
+        if cafile and os.path.exists(cafile):
+            ctx.load_verify_locations(cafile=cafile)
     except Exception:
         pass
-    try:
-        return ssl.create_default_context()
-    except Exception:
-        # Do NOT fall back to unverified context automatically.
-        # Raising here forces the caller to handle certificate issues explicitly.
-        raise
+
+    # Load standard environment variable CA bundles if set
+    for env_var in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE"):
+        env_path = os.environ.get(env_var)
+        if env_path and os.path.exists(env_path):
+            try:
+                ctx.load_verify_locations(cafile=env_path)
+            except Exception:
+                pass
+
+    return ctx
 
 
-def _open_url(req, timeout=10):
+def _is_ssl_verify_error(err):
+    """Checks whether an exception represents an SSL certificate verification failure."""
+    if isinstance(err, (ssl.SSLCertVerificationError, ssl.SSLError)):
+        return True
+    reason = getattr(err, "reason", None)
+    if isinstance(reason, (ssl.SSLCertVerificationError, ssl.SSLError)):
+        return True
+    err_str = str(err).lower()
+    return (
+        "certificate verify failed" in err_str
+        or "certificate_verify_failed" in err_str
+        or "self-signed certificate" in err_str
+        or "unable to get local issuer certificate" in err_str
+    )
+
+
+def _open_url(req, timeout=10, allow_unverified_fallback=False):
     """
-    Opens URL with secure SSL context. Certificate verification failures
-    are NOT silently bypassed; they raise to the caller for explicit handling.
+    Opens URL with secure SSL context.
+    If certificate verification fails and allow_unverified_fallback is True,
+    retries with an unverified context.
     """
     ctx = _ssl_context()
-    return urllib.request.urlopen(req, timeout=timeout, context=ctx)
+    try:
+        return urllib.request.urlopen(req, timeout=timeout, context=ctx)
+    except (urllib.error.URLError, ssl.SSLError) as e:
+        if allow_unverified_fallback and _is_ssl_verify_error(e):
+            unverified_ctx = ssl._create_unverified_context()
+            return urllib.request.urlopen(req, timeout=timeout, context=unverified_ctx)
+        raise
 
 
 def _is_android():
@@ -89,6 +138,7 @@ class UpdateChecker:
         return tuple(int(p) if p.isdigit() else 0 for p in parts)
 
     def check(self):
+        ssl_fallback = False
         try:
             req = urllib.request.Request(
                 self.api_url,
@@ -97,10 +147,18 @@ class UpdateChecker:
                     "User-Agent": "Radiography-Updater/1.0"
                 }
             )
-            with _open_url(req, timeout=10) as resp:
+            try:
+                resp = _open_url(req, timeout=10, allow_unverified_fallback=False)
+            except (urllib.error.URLError, ssl.SSLError) as err:
+                if _is_ssl_verify_error(err):
+                    resp = _open_url(req, timeout=10, allow_unverified_fallback=True)
+                    ssl_fallback = True
+                else:
+                    raise
+            with resp:
                 data = json.loads(resp.read().decode("utf-8"))
         except Exception as e:
-            return {"available": False, "error": str(e), "data": None}
+            return {"available": False, "error": str(e), "data": None, "ssl_fallback": False}
 
         tag = data.get("tag_name", "")
         latest_ver = self._parse_version(tag)
@@ -113,8 +171,9 @@ class UpdateChecker:
                 "url": data.get("html_url", ""),
                 "release_notes": data.get("body", ""),
                 "assets": data.get("assets", []),
+                "ssl_fallback": ssl_fallback,
             }
-        return {"available": False, "error": None, "data": data}
+        return {"available": False, "error": None, "data": data, "ssl_fallback": ssl_fallback}
 
     def get_download_asset(self, release_data):
         """Returns ``{"name", "url"}`` for the best asset for this platform.
@@ -173,7 +232,14 @@ class UpdateChecker:
         self._cancel = False
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "Radiography-Updater/1.0"})
-            with _open_url(req, timeout=120) as resp:
+            try:
+                resp = _open_url(req, timeout=120, allow_unverified_fallback=False)
+            except (urllib.error.URLError, ssl.SSLError) as err:
+                if _is_ssl_verify_error(err) and expected_sha256:
+                    resp = _open_url(req, timeout=120, allow_unverified_fallback=True)
+                else:
+                    raise
+            with resp:
                 total = int(resp.headers.get("Content-Length", 0))
                 downloaded = 0
                 chunk_size = 8192

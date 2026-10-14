@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import hashlib
 import os
 import ssl
 import unittest
@@ -161,5 +162,96 @@ class TestUpdater(unittest.TestCase):
             if os.path.exists(path):
                 os.unlink(path)
 
+    def test_ssl_context_relaxes_strict_flag(self):
+        ctx = self.ssl_context()
+        if hasattr(ssl, "VERIFY_X509_STRICT"):
+            self.assertEqual(
+                ctx.verify_flags & ssl.VERIFY_X509_STRICT,
+                0,
+                "VERIFY_X509_STRICT must be disabled so corporate proxies are not rejected"
+            )
+
+    def test_check_fallback_on_ssl_verification_error(self):
+        import urllib.error
+        from unittest.mock import patch, MagicMock
+        checker = self.UpdateChecker()
+
+        call_count = [0]
+        def mock_open_url(req, timeout=10, allow_unverified_fallback=False):
+            call_count[0] += 1
+            if not allow_unverified_fallback:
+                raise urllib.error.URLError("[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate in certificate chain (_ssl.c:1032)")
+            mock_resp = MagicMock()
+            mock_resp.read.return_value = b'{"tag_name": "v99.0.0", "html_url": "https://github.com/test", "body": "notes"}'
+            mock_resp.__enter__.return_value = mock_resp
+            return mock_resp
+
+        with patch("src.core.updater._open_url", side_effect=mock_open_url):
+            result = checker.check()
+            self.assertTrue(result["available"])
+            self.assertEqual(result["version"], "v99.0.0")
+            self.assertTrue(result.get("ssl_fallback"))
+            self.assertEqual(call_count[0], 2)
+
+    def test_is_ssl_verify_error_detection(self):
+        import urllib.error
+        from src.core.updater import _is_ssl_verify_error
+
+        # Standard SSLError / SSLCertVerificationError
+        self.assertTrue(_is_ssl_verify_error(ssl.SSLCertVerificationError("self-signed certificate")))
+        # Wrapped in URLError
+        self.assertTrue(_is_ssl_verify_error(urllib.error.URLError(ssl.SSLCertVerificationError("verify failed"))))
+        self.assertTrue(_is_ssl_verify_error(urllib.error.URLError("[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed")))
+        # Non-SSL errors
+        self.assertFalse(_is_ssl_verify_error(urllib.error.URLError("Connection refused")))
+        self.assertFalse(_is_ssl_verify_error(TimeoutError("timed out")))
+
+    def test_windows_cert_store_loading_mock(self):
+        from unittest.mock import patch
+        fake_certs = [
+            (b"cert1", "X509_ASN_ENCODING", 0),
+            (b"cert2", "X509_ASN_ENCODING", 0),
+        ]
+        with patch("sys.platform", "win32"), \
+             patch("ssl.enum_certificates", create=True, return_value=fake_certs), \
+             patch("ssl.DER_cert_to_PEM_cert", side_effect=lambda b: f"-----BEGIN CERTIFICATE-----\n{b.decode()}\n-----END CERTIFICATE-----"), \
+             patch.object(ssl.SSLContext, "load_verify_locations") as mock_load:
+            ctx = self.ssl_context()
+            self.assertGreaterEqual(mock_load.call_count, 2)
+
+    def test_download_update_ssl_fallback_with_and_without_checksum(self):
+        import urllib.error
+        from unittest.mock import patch, MagicMock
+        checker = self.UpdateChecker()
+
+        # Without expected_sha256: SSL error must be re-raised (no unverified download without hash)
+        with patch("src.core.updater._open_url", side_effect=urllib.error.URLError("certificate verify failed")):
+            with self.assertRaises(RuntimeError) as ctx_err:
+                checker.download_update("https://example.com/test.exe", expected_sha256=None)
+            self.assertIn("certificate verify failed", str(ctx_err.exception))
+
+        # With expected_sha256: allowed fallback and SHA-256 validation
+        call_count = [0]
+        payload = b"trusted-installer-payload"
+        expected_hash = hashlib.sha256(payload).hexdigest()
+        def mock_open_url_dl(req, timeout=120, allow_unverified_fallback=False):
+            call_count[0] += 1
+            if not allow_unverified_fallback:
+                raise urllib.error.URLError("certificate verify failed")
+            mock_resp = MagicMock()
+            mock_resp.headers = {"Content-Length": str(len(payload))}
+            mock_resp.read.side_effect = [payload, b""]
+            mock_resp.__enter__.return_value = mock_resp
+            return mock_resp
+
+        with patch("src.core.updater._open_url", side_effect=mock_open_url_dl):
+            tmp_path = checker.download_update("https://example.com/test.exe", expected_sha256=expected_hash)
+            self.assertIsNotNone(tmp_path)
+            self.assertTrue(os.path.exists(tmp_path))
+            os.unlink(tmp_path)
+            self.assertEqual(call_count[0], 2)
+
+
 if __name__ == "__main__":
     unittest.main()
+

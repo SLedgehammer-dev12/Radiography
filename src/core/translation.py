@@ -10,8 +10,8 @@ class Translation:
                 "app_title": "DOĞAL GAZ BORU HATLARI DİNAMİK RT ÇEKİM HESAPLAYICI (ISO 17636 / API 1104)",
                 "lang_switch": "English",
                 "settings": "Ayarlar",
-                "outputs": "Hesaplama Sonuçları",
-                "warnings": "Sistem Uyarı ve Teşhis Mesajları",
+                "outputs": "3. Hesaplama Sonuçları",
+                "warnings": "6. Sistem Uyarı ve Teşhis Mesajları",
                 "theme_dark": "Karanlık Tema",
                 "theme_light": "Aydınlık Tema",
                 "export_pdf": "PDF Raporu Oluştur",
@@ -180,7 +180,7 @@ class Translation:
                 # Setup parameters
                 "exposure_section": "2. Pozlama ve Geometri Ayarları",
                 "applied_exposure_section": "2. Uygulanan Pozlama ve Geometri Ayarları",
-                "report_info_section": "Rapor / Prosedür Bilgileri",
+                "report_info_section": "8. Rapor / Prosedür Bilgileri",
                 "report_no": "Rapor No:",
                 "report_rev": "Revizyon No:",
                 "project": "Proje / Müşteri:",
@@ -273,12 +273,18 @@ class Translation:
                 "target_snr": "Hedef Normalize SNR_N (Dijital):",
                 "detector_quality": "Gereken Dedektör Sınıfı / SRb:",
                 "calc_time": "Hesaplanan Poz Süresi (T):",
+                "total_joint_time": "1 Joint Toplam Poz Süresi:",
+                "exposures_film": "Film Kapsamasına Göre Poz Sayısı:",
                 "dda_frame_details": "DDA Kare & Doz Entegrasyon Detayları",
                 "dda_frame_count": "Kare Sayısı (Averaging)",
                 "dda_frame_time": "Kare Süresi",
                 "dda_fps": "Kare Hızı (FPS)",
                 "dda_target_adu": "Hedef ADC Doyumu",
                 "dda_total_dose": "Toplam Dedektör Dozu",
+                "info_wae_circumference_assumed": "BİLGİ: Boru ekseni (Y) yönündeki kaynak dikişi ve ITAB genişliği (WAE), kaset genişliği içinde kabul edilmiştir.",
+                "opt_film_step": "POZ OPTİMİZASYONU: Kaset boyu en az {:.0f} mm seçilirse poz sayısı {}'e düşürülebilir (Joint başına ~{} tasarruf).",
+                "opt_film_ideal": "İDEAL TABAN (Annex A): Kaset boyu en az {:.0f} mm seçilirse standart kalınlık tabanı olan {} poza inilebilir.",
+                "opt_fmin_detector": "f_min OPTİMİZASYONU: Çekim mesafesi mutlak fokal sınıra (f_min_geo={:.0f} mm) indirilmek istenirse önerilen aktif dedektör genişliği en fazla {:.0f} mm olmalıdır.",
 
                 # Warnings
                 "warn_class_a": "SİSTEM UYARISI: Doğal gaz hatlarında (API 1104) genelde Sınıf B zorunludur. Sınıf A seçimi müşteri onayı gerektirir.",
@@ -301,7 +307,7 @@ class Translation:
                 "warn_f_min_failed": "UYARI: Sahadaki SFD mesafesi ({}) önerilen SFD_min ({}) değerinin altındadır! Kalite kaybı oluşabilir.",
 
                 # API 1104 Defect Module
-                "defect_section": "API 1104 Hata Modülü",
+                "defect_section": "7. API 1104 Hata Modülü",
                 "defect_standard": "Kusur Değerlendirme Standardı:",
                 "defect_std_api1104": "API 1104",
                 "defect_std_iso5817": "ISO 5817",
@@ -348,7 +354,7 @@ class Translation:
                 "dialog_cancel": "İptal",
 
                 # Matplotlib Sketch
-                "sketch_title": "Çekim Düzeneği Geometrisi (Weld & Beam Sketch)",
+                "sketch_title": "5. Çekim Düzeneği Geometrisi (Weld & Beam Sketch)",
                 "source": "Kaynak",
                 "detector": "Dedektör/Film",
                 "pipe_wall": "Boru Cidar",
@@ -361,7 +367,7 @@ class Translation:
                 "safety_ring": "Emniyet Çemberi",
 
                 # Procedure Check Module
-                "procedure_section": "Prosedür Kontrol Modülü",
+                "procedure_section": "4. Prosedür Kontrol Modülü",
                 "applied_kv": "Uygulanan Voltaj (kV):",
                 "applied_activity": "Uygulanan Aktivite (Ci):",
                 "applied_sfd": "Uygulanan SFD (Odak-Film) (mm):",
@@ -409,12 +415,14 @@ class Translation:
                 "tt_exposures": "ISO 17636-1:2022 Ek A: Boru kaynak çevresinin tamamını taramak için gereken asgari film/çekim sayısıdır. Bindirme gereksinimi için Madde 6.6'ya bakınız.",
                 "tt_req_exposures": "Standart/grafik ve panel kapsaması hesabının büyüğü olan gerekli asgari poz sayısıdır (ISO 17636-1:2022 Ek A, ISO 17636-2:2022 Madde 7.8/Ek A).",
                 "tt_exposures_panel": "ISO 17636-2:2022 Madde 7.8 ve Ek A: Düz panel DDA aktif genişliğinin değerlendirilebilir alan sınırları içinde boru çevresini tamamen kaplaması için gereken asgari poz sayısıdır. Görüntü bindirmesi etkin kaplama açısını azaltır.",
+                "tt_exposures_film": "Film boyutu (uzunluğu) ve bindirme payına göre boru çevresini tamamen sarmak için gereken asgari poz sayısıdır.",
                 "tt_exposures_applied": "Teknisyen/müşteri tarafından uygulanması planlanan fiili poz sayısıdır.",
                 "tt_exposures_check": "Uygulanan poz sayısının gerekli minimum ile (standart/grafik ve panel kapsaması değerlerinin büyüğü) karşılaştırılmasıdır.",
                 "tt_single_wire_iqi": "ISO 19232-1 & ISO 17636-1:2022 Ek B Tablolar B.1–B.12: Teknik ve IQI konumuna göre (kaynak tarafı/film tarafı, SWSI/DWSI/DWDI) gereken asgari tek tel (Single Wire) IQI numarasıdır.",
                 "tt_duplex_iqi": "ISO 19232-5 & ISO 17636-2:2022 Madde 6.7.2: Görüntü kalitesi için gereken asgari ikili tel (Duplex Wire) çözünürlük numarasıdır. Sınırlar Tablo B.13/B.14'tedir.",
                 "tt_quality_target": "ISO 17636-1:2022 Madde 7.8/Tablo 5 (Analog film yoğunluğu: Sınıf B için >=2.3) veya ISO 17636-2:2022 Madde 7.3.1/Tablo 3-4 (dinamik asgari SNR_N) hedefidir.",
                 "tt_calc_time": "Zayıflatma katsayısı (mu) ve efektif kalınlık (w_eff) kullanılarak hesaplanan teorik pozlama süresidir. Chart Kaynağı seçiliyse üretici poz tablosu (SCRATA R-Factor / Type X) kullanılır.",
+                "tt_total_joint_time": "Boru ek kaynağının (joint) %100 çevre muayenesini tamamlamak için gereken tüm pozların toplam radyasyon ışınlama süresidir (Gereken Poz Sayısı × Tekil Süre).",
                 "tt_base_multiplier": "Teknik/ekipman doğrulaması (film dozimetresi, banyo kimyası, dedektör kalibrasyonu, malzeme bileşimi) ile belirlenen boyutsuz saha düzeltme çarpanıdır. Hesaplanan poz süresini ölçekler ve PDF raporuna kaydedilir. 1.0 = model değerini değiştirmez. Değer, cihaz/teknik kalibrasyon kaydına dayanmalıdır.",
                 "tt_base_factor": "Pozlama tablosu sabiti (E): poz süresi formülünde kaynağa özgü kalibrasyon sabitidir (t = E·(SFD/1000)²·e^(μ·w)/çıktı). Birim: X-Ray için mA·min/m², izotoplar için Ci·min/m². Kaynağa göre otomatik atanır; yalnızca gerçek pozlama tablonuzdan kalibre edildiğinde değiştirin.",
                 "tt_detector_quality": "ISO 17636-1:2022 Tablo 3/4 (Analog film sistemi sınıfı) veya ISO 17636-2:2022 Tablo B.13/B.14 (Dijital dedektör azami SRb) gereksinimidir.",
@@ -437,8 +445,8 @@ class Translation:
                 "app_title": "NATURAL GAS PIPELINE DYNAMIC RT SHOT CALCULATOR (ISO 17636 / API 1104)",
                 "lang_switch": "Türkçe",
                 "settings": "Settings",
-                "outputs": "Calculation Outputs",
-                "warnings": "System Warning and Diagnostic Messages",
+                "outputs": "3. Calculation Outputs",
+                "warnings": "6. System Warning and Diagnostic Messages",
                 "theme_dark": "Dark Theme",
                 "theme_light": "Light Theme",
                 "export_pdf": "Export PDF Report",
@@ -607,7 +615,7 @@ class Translation:
                 # Setup parameters
                 "exposure_section": "2. Exposure and Geometry Settings",
                 "applied_exposure_section": "2. Applied Exposure and Geometry Settings",
-                "report_info_section": "Report / Procedure Information",
+                "report_info_section": "8. Report & Procedure Information",
                 "report_no": "Report No:",
                 "report_rev": "Revision No:",
                 "project": "Project / Client:",
@@ -700,12 +708,18 @@ class Translation:
                 "target_snr": "Target Normalized SNR_N (Digital):",
                 "detector_quality": "Required Detector Class / SRb:",
                 "calc_time": "Calculated Exposure Time (T):",
+                "total_joint_time": "Total Joint Exposure Time:",
+                "exposures_film": "Film Coverage Exposures:",
                 "dda_frame_details": "DDA Frame & Dose Integration Details",
                 "dda_frame_count": "Frame Count (Averaging)",
                 "dda_frame_time": "Frame Integration Time",
                 "dda_fps": "Frame Rate (FPS)",
                 "dda_target_adu": "Target ADC Saturation",
                 "dda_total_dose": "Total Detector Dose",
+                "info_wae_circumference_assumed": "NOTE: The weld area and HAZ (WAE) along the pipe axis is assumed to be fully covered by the film/panel width.",
+                "opt_film_step": "EXPOSURE OPTIMIZATION: Increasing film length to >= {:.0f} mm reduces exposures to {} (~{} saved per joint).",
+                "opt_film_ideal": "IDEAL BASELINE (Annex A): Increasing film length to >= {:.0f} mm achieves the standard thickness baseline of {} exposures.",
+                "opt_fmin_detector": "f_min OPTIMIZATION: To reduce shooting distance down to the physical focal spot limit (f_min_geo={:.0f} mm), recommended active detector width is <= {:.0f} mm.",
 
                 # Warnings
                 "warn_class_a": "SYSTEM WARNING: In natural gas pipelines (API 1104), Class B is generally mandatory. Class A requires customer approval.",
@@ -728,7 +742,7 @@ class Translation:
                 "warn_f_min_failed": "WARNING: Field SFD ({}) is below the recommended SFD_min ({})! Quality loss may occur.",
 
                 # API 1104 Defect Module
-                "defect_section": "API 1104 Defect Module",
+                "defect_section": "7. API 1104 Defect Module",
                 "defect_standard": "Defect Evaluation Standard:",
                 "defect_std_api1104": "API 1104",
                 "defect_std_iso5817": "ISO 5817",
@@ -775,7 +789,7 @@ class Translation:
                 "dialog_cancel": "Cancel",
 
                 # Matplotlib Sketch
-                "sketch_title": "Weld & Beam Sketch Geometry",
+                "sketch_title": "5. Weld & Beam Sketch Geometry",
                 "source": "Source",
                 "detector": "Detector/Film",
                 "pipe_wall": "Pipe Wall",
@@ -788,7 +802,7 @@ class Translation:
                 "safety_ring": "Safety Perimeter",
 
                 # Procedure Check Module
-                "procedure_section": "Procedure Compliance Module",
+                "procedure_section": "4. Procedure Compliance Module",
                 "applied_kv": "Applied Voltage (kV):",
                 "applied_activity": "Applied Activity (Ci):",
                 "applied_sfd": "Applied SFD (source-to-film) (mm):",
@@ -836,12 +850,14 @@ class Translation:
                 "tt_exposures": "ISO 17636-1:2022 Annex A: Minimum number of film exposures required to cover the entire weld circumference. See Clause 6.6 for overlap.",
                 "tt_req_exposures": "Required minimum exposure count: the larger of the standard/graph value and the panel-coverage value (ISO 17636-1:2022 Annex A, ISO 17636-2:2022 Clause 7.8/Annex A).",
                 "tt_exposures_panel": "ISO 17636-2:2022 Clause 7.8 and Annex A: Minimum exposures required so that a flat-panel DDA active width covers the weld circumference within the evaluable area limits. Image overlap reduces the effective coverage angle.",
+                "tt_exposures_film": "Minimum number of exposures required to cover the pipe circumference based on film length and overlap.",
                 "tt_exposures_applied": "Actual number of exposures planned by the technician/client.",
                 "tt_exposures_check": "Comparison of the applied exposures against the required minimum (the larger of the standard/graph value and the panel-coverage value).",
                 "tt_single_wire_iqi": "ISO 19232-1 & ISO 17636-1:2022 Annex B Tables B.1–B.12: Required minimum single wire IQI number depending on technique and IQI side (source/film side, SWSI/DWSI/DWDI).",
                 "tt_duplex_iqi": "ISO 19232-5 & ISO 17636-2:2022 Clause 6.7.2: Required minimum duplex wire resolution number for image quality. Limits are in Tables B.13/B.14.",
                 "tt_quality_target": "ISO 17636-1:2022 Clause 7.8/Table 5 (Analog film density: >=2.3 for Class B) or ISO 17636-2:2022 Clause 7.3.1/Tables 3-4 (dynamic minimum SNR_N).",
                 "tt_calc_time": "Theoretical exposure time calculated using attenuation coefficient (mu) and effective thickness (w_eff). When Chart Source is active, manufacturer exposure chart (SCRATA R-Factor / Type X) is used instead.",
+                "tt_total_joint_time": "Total radiation exposure time required to inspect 100% of the pipe girth weld joint (Required Exposures × Single Shot Time).",
                 "tt_base_multiplier": "Dimensionless field correction factor determined by technique/equipment qualification (film dosimetry, processing chemistry, detector calibration, material composition). Scales the calculated exposure time and is recorded in the PDF report. 1.0 keeps the model value unchanged. The value should be traceable to an equipment/technique calibration record.",
                 "tt_base_factor": "Exposure chart constant (E): the source-specific calibration constant in the exposure time formula (t = E·(SFD/1000)²·e^(μ·w)/output). Units: mA·min/m² for X-Ray, Ci·min/m² for isotopes. Auto-assigned per source; change only when calibrated from your actual exposure chart.",
                 "tt_detector_quality": "ISO 17636-1:2022 Tables 3/4 (Analog film system class) or ISO 17636-2:2022 Tables B.13/B.14 (Digital detector max SRb) requirement.",

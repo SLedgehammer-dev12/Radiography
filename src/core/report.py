@@ -438,9 +438,16 @@ class PDFReportGenerator:
         iqi_label = lang_obj.get("single_step_hole_iqi") if inputs.get("iqi_type") == "step_hole" else lang_obj.get("single_wire_iqi")
 
         exp_panel = outputs.get("exposures_panel")
+        exp_film = outputs.get("exposures_film")
         exp_applied = outputs.get("exposures_applied")
         exp_check = outputs.get("exposures_check")
-        exp_panel_str = "N/A" if exp_panel is None else str(exp_panel)
+        if inputs.get("tech") == "digital":
+            exp_dim_label = lang_obj.get("exposures_panel")
+            exp_dim_str = "N/A" if exp_panel is None else str(exp_panel)
+        else:
+            exp_dim_label = lang_obj.get("exposures_film")
+            exp_dim_str = "N/A" if exp_film is None else str(exp_film)
+
         exp_applied_str = "N/A" if exp_applied is None else str(exp_applied)
         if exp_check is None:
             exp_check_str = "N/A"
@@ -452,10 +459,10 @@ class PDFReportGenerator:
         outputs_data = [
             [Paragraph(lang_obj.get("w_nom"), label_style), Paragraph(f"{outputs.get('w_nom', 0.0):.2f} mm", value_style),
              Paragraph(lang_obj.get("req_exposures"), label_style), Paragraph(str(outputs.get('exposures', 0)), value_style)],
-            [Paragraph(lang_obj.get("exposures_panel"), label_style), Paragraph(exp_panel_str, value_style),
+            [Paragraph(exp_dim_label, label_style), Paragraph(exp_dim_str, value_style),
              Paragraph(lang_obj.get("exposures_applied"), label_style), Paragraph(exp_applied_str, value_style)],
             [Paragraph(lang_obj.get("exposures_check"), label_style), Paragraph(exp_check_str, value_style),
-             Paragraph("", label_style), Paragraph("", value_style)],
+             Paragraph(lang_obj.get("total_joint_time"), label_style), Paragraph(_esc(outputs.get('total_joint_time', "N/A")), value_style)],
             [Paragraph(lang_obj.get("w_eff"), label_style), Paragraph(f"{outputs.get('w_eff', 0.0):.2f} mm", value_style),
              Paragraph(iqi_label, label_style), Paragraph(_esc(outputs.get('single_wire_iqi', "")), value_style)],
             [Paragraph(lang_obj.get("u_max"), label_style), Paragraph(f"{outputs.get('u_max', 0.0):.1f} kV" if outputs.get('u_max') else "N/A (Isotope)", value_style),
@@ -528,6 +535,10 @@ class PDFReportGenerator:
             provenance_lines.append(
                 f"<b>{_esc(lang_obj.get('req_exposures'))}</b> — "
                 f"{_esc(outputs['exposures_provenance_text'])}")
+        suggestions = outputs.get("suggestions") or []
+        s_msgs = suggestions.get("messages", []) if isinstance(suggestions, dict) else suggestions
+        for s in s_msgs:
+            provenance_lines.append(f"<b>💡</b> {_esc(s)}")
         if provenance_lines:
             provenance_style = ParagraphStyle(
                 name='ProvenanceNote',

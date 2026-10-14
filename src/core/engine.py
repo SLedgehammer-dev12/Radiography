@@ -101,6 +101,16 @@ def format_exposures_provenance(prov, trans):
                 prov.get("next_ratio"), prov.get("next_distance_mm"))
         if prov.get("l3_dw"):
             text += " — " + trans.get("exp_prov_l3")
+        if prov.get("film_coverage_n"):
+            n_film = prov.get("film_coverage_n")
+            if prov.get("governing_factor") == "film_size":
+                film_ov = prov.get("film_overlap_mm")
+                ov_str_tr = f", bindirme: {film_ov:.0f} mm" if film_ov is not None else ""
+                ov_str_en = f", overlap: {film_ov:.0f} mm" if film_ov is not None else ""
+                if getattr(trans, "language", "tr") == "tr":
+                    text += f" | Kaset Kapsaması: {n_film} poz (Kısıtlayan: Film Boyutu{ov_str_tr})"
+                else:
+                    text += f" | Film Coverage: {n_film} exp (Governing: Film Length{ov_str_en})"
         return text
     if method == "panoramic":
         return trans.get("exp_prov_panoramic")
@@ -974,6 +984,16 @@ class CalculationEngine:
         panel_width = f["panel_width"]
         panel_height = f["panel_height"]
         panel_res = None
+        n_film = None
+        user_overlap = None
+        for ov_key in ("film_overlap", "app_overlap", "overlap"):
+            if f.get(ov_key) is not None:
+                try:
+                    user_overlap = float(f[ov_key])
+                    break
+                except (ValueError, TypeError):
+                    pass
+        overlap_mm = user_overlap if user_overlap is not None else 10.0
         if tech == "digital":
             overlap_pct = f["panel_overlap"]
             f_override = f.get("f_source")
@@ -1027,14 +1047,33 @@ class CalculationEngine:
                 else:
                     warnings.append(f"WARNING: Applied exposures ({n_applied}) do not meet the required minimum ({n_required}).")
         else:
-            n_required = exposures
+            # Analog film coverage calculation
+            n_film = None
+            film_res = None
+            raw_len = max(float(f.get("film_height") or 0.0), float(f.get("film_width") or 0.0))
+            if raw_len > 0.0 and od > 0.0 and not calc.is_central_projection(geometry, std_figure):
+                film_res = calc.calculate_film_exposures(od, raw_len, overlap_mm, geometry)
+                n_film = film_res["n_film"]
+            cmp_res = calc.evaluate_exposure_comparison(
+                exposures, n_panel=None, n_applied=n_applied, n_film=n_film
+            )
+            n_required = cmp_res["n_required"]
             if n_applied > 0:
                 exposures_ok = (n_applied >= n_required)
                 if not exposures_ok:
                     if trans.language == "tr":
-                        warnings.append(f"UYARI: Uygulanan poz sayısı ({n_applied}) standartın gerektirdiği asgari poz sayısını ({n_required}) karşılamıyor.")
+                        warnings.append(f"UYARI: Uygulanan poz sayısı ({n_applied}) standartın ve film kapsamasının gerektirdiği asgari poz sayısını ({n_required}) karşılamıyor.")
                     else:
                         warnings.append(f"WARNING: Applied exposures ({n_applied}) do not meet the required minimum ({n_required}).")
+            if cmp_res.get("limiting_factor") == "film_size":
+                exposures_prov["film_coverage_n"] = n_film
+                exposures_prov["governing_factor"] = "film_size"
+                exposures_prov["film_length_mm"] = raw_len
+                exposures_prov["film_overlap_mm"] = overlap_mm
+                if trans.language == "tr":
+                    warnings.append(f"BİLGİ: Kaset boyutu ({raw_len:.0f} mm, bindirme: {overlap_mm:.0f} mm) poz sayısını belirliyor ({n_film} poz, Annex A tabanı: {exposures} poz).")
+                else:
+                    warnings.append(f"NOTE: Film length ({raw_len:.0f} mm, overlap: {overlap_mm:.0f} mm) limits exposure count ({n_film} exposures, Annex A baseline: {exposures}).")
 
         # 6. kV input (X-ray only)
         if source == "x_ray":
@@ -1188,6 +1227,54 @@ class CalculationEngine:
         exposure_time_prov["final_min"] = min_calc
         exposure_time_prov["final_sec"] = sec_calc
         exposure_time_prov_text = format_exposure_time_provenance(exposure_time_prov, trans)
+
+        # 11b. Joint total exposure time & optimization recommendations
+        effective_joint_exposures = n_applied if n_applied > 0 else n_required
+        joint_time_res = calc.calculate_joint_total_time(raw_time, effective_joint_exposures)
+        total_joint_sec = joint_time_res["total_seconds"]
+        total_joint_min = joint_time_res["minutes"]
+        total_joint_sec_rem = joint_time_res["seconds"]
+        time_unit_min = "dk" if trans.language == "tr" else "min"
+        time_unit_sec = "sn" if trans.language == "tr" else "sec"
+        total_joint_str = f"{total_joint_min} {time_unit_min} {total_joint_sec_rem:02d} {time_unit_sec}"
+
+        suggestion_msgs = []
+        suggestions = {
+            "film_rec": None,
+            "fmin_rec": None,
+            "time_saved_step_str": None,
+            "messages": suggestion_msgs,
+        }
+        if tech == "analog" and od > 0.0 and n_required > exposures:
+            film_rec = calc.recommend_film_size(od, n_required, exposures, overlap_mm=overlap_mm)
+            if film_rec and film_rec["can_reduce"]:
+                step_diff = n_required - film_rec["target_n_step"]
+                if step_diff > 0 and raw_time > 0:
+                    saved_sec = step_diff * raw_time
+                    s_min = int(saved_sec // 60)
+                    s_sec = int(saved_sec % 60)
+                    time_saved_str = f"{s_min} {time_unit_min} {s_sec:02d} {time_unit_sec}"
+                    suggestions["time_saved_step_str"] = time_saved_str
+                    msg_step = trans.get("opt_film_step", film_rec["req_length_step_mm"], film_rec["target_n_step"], time_saved_str)
+                    warnings.append(msg_step)
+                    suggestion_msgs.append(msg_step)
+                msg_ideal = trans.get("opt_film_ideal", film_rec["req_length_ideal_mm"], film_rec["target_n_ideal"])
+                warnings.append(msg_ideal)
+                suggestion_msgs.append(msg_ideal)
+                suggestions["film_rec"] = film_rec
+
+        # f_min geometry optimization recommendation
+        f_current = f.get("f_source") if f.get("f_source") else max(sfd - b_dist, 1.0)
+        fmin_rec = calc.recommend_detector_size_for_fmin(od, t, d, f_current, testing_class=testing_class)
+        if fmin_rec and fmin_rec["can_optimize"]:
+            suggestions["fmin_rec"] = fmin_rec
+            msg_fmin = trans.get("opt_fmin_detector", fmin_rec["f_min_geo"], fmin_rec["recommended_detector_width_mm"])
+            warnings.append(msg_fmin)
+            suggestion_msgs.append(msg_fmin)
+
+        # WAE circumferential assumption note (when film coverage governs)
+        if tech == "analog" and cmp_res.get("limiting_factor") == "film_size":
+            warnings.append(trans.get("info_wae_circumference_assumed"))
 
         if exposure_time_prov.get("fallback_reason"):
             fb = exposure_time_prov["fallback_reason"]
@@ -1427,6 +1514,17 @@ class CalculationEngine:
                 else:
                     warnings.append("EXCEPTION (Clause 6.9): For Se-75 source with w < 12mm Class B, target SNR_N is increased by 1.4x (100 -> 140).")
 
+        if tech == "analog" and f.get("app_quality") is not None:
+            try:
+                app_d = float(f["app_quality"])
+                if app_d > 4.0:
+                    if trans.language == "tr":
+                        warnings.append(f"UYARI: Uygulanan optik yoğunluk ({app_d:.2f}) standart azami limitini (4.00) aşıyor! Film aşırı koyulaşmış ve detaylar değerlendirilemeyebilir.")
+                    else:
+                        warnings.append(f"WARNING: Applied optical density ({app_d:.2f}) exceeds the standard maximum limit (4.00)! Film may be too dark and unreadable.")
+            except (ValueError, TypeError):
+                pass
+
         if source == "x_ray":
             if tech == "analog":
                 warnings.append(trans.get("warn_analog_kv_limit"))
@@ -1543,13 +1641,15 @@ class CalculationEngine:
             "f_min_asme": f"{f_min_asme:.1f} mm" if (standard == "asme" and f_min_asme is not None) else "N/A",
             "sfd_min": f"{sfd_min:.1f} mm",
             "ug": f"{ug:.3f} mm",
-            "req_exposures": f"{exposures}",
-            "exposures_panel": f"{n_panel}" if n_panel is not None else "N/A",
+            "req_exposures": f"{n_required}",
+            "exposures_panel": f"{n_panel}" if (tech == "digital" and n_panel is not None) else (f"{n_film}" if n_film is not None else "N/A"),
+            "exposures_film": f"{n_film}" if n_film is not None else "N/A",
             "exposures_applied": f"{n_applied}" if n_applied > 0 else "-",
             "single_wire_iqi": wire_str,
             "duplex_iqi": duplex_str if tech == "digital" else "N/A",
             "quality_target": target_quality,
             "calc_time": f"{time_display_val}{dda_tag}{chart_label}",
+            "total_joint_time": total_joint_str,
             "detector_quality": detector_quality_str,
             "asme_iqi": asme_iqi_str,
             "barrier_distance": barrier_str,
@@ -1603,16 +1703,22 @@ class CalculationEngine:
             "filter_recommendation": filter_str,
             "exposures_graph": exposures,
             "exposures_panel": n_panel,
+            "exposures_film": n_film,
+            "film_overlap": overlap_mm,
             "exposures_applied": n_applied,
             "required_exposures": n_required,
             "exposures_ok": exposures_ok,
             "base_multiplier": base_multiplier,
+            "total_joint_time_seconds": total_joint_sec,
+            "total_joint_time_str": total_joint_str,
+            "suggestions": suggestions,
         }
         if tech == "digital":
             calculated["required_snr"] = target_snr_val
             calculated["sfd_comp_target"] = sfd_comp_target
         else:
             calculated["required_density"] = required_density
+            calculated["max_density"] = 4.0
 
         # Provenance for the PDF/screen explanations.
         calculated["sfd_min_provenance"] = geo["sfd_min_provenance"]
@@ -1696,6 +1802,7 @@ class CalculationEngine:
             "target_quality": target_quality,
             "target_snr": target_snr_val,
             "required_density": required_density,
+            "max_density": 4.0,
             "sfd_comp_target": sfd_comp_target,
             "table_name": table_name,
             "calc_time": raw_time,
@@ -1715,6 +1822,11 @@ class CalculationEngine:
             "f_min_provenance": geo["f_min_provenance"],
             "exposure_time_provenance": exposure_time_prov,
             "exposure_time_provenance_text": exposure_time_prov_text,
+            "total_joint_time_seconds": total_joint_sec,
+            "total_joint_time_str": total_joint_str,
+            "exposures_film": n_film,
+            "film_overlap": overlap_mm,
+            "suggestions": suggestions,
         }
 
         return {

@@ -272,12 +272,12 @@
 
 .group-title {
   margin: 0;
-  padding: 12px 16px;
-  font-size: 13px;
-  font-weight: 650;
-  text-transform: uppercase;
-  letter-spacing: 0.7px;
-  color: var(--text-muted);
+  padding: 13px 18px;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.35px;
+  line-height: 1.3;
+  color: var(--text);
   background: var(--panel-2);
   border-bottom: 1px solid var(--panel-border);
   border-top-left-radius: var(--radius);
@@ -290,10 +290,15 @@ summary.group-title {
   list-style: none;
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 10px;
   position: sticky;
   top: 0;
   z-index: 6;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.35px;
+  line-height: 1.3;
+  color: var(--text);
 }
 
 .group-header-action {
@@ -1081,6 +1086,84 @@ details.group:not([open]) > summary.group-title {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.sketch-3d-wrapper.is-fullscreen {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 999999 !important;
+  background: #0d1117 !important;
+  padding: 16px 28px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+}
+
+[data-theme="light"] .sketch-3d-wrapper.is-fullscreen {
+  background: #f1f4f9 !important;
+}
+
+.sketch-3d-fullscreen-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 1600px;
+  border-bottom: 1px solid var(--panel-border);
+  padding-bottom: 10px;
+}
+
+.sketch-3d-fullscreen-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16.5px;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.sketch-close-fullscreen-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 18px;
+  font-size: 13.5px;
+  font-weight: 750;
+  border-radius: 8px;
+  background: #e06c75;
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 4px 14px rgba(224, 108, 117, 0.4);
+}
+
+.sketch-close-fullscreen-btn:hover {
+  background: #e84d5c;
+  transform: translateY(-1px);
+}
+
+.sketch-3d-wrapper.is-fullscreen .sketch-3d-toolbar,
+.sketch-3d-wrapper.is-fullscreen .sketch-3d-footer,
+.sketch-3d-wrapper.is-fullscreen .sketch-3d-notice {
+  width: 100%;
+  max-width: 1600px;
+}
+
+.sketch-3d-wrapper.is-fullscreen .sketch-3d-canvas {
+  width: auto;
+  max-width: min(1600px, 97vw);
+  height: calc(100vh - 160px);
+  max-height: calc(100vh - 160px);
+  border: 1px solid var(--accent);
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.9);
+  object-fit: contain;
 }
 
 .sketch-3d-notice {

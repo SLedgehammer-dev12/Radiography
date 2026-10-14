@@ -368,3 +368,74 @@ def test_invalid_xray_kv_does_not_crash_and_warns(engine, bad_kv):
     })
     assert result["calculated"]["calc_time_raw"] > 0
     assert any("120" in w for w in result["warnings"]), result["warnings"]
+
+
+def test_film_exposures_coverage_and_suggestions(engine):
+    """Tests that film dimension coverage is computed, updates N_required when it
+    exceeds the Annex A graph, provides optimization suggestions, and calculates
+    total joint exposure time."""
+    result = engine.calculate({
+        "od": 323.9, "t": 8.0, "cap": 1.5, "tech": "analog", "geometry": "dwsi",
+        "film_width": 80.0, "film_height": 120.0, "film_overlap": 10.0,
+        "sfd": 600.0, "source": "x_ray", "app_kv": 120.0, "app_time": 60.0,
+    }, {}, "tr")
+
+    calc = result["calculated"]
+    assert calc["exposures_film"] is not None
+    assert calc["exposures_film"] >= 10  # 1017.56 / 110 = ~9.25 -> 10
+    assert calc["required_exposures"] >= calc["exposures_film"]
+    assert calc["total_joint_time_seconds"] == pytest.approx(
+        calc["required_exposures"] * calc["calc_time_raw"], rel=1e-3
+    )
+    assert result["display"]["total_joint_time"]
+    assert len(calc["suggestions"]["messages"]) > 0
+    assert any("Kaset boyu" in s or "POZ OPTİMİZASYONU" in s for s in calc["suggestions"]["messages"])
+
+
+def test_dynamic_film_overlap_in_engine(engine):
+    """Verifies that user-entered overlap is dynamically taken into account
+    when calculating film exposure count."""
+    # 12" pipe (OD = 323.9 mm) -> C = ~1017.56 mm
+    # 400 mm film with 10 mm overlap -> usable 390 -> 3 exposures
+    res_10 = engine.calculate({
+        "od": 323.9, "t": 8.0, "tech": "analog", "geometry": "dwsi",
+        "film_width": 100.0, "film_height": 400.0, "app_overlap": 10.0,
+    })
+    assert res_10["calculated"]["exposures_film"] == 3
+    assert res_10["calculated"]["film_overlap"] == 10.0
+
+    # Increase overlap to 70 mm -> usable 330 -> 4 exposures
+    res_70 = engine.calculate({
+        "od": 323.9, "t": 8.0, "tech": "analog", "geometry": "dwsi",
+        "film_width": 100.0, "film_height": 400.0, "app_overlap": 70.0,
+    })
+    assert res_70["calculated"]["exposures_film"] == 4
+    assert res_70["calculated"]["film_overlap"] == 70.0
+
+    # Increase overlap to 150 mm -> usable 250 -> 5 exposures
+    res_150 = engine.calculate({
+        "od": 323.9, "t": 8.0, "tech": "analog", "geometry": "dwsi",
+        "film_width": 100.0, "film_height": 400.0, "app_overlap": 150.0,
+    })
+    assert res_150["calculated"]["exposures_film"] == 5
+    assert res_150["calculated"]["film_overlap"] == 150.0
+
+
+def test_analog_max_density_warning(engine):
+    """Verifies that exceeding the 4.0 optical density limit generates a warning."""
+    # Within limit (D = 2.5) -> No density warning
+    res_ok = engine.calculate({
+        "od": 323.9, "t": 8.0, "tech": "analog", "geometry": "dwsi",
+        "app_quality": 2.5,
+    })
+    assert not any("optik yoğunluk" in w.lower() for w in res_ok["warnings"])
+
+    # Exceeding limit (D = 4.4) -> Warning generated
+    res_high = engine.calculate({
+        "od": 323.9, "t": 8.0, "tech": "analog", "geometry": "dwsi",
+        "app_quality": 4.4,
+    })
+    assert any("optik yoğunluk" in w.lower() and "4.00" in w for w in res_high["warnings"])
+
+
+

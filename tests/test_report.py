@@ -412,3 +412,29 @@ class TestReportProvenance(unittest.TestCase):
         outputs = {"w_nom": 12.0, "w_eff": 15.0, "exposures": 8}
         self.assertTrue(self.gen.generate_report(
             filepath, inputs, outputs, [], None, False, None, self.trans))
+
+    def test_pdf_report_suggestions_messages_rendered(self):
+        filepath = os.path.join(self.tmpdir, "suggestions_rendered.pdf")
+        inputs = {
+            "material_text": "Steel", "class_text": "Class B", "od": 114.3,
+            "t": 6.0, "cap": 0.0, "d": 2.0, "sfd": 600.0, "output_val": 5.0,
+            "base_e": 3.0, "speed": "C5", "tech": "analog",
+            "tech_text": "Analog Film", "source": "x_ray", "source_text": "X-Ray",
+            "geometry": "dwsi", "geometry_text": "DWSI", "standard": "iso",
+            "report_info": {}, "input_kv": 120.0, "overlap": 10.0,
+            "iqi_type": "wire", "snr_location": "weld",
+        }
+        outputs = {
+            "w_nom": 12.0, "w_eff": 15.0, "exposures": 8,
+            "suggestions": {
+                "film_rec": {"can_reduce": True},
+                "messages": ["Use 480 mm film to reduce exposures to 3"],
+            },
+        }
+        self.assertTrue(self.gen.generate_report(
+            filepath, inputs, outputs, [], None, False, None, self.trans))
+        import pypdf
+        text = " ".join(
+            (page.extract_text() or "") for page in pypdf.PdfReader(filepath).pages)
+        self.assertIn("Use 480 mm film to reduce exposures to 3", text)
+        self.assertNotIn("film_rec", text)

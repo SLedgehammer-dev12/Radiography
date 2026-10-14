@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.0.1] - 2026-10-14
+
+### Fixed (Windows desktop updater & SSL)
+- **Windows Certificate Store integration**: Resolved `[SSL: CERTIFICATE_VERIFY_FAILED]` error on Windows systems behind enterprise proxies, VPNs, or antivirus scanners (Kaspersky, ESET, Bitdefender, etc.) by loading root and intermediate certificates from the Windows Certificate Store (`ROOT`, `CA`, `MY`) and relaxing `VERIFY_X509_STRICT`.
+- **Resilient update check fallback**: Update check falls back to unverified connection if proxy SSL inspection intercepts API responses, while strictly enforcing SHA-256 integrity verification on downloaded update binaries.
+- **Update failure UX**: Localized diagnostic hint and direct GitHub releases fallback link provided when an SSL inspection failure occurs.
+
+### Fixed (core calculations & standards)
+- **Level 3 documentation**: Documented active Level 3 overrides and approval note in PDF inspection reports.
+- **Calculation edge cases**: Fixed `base_e` empty fallback, ASME VIII defect message formatting, chart HVL/gamma merge, standard screens/filters, report IQI rows, and ISO 17636-2 SRb limits.
+
+### Added
+- **Ponytail senior developer tooling**: Integrated Ponytail minimalist developer guidelines and OpenCode/Antigravity rule definitions.
+
 ## [2.0.0] - 2026-10-06
 
 ### Fixed (calculation accuracy — ISO 17636-1/2:2022)

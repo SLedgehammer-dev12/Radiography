@@ -112,6 +112,7 @@ const OUTPUT_KEYS = [
   "asme_iqi",
   "quality_target",
   "calc_time",
+  "total_joint_time",
   "detector_quality",
   "barrier_distance",
   "filter_recommendation",
@@ -385,6 +386,9 @@ export default function App() {
   }
   const outputLabel = (key: string): string => {
     if (key === "sfd_min") return t(digital ? "sfd_min" : "sfd_min_analog");
+    if (key === "exposures_panel") {
+      return t(digital ? "exposures_panel" : "exposures_film");
+    }
     if (key === "quality_target") {
       return t(digital ? "target_snr" : "optical_density");
     }
@@ -637,14 +641,14 @@ export default function App() {
   const exportPreset = () =>
     downloadJson("rt_preset.json", {
       type: "radiography_preset",
-      version: pyClient.version ?? "2.0.0",
+      version: pyClient.version ?? "2.0.1",
       state: formToDesktopState(form, reportInfo, pipeData, lang),
     });
 
   const exportProject = () =>
     downloadJson("rt_project.json", {
       type: "radiography_project",
-      version: pyClient.version ?? "2.0.0",
+      version: pyClient.version ?? "2.0.1",
       state: formToDesktopState(form, reportInfo, pipeData, lang),
       calculated: result?.calculated ?? {},
       warnings: (result?.warnings ?? []).join("\n"),
@@ -1969,13 +1973,13 @@ export default function App() {
                 onChange={(value) => patch("app_wire", Number(value))}
               />
               <SliderField
-                label={t("applied_quality")}
+                label={t("applied_quality") + (digital ? " (SNR_N)" : " (D)")}
                 value={form.app_quality}
-                min={0.01}
-                max={10000}
-                step={1}
-                sliderMin={1}
-                sliderMax={300}
+                min={digital ? 1 : 0.5}
+                max={digital ? 1000 : 5.0}
+                step={digital ? 1 : 0.05}
+                sliderMin={digital ? 10 : 1.5}
+                sliderMax={digital ? 300 : 4.5}
                 onChange={(value) => patch("app_quality", value ?? 0)}
               />
               {/* Applied exposure count: used by the compliance check in BOTH
@@ -2089,6 +2093,9 @@ export default function App() {
                         )
                       ) : (
                         `w_eff = ${result.display.w_eff} • ${digital ? "SDD" : "SFD"} = ${form.sfd} mm • F = ${form.base_multiplier}×`
+                      )}
+                      {result.display.total_joint_time && (
+                        ` • ⏱️ ${t("total_joint_time").replace(/:\s*$/, "")}: ${result.display.total_joint_time}`
                       )}
                     </div>
                   )}
@@ -2283,7 +2290,9 @@ export default function App() {
                           ? `${strings[`tt_${key}`] ?? ""} ${exposuresProvenanceText}`.trim()
                           : key === "calc_time" && exposureTimeProvenanceText
                             ? `${strings[`tt_${key}`] ?? ""}\n${exposureTimeProvenanceText}`.trim()
-                            : strings[`tt_${key}`]
+                            : key === "exposures_panel"
+                              ? (strings[digital ? "tt_exposures_panel" : "tt_exposures_film"] ?? "")
+                              : strings[`tt_${key}`]
                   }
                 />
               ))}
@@ -2355,8 +2364,8 @@ export default function App() {
               <Group
                 title={
                   lang === "tr"
-                    ? "3D Çekim Geometrisi ve İzdüşüm Sahnesi"
-                    : "3D Shooting Geometry & Projection Scene"
+                    ? "5. 3D Çekim Geometrisi ve İzdüşüm Sahnesi"
+                    : "5. 3D Shooting Geometry & Projection Scene"
                 }
               >
                 {result ? (
@@ -2403,7 +2412,13 @@ export default function App() {
             )}
 
             <div style={{ display: sketchTab === "dynamic" ? "block" : "none" }}>
-              <Group title={t("sketch_title")}>
+              <Group
+                title={
+                  lang === "tr"
+                    ? "5. Dinamik Çekim Düzeni (2D Çizim)"
+                    : "5. Dynamic Weld Setup (2D Sketch)"
+                }
+              >
                 {result ? (
                   <div id="dynamic-sketch">
                     <WeldSetupSvg
@@ -2452,7 +2467,13 @@ export default function App() {
             </div>
 
             <div style={{ display: sketchTab === "figure" ? "block" : "none" }}>
-              <Group title={t("standard_fig")}>
+              <Group
+                title={
+                  lang === "tr"
+                    ? "5. Standart Çekim Düzeni Figürü (ISO 17636)"
+                    : "5. Standard Arrangement Figure (ISO 17636)"
+                }
+              >
                 {form.std_figure ? (
                   <div id="standard-sketch">
                     <StandardFigureSvg
@@ -2470,8 +2491,8 @@ export default function App() {
               <Group
                 title={
                   lang === "tr"
-                    ? "ISO 17636 Annex A Çalışma Noktası Grafiği"
-                    : "ISO 17636 Annex A Operating Point Chart"
+                    ? "5. ISO 17636 Annex A Çalışma Noktası Grafiği"
+                    : "5. ISO 17636 Annex A Operating Point Chart"
                 }
               >
                 {exposuresProvenance && exposuresProvenance.method === "annex_a" ? (
@@ -2670,14 +2691,14 @@ export default function App() {
         {showAbout && (
           <AboutModal
             t={t}
-            currentVersion={pyClient.version ?? "2.0.0"}
+            currentVersion={pyClient.version ?? "2.0.1"}
             onClose={() => setShowAbout(false)}
           />
         )}
         {showUpdates && (
           <UpdateModal
             t={t}
-            currentVersion={pyClient.version ?? "2.0.0"}
+            currentVersion={pyClient.version ?? "2.0.1"}
             onClose={() => setShowUpdates(false)}
           />
         )}
@@ -2898,7 +2919,7 @@ interface AboutModalProps {
   currentVersion?: string;
 }
 
-function AboutModal({ t, onClose, currentVersion = "2.0.0" }: AboutModalProps) {
+function AboutModal({ t, onClose, currentVersion = "2.0.1" }: AboutModalProps) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal about-modal" onClick={(e) => e.stopPropagation()}>
@@ -2970,7 +2991,7 @@ interface UpdateModalProps {
   currentVersion?: string;
 }
 
-function UpdateModal({ t, onClose, currentVersion = "2.0.0" }: UpdateModalProps) {
+function UpdateModal({ t, onClose, currentVersion = "2.0.1" }: UpdateModalProps) {
   const [updateState, setUpdateState] = useState<{
     status: "checking" | "up_to_date" | "available" | "error";
     latestVersion?: string;

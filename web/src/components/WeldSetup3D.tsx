@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 export interface WeldSetup3DProps {
   od: number;
@@ -98,6 +99,22 @@ export function WeldSetup3D({
   const [showDimensions, setShowDimensions] = useState<boolean>(true);
   const [showProjection, setShowProjection] = useState<boolean>(true);
   const [previewUserGeo, setPreviewUserGeo] = useState<boolean>(true);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+    document.body.style.overflow = "hidden";
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isFullscreen]);
 
   const dragRef = useRef<{
     active: boolean;
@@ -173,11 +190,15 @@ export function WeldSetup3D({
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
-    const width = 520;
-    const height = 430;
-    if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
-      canvas.width = width * dpr;
-      canvas.height = height * dpr;
+    const width = isFullscreen
+      ? Math.min(1600, Math.max(900, (window.innerWidth || 1200) - 56))
+      : 520;
+    const height = isFullscreen
+      ? Math.min(960, Math.max(600, (window.innerHeight || 800) - 160))
+      : 430;
+    if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(height * dpr)) {
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
     }
     ctx.save();
     ctx.scale(dpr, dpr);
@@ -1447,12 +1468,32 @@ export function WeldSetup3D({
     showDimensions,
     showProjection,
     totalStations,
+    isFullscreen,
   ]);
 
   const tr = lang === "tr";
 
-  return (
-    <div className="sketch-3d-wrapper">
+  const content = (
+    <div
+      className={`sketch-3d-wrapper ${isFullscreen ? "is-fullscreen" : ""}`}
+    >
+      {isFullscreen && (
+        <div className="sketch-3d-fullscreen-header">
+          <h3 className="sketch-3d-fullscreen-title">
+            {tr
+              ? "5. 3D Çekim Geometrisi ve İzdüşüm Sahnesi (Tam Ekran)"
+              : "5. 3D Shooting Geometry & Projection Scene (Fullscreen)"}
+          </h3>
+          <button
+            type="button"
+            className="sketch-close-fullscreen-btn"
+            onClick={() => setIsFullscreen(false)}
+          >
+            {tr ? "✕ Kapat (ESC)" : "✕ Close (ESC)"}
+          </button>
+        </div>
+      )}
+
       {geometryForced && userGeometry && (
         <div className="sketch-3d-notice">
           <span>
@@ -1543,12 +1584,34 @@ export function WeldSetup3D({
             {tr ? "Ölçüler" : "Dimensions"}
           </button>
         </div>
+
+        <div className="sketch-btn-group">
+          <button
+            type="button"
+            className={`sketch-mini-btn ${isFullscreen ? "active" : ""}`}
+            style={{ fontWeight: 700 }}
+            onClick={() => setIsFullscreen((v) => !v)}
+            title={
+              tr
+                ? "3D sahneyi tam ekranda aç (ESC ile kapat)"
+                : "Open 3D scene in fullscreen (ESC to close)"
+            }
+          >
+            {isFullscreen ? (tr ? "✕ Küçült" : "✕ Minimize") : (tr ? "⛶ Tam Ekran" : "⛶ Fullscreen")}
+          </button>
+        </div>
       </div>
 
       <canvas
         ref={canvasRef}
         className="sketch-3d-canvas"
-        style={{ width: "100%", height: "auto", aspectRatio: "520 / 430" }}
+        style={{
+          width: isFullscreen ? "min(1360px, 96vw)" : "100%",
+          height: "auto",
+          aspectRatio: isFullscreen
+            ? `${Math.min(1360, Math.max(760, (window.innerWidth || 1200) - 64))} / ${Math.min(840, Math.max(500, (window.innerHeight || 800) - 170))}`
+            : "520 / 430",
+        }}
         onPointerDown={(event) => {
           event.currentTarget.setPointerCapture(event.pointerId);
           dragRef.current = {
@@ -1662,4 +1725,6 @@ export function WeldSetup3D({
       </div>
     </div>
   );
+
+  return isFullscreen ? createPortal(content, document.body) : content;
 }

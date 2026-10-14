@@ -1328,6 +1328,75 @@ class TestRTCalculatorEdgeCases(unittest.TestCase):
         self.assertAlmostEqual(base_m, 4.8 * 20 * 1000.0, places=0)
         self.assertGreater(r_m, r_r)   # mSv convention (1R~10mSv) gives slightly larger distance
 
+    def test_calculate_film_exposures(self):
+        # 12" pipe (OD = 323.9 mm) -> C = ~1017.56 mm
+        # 400 mm film with 10 mm overlap -> effective 390 mm -> ceil(1017.56 / 390) = 3 exposures
+        res = self.calc.calculate_film_exposures(323.9, 400.0, overlap_mm=10.0, geometry="dwsi")
+        self.assertEqual(res["n_film"], 3)
+
+        # 240 mm film with 10 mm overlap -> effective 230 mm -> ceil(1017.56 / 230) = 5 exposures
+        res5 = self.calc.calculate_film_exposures(323.9, 240.0, overlap_mm=10.0, geometry="dwsi")
+        self.assertEqual(res5["n_film"], 5)
+
+        # Dynamic overlap checks:
+        # Overlap = 10 mm -> usable 390 mm -> ceil(1017.56 / 390) = 3
+        self.assertEqual(self.calc.calculate_film_exposures(323.9, 400.0, overlap_mm=10.0)["n_film"], 3)
+        # Overlap = 70 mm -> usable 330 mm -> ceil(1017.56 / 330) = 4
+        self.assertEqual(self.calc.calculate_film_exposures(323.9, 400.0, overlap_mm=70.0)["n_film"], 4)
+        # Overlap = 150 mm -> usable 250 mm -> ceil(1017.56 / 250) = 5
+        self.assertEqual(self.calc.calculate_film_exposures(323.9, 400.0, overlap_mm=150.0)["n_film"], 5)
+        # Overlap = 0 mm -> usable 400 mm -> ceil(1017.56 / 400) = 3
+        self.assertEqual(self.calc.calculate_film_exposures(323.9, 400.0, overlap_mm=0.0)["n_film"], 3)
+
+        # Edge cases
+        self.assertEqual(self.calc.calculate_film_exposures(323.9, 0.0)["n_film"], 1)
+        self.assertEqual(self.calc.calculate_film_exposures(50.0, 300.0, geometry="dwdi_elliptic")["n_film"], 3)
+
+    def test_recommend_film_size(self):
+        # OD = 323.9, current_n = 5, annex_n = 3
+        recs = self.calc.recommend_film_size(323.9, current_n=5, annex_n=3, overlap_mm=10.0)
+        self.assertIsNotNone(recs)
+        self.assertTrue(recs["can_reduce"])
+        # To step down to 4: C / 4 + 10 = ~1017.56 / 4 + 10 = ~264.4 mm
+        self.assertEqual(recs["target_n_step"], 4)
+        self.assertAlmostEqual(recs["req_length_step_mm"], 1017.56 / 4 + 10.0, delta=1.0)
+        # To reach annex_n = 3: C / 3 + 10 = ~349.2 mm
+        self.assertEqual(recs["target_n_ideal"], 3)
+        self.assertAlmostEqual(recs["req_length_ideal_mm"], 1017.56 / 3 + 10.0, delta=1.0)
+
+    def test_calculate_joint_total_time(self):
+        # 90 seconds per shot, 4 exposures -> 360 seconds (6 min)
+        res_tr = self.calc.calculate_joint_total_time(90.0, 4, lang="tr")
+        self.assertEqual(res_tr["total_seconds"], 360.0)
+        self.assertIn("6 dk", res_tr["formatted"])
+        self.assertIn("4 poz", res_tr["formatted"])
+
+        res_en = self.calc.calculate_joint_total_time(45.0, 2, lang="en")
+        self.assertEqual(res_en["total_seconds"], 90.0)
+        self.assertIn("1 min", res_en["formatted"])
+        self.assertIn("30 sec", res_en["formatted"])
+        self.assertIn("2 exp", res_en["formatted"])
+
+    def test_recommend_detector_size_for_fmin(self):
+        # API 5L pipe: OD = 323.9, t = 8.0, focal = 2.0, current_f = 600.0
+        rec = self.calc.recommend_detector_size_for_fmin(323.9, 8.0, focal_size=2.0, current_f=600.0, testing_class="class_b")
+        self.assertIsNotNone(rec)
+        self.assertIn("f_min_geo", rec)
+        self.assertIn("recommended_detector_width_mm", rec)
+        self.assertLess(rec["f_min_geo"], 600.0)
+        self.assertGreater(rec["recommended_detector_width_mm"], 10.0)
+
+    def test_evaluate_exposure_comparison_with_film(self):
+        # Graph says 3, film size says 5, applied is 4 -> Not sufficient because 4 < max(3, 5)
+        res = self.calc.evaluate_exposure_comparison(n_graph=3, n_panel=None, n_applied=4, n_film=5)
+        self.assertFalse(res["is_sufficient"])
+        self.assertEqual(res["n_required"], 5)
+        self.assertEqual(res["limiting_factor"], "film_size")
+
+        # Applied 5 -> Sufficient
+        res_ok = self.calc.evaluate_exposure_comparison(n_graph=3, n_panel=None, n_applied=5, n_film=5)
+        self.assertTrue(res_ok["is_sufficient"])
+
 if __name__ == "__main__":
     unittest.main()
 

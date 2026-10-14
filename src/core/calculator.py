@@ -1549,22 +1549,188 @@ class RTCalculator:
             "f_min_applied": f_min_applied,
         }
 
-    def evaluate_exposure_comparison(self, n_graph, n_panel, n_applied):
+    def calculate_film_exposures(self, od, film_length, overlap_mm=10.0, geometry="dwsi"):
+        """
+        Calculates the minimum number of film exposures required to cover
+        the entire weld circumference (ISO 17636-1:2022 Clause 6.6 & Annex A).
+
+        Parameters
+        ----------
+        od : pipe outside diameter (mm)
+        film_length : physical length of the film along the circumference (mm)
+        overlap_mm : mandatory overlap between neighbouring films (mm, min 10 mm)
+        geometry : "swsi" | "dwsi" | "dwdi_elliptic" | "dwdi_super"
+        """
+        try:
+            od = float(od)
+            film_length = float(film_length)
+            overlap_mm = max(0.0, float(overlap_mm))
+        except (TypeError, ValueError):
+            return {"n_film": 1, "circumference_mm": 0.0, "usable_length_mm": 0.0, "overlap_mm": 10.0}
+
+        if od <= 0.0 or film_length <= 0.0:
+            return {"n_film": 1, "circumference_mm": 0.0, "usable_length_mm": 0.0, "overlap_mm": overlap_mm}
+
+        c_weld = math.pi * od
+
+        if geometry in ("dwdi_elliptic", "dwdi_super"):
+            n_fixed = 3 if geometry == "dwdi_super" else (3 if (od > 0 and 8.0 / od >= 0.12) else 2)
+            return {
+                "n_film": n_fixed,
+                "circumference_mm": round(c_weld, 1),
+                "usable_length_mm": round(film_length, 1),
+                "overlap_mm": overlap_mm,
+            }
+
+        usable_len = max(5.0, film_length - overlap_mm)
+        min_n = 3 if geometry == "dwsi" else 1
+
+        n_film = max(min_n, int(math.ceil(c_weld / usable_len)))
+        return {
+            "n_film": n_film,
+            "circumference_mm": round(c_weld, 1),
+            "usable_length_mm": round(usable_len, 1),
+            "overlap_mm": overlap_mm,
+        }
+
+    def recommend_film_size(self, od, current_n, annex_n, overlap_mm=10.0):
+        """
+        Calculates recommended film sizes to optimize exposure count:
+        1) To reduce current exposures by 1 (N -> N - 1)
+        2) To reach the standard thickness limit (N -> N_annex)
+        """
+        try:
+            od = float(od)
+            current_n = int(current_n)
+            annex_n = max(1, int(annex_n))
+            overlap_mm = max(0.0, float(overlap_mm))
+        except (TypeError, ValueError):
+            return None
+
+        if od <= 0.0 or current_n <= 1:
+            return None
+
+        c_weld = math.pi * od
+        can_reduce = current_n > annex_n
+
+        # Target 1: N - 1
+        n_step = max(annex_n, current_n - 1)
+        req_len_step = (c_weld / float(n_step)) + overlap_mm if n_step > 0 else 0.0
+
+        # Target 2: Annex N (ideal baseline)
+        req_len_ideal = (c_weld / float(annex_n)) + overlap_mm if annex_n > 0 else 0.0
+
+        return {
+            "can_reduce": can_reduce,
+            "n_current": current_n,
+            "n_annex": annex_n,
+            "target_n_step": n_step,
+            "req_length_step_mm": round(req_len_step, 1),
+            "target_n_ideal": annex_n,
+            "req_length_ideal_mm": round(req_len_ideal, 1),
+        }
+
+    def calculate_joint_total_time(self, single_time_seconds, exposures, lang="tr"):
+        """
+        Calculates total radiation exposure time for 1 complete pipe joint (butt weld).
+        Total Time = Exposures * Single Shot Time.
+        """
+        try:
+            t_sec = max(0.0, float(single_time_seconds))
+            n = max(1, int(exposures))
+        except (TypeError, ValueError):
+            return {"total_seconds": 0.0, "minutes": 0, "seconds": 0, "formatted": "0 sn" if lang == "tr" else "0 s"}
+
+        total_sec = t_sec * n
+        mins = int(total_sec // 60)
+        secs = int(total_sec % 60)
+        if lang == "tr":
+            formatted = f"{mins} dk {secs} sn ({n} poz)" if mins > 0 else f"{secs} sn ({n} poz)"
+        else:
+            formatted = f"{mins} min {secs} sec ({n} exp)" if mins > 0 else f"{secs} sec ({n} exp)"
+        return {
+            "total_seconds": round(total_sec, 2),
+            "minutes": mins,
+            "seconds": secs,
+            "formatted": formatted,
+        }
+
+    def recommend_detector_size_for_fmin(self, od, t, focal_size, current_f, testing_class="class_b"):
+        """
+        Calculates the theoretical minimum source-to-object distance (f_min_geo)
+        determined strictly by the focal spot size and contact wall thickness
+        (ISO 17636-1/2 Clause 7.6 nomogram / geometric unsharpness floor),
+        and recommends the maximum active panel/film width that avoids
+        inflating f_min due to chord gap b_ed.
+        """
+        try:
+            od = float(od)
+            t = float(t)
+            focal_size = float(focal_size)
+            current_f = float(current_f)
+        except (TypeError, ValueError):
+            return None
+
+        if od <= 0.0 or t <= 0.0 or focal_size <= 0.0:
+            return None
+
+        # Contact geometric limit: b = t
+        f_min_geo = self.calculate_f_min(focal_size, t, testing_class, t)
+        if f_min_geo <= 0.0:
+            return None
+
+        re = od / 2.0
+        # If chord gap bed is kept within b_contact tolerance (b <= 1.2 * t),
+        # bed <= 0.2 * t.
+        cos_limit = 1.0 - (0.2 * t / max(re, 0.1))
+        cos_clamped = max(-1.0, min(1.0, cos_limit))
+        theta_max = math.acos(cos_clamped)
+
+        # Lateral chord width at pipe surface
+        w_opt_surface = 2.0 * re * math.sin(theta_max)
+
+        can_optimize = current_f > (f_min_geo + 5.0)
+
+        return {
+            "f_min_geo": round(f_min_geo, 1),
+            "current_f": round(current_f, 1),
+            "can_optimize": can_optimize,
+            "recommended_detector_width_mm": round(w_opt_surface, 1),
+        }
+
+    def evaluate_exposure_comparison(self, n_graph, n_panel=None, n_applied=0, n_film=None):
         """
         Compares the standard/graph-based minimum exposures (n_graph), the
-        panel-coverage minimum exposures (n_panel) and the user's applied
-        exposures (n_applied). The governing required value is max(n_graph,
-        n_panel); the applied value is sufficient when it is >= that.
+        panel-coverage minimum exposures (n_panel), film-coverage minimum (n_film)
+        and the user's applied exposures (n_applied). The governing required value
+        is max(n_graph, n_panel, n_film); the applied value is sufficient when >= that.
         """
         n_graph_i = max(1, int(n_graph))
-        n_panel_i = max(1, int(n_panel))
+        n_panel_i = int(n_panel) if (n_panel is not None and n_panel > 0) else None
+        n_film_i = int(n_film) if (n_film is not None and n_film > 0) else None
         n_applied_i = max(0, int(n_applied))
-        n_required = max(n_graph_i, n_panel_i)
+        
+        candidates = [n_graph_i]
+        if n_panel_i is not None:
+            candidates.append(n_panel_i)
+        if n_film_i is not None:
+            candidates.append(n_film_i)
+            
+        n_required = max(candidates)
+
+        limiting = "graph"
+        if n_film_i is not None and n_required == n_film_i and n_film_i > n_graph_i:
+            limiting = "film_size"
+        elif n_panel_i is not None and n_required == n_panel_i and n_panel_i > n_graph_i:
+            limiting = "panel_size"
+
         return {
             "n_graph": n_graph_i,
             "n_panel": n_panel_i,
+            "n_film": n_film_i,
             "n_applied": n_applied_i,
             "n_required": n_required,
+            "limiting_factor": limiting,
             "is_sufficient": n_applied_i >= n_required,
         }
 

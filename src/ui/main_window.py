@@ -23,7 +23,7 @@ from src.ui.sketch import WeldSketchCanvas, StandardSchematicCanvas
 from src.ui.compensation import Level3Dialog
 from src.core.report import PDFReportGenerator
 from src.core.procedure_check import ProcedureComplianceChecker
-from src.core.updater import UpdateChecker
+from src.core.updater import UpdateChecker, GITHUB_REPO
 from src.core.version import __version__ as CURRENT_VERSION
 from src.core.asme_b36 import ASME_B36_10_PIPES
 from src.ui.panels.input_panel import InputPanelMixin, QFormLayout_custom
@@ -392,7 +392,8 @@ class MainWindow(QMainWindow,
         scroll_layout_1.setContentsMargins(5, 5, 5, 5)
         scroll_layout_1.setSpacing(0)
 
-        grp_inputs = QGroupBox(self.trans.get("inputs_section"))
+        self.grp_inputs = QGroupBox(self.trans.get("inputs_section"))
+        grp_inputs = self.grp_inputs
         grp_inputs_layout = QFormLayout_custom()
         grp_inputs.setLayout(grp_inputs_layout)
 
@@ -693,7 +694,8 @@ class MainWindow(QMainWindow,
         outputs_layout.setContentsMargins(5, 5, 5, 5)
         outputs_layout.setSpacing(4)
 
-        grp_outputs = QGroupBox(self.trans.get("outputs"))
+        self.grp_outputs = QGroupBox(self.trans.get("outputs"))
+        grp_outputs = self.grp_outputs
         grp_outputs.setObjectName("OutputsBox")
         grp_outputs_layout = QVBoxLayout(grp_outputs)
         grp_outputs_layout.setSpacing(6)
@@ -706,7 +708,7 @@ class MainWindow(QMainWindow,
             "w_nom", "w_eff", "u_max", "f_min", "f_min_asme", "sfd_min",
             "ug", "req_exposures", "exposures_panel", "exposures_applied", "exposures_check",
             "single_wire_iqi", "duplex_iqi",
-            "asme_iqi", "quality_target", "calc_time", "detector_quality",
+            "asme_iqi", "quality_target", "calc_time", "total_joint_time", "detector_quality",
             "barrier_distance", "filter_recommendation"
         ]
 
@@ -1011,6 +1013,7 @@ class MainWindow(QMainWindow,
         # Also update procedure compliance label and default value
         if is_digital:
             self.lbl_app_quality.setText(self.trans.get("applied_quality") + " (SNR_N):")
+            self.txt_app_quality.setValidator(QDoubleValidator(0.1, 1000.0, 1))
             try:
                 val = float(self.txt_app_quality.text().replace(",", "."))
                 if val < 5.0:
@@ -1019,6 +1022,7 @@ class MainWindow(QMainWindow,
                 self.txt_app_quality.setText("140")
         else:
             self.lbl_app_quality.setText(self.trans.get("applied_quality") + " (D):")
+            self.txt_app_quality.setValidator(QDoubleValidator(0.1, 5.0, 2))
             try:
                 val = float(self.txt_app_quality.text().replace(",", "."))
                 if val >= 5.0:
@@ -1470,9 +1474,21 @@ class MainWindow(QMainWindow,
         self.tab_sketch.setTabText(0, self.trans.get("tab_dynamic"))
         self.tab_sketch.setTabText(1, self.trans.get("tab_standard"))
 
-        # Update QGroupBox titles for exposure section
-        self.grp_exposure.setTitle(self.trans.get("applied_exposure_section"))
-        self.grp_compliance.setTitle(self.trans.get("procedure_section"))
+        # Update QGroupBox titles
+        if hasattr(self, "grp_inputs"):
+            self.grp_inputs.setTitle(self.trans.get("inputs_section"))
+        if hasattr(self, "grp_exposure"):
+            self.grp_exposure.setTitle(self.trans.get("applied_exposure_section"))
+        if hasattr(self, "grp_outputs"):
+            self.grp_outputs.setTitle(self.trans.get("outputs"))
+        if hasattr(self, "grp_compliance"):
+            self.grp_compliance.setTitle(self.trans.get("procedure_section"))
+        if hasattr(self, "sketch_box"):
+            self.sketch_box.setTitle(self.trans.get("sketch_title"))
+        if hasattr(self, "grp_warnings"):
+            self.grp_warnings.setTitle(self.trans.get("warnings"))
+        if hasattr(self, "grp_defect"):
+            self.grp_defect.setTitle(self.trans.get("defect_section"))
         if hasattr(self, "grp_report_info"):
             self.grp_report_info.setTitle(self.trans.get("report_info_section"))
             for attr, key, _ in self._report_fields:
@@ -1699,7 +1715,7 @@ class MainWindow(QMainWindow,
             (self.txt_barrier_limit, 0.1, 1000.0),
             (self.txt_app_overlap, 0.0, 500.0),
             (self.txt_app_srb, 1.0, 1000.0),
-            (self.txt_app_quality, 0.01, 10000.0),
+            (self.txt_app_quality, 0.01, 10000.0 if self.rad_digital.isChecked() else 5.0),
             (self.txt_panel_width, 10.0, 2000.0),
             (self.txt_panel_height, 10.0, 2000.0),
             (self.txt_panel_overlap, 0.0, 50.0),
@@ -2221,7 +2237,7 @@ class MainWindow(QMainWindow,
         app_activity = raw_act / 37.0 if unit == "GBq" else raw_act
 
         raw_overlap = _float_opt(self.txt_app_overlap)
-        app_overlap = self._to_mm(raw_overlap) if raw_overlap is not None else 0.0
+        app_overlap = self._to_mm(raw_overlap) if raw_overlap is not None else 10.0
         app_overlap_warn = self._to_mm(raw_overlap) if raw_overlap is not None else 10.0
 
         barrier_limit = _float(self.txt_barrier_limit, 20.0)
@@ -2250,6 +2266,7 @@ class MainWindow(QMainWindow,
             "bed": bed, "bgap": bgap,
             "app_kv": app_kv, "app_activity": app_activity, "app_time": app_time,
             "app_quality": app_quality, "app_overlap": app_overlap,
+            "film_overlap": app_overlap,
             "app_overlap_warn": app_overlap_warn, "app_srb": app_srb,
             "app_wire": self.cmb_app_wire.currentData(),
             "app_duplex": self.cmb_app_duplex.currentData(),
@@ -2560,8 +2577,9 @@ class MainWindow(QMainWindow,
             "f_min_asme": f_min_asme,
             "sfd_min": sfd_min,
             "ug": ug,
-            "exposures": exposures,
+            "exposures": self.last_calculated.get("required_exposures", exposures),
             "exposures_panel": self.last_calculated.get("exposures_panel"),
+            "exposures_film": self.last_calculated.get("exposures_film"),
             "exposures_applied": self.last_calculated.get("exposures_applied"),
             "exposures_check": self.last_calculated.get("exposures_ok"),
             "single_wire_iqi": wire_str,
@@ -2570,6 +2588,8 @@ class MainWindow(QMainWindow,
             "barrier_distance": self.last_calculated.get("barrier_distance", "N/A"),
             "quality_target": target_quality,
             "calc_time": calc_time,
+            "total_joint_time": self.last_calculated.get("total_joint_time_str", "N/A"),
+            "suggestions": self.last_calculated.get("suggestions", []),
             "base_multiplier": self.last_calculated.get("base_multiplier", 1.0),
             "detector_quality": self.out_labels["detector_quality"][1].text(),
             "filter_recommendation": self.out_labels["filter_recommendation"][1].text(),
@@ -2803,10 +2823,18 @@ class MainWindow(QMainWindow,
                 version = str(result.get("version", "?"))
                 # release_notes may be None/null from the GitHub API -> slice a str
                 notes = str(result.get("release_notes") or "")[:500]
+                ssl_note = ""
+                if result.get("ssl_fallback"):
+                    is_tr = getattr(self, "trans", None) and getattr(self.trans, "language", "") == "tr"
+                    ssl_note = (
+                        "\n\n(Not: Ağınızda SSL denetimi / kurumsal filtre algılandı; dosya bütünlüğü SHA-256 ile doğrulanacaktır.)"
+                        if is_tr
+                        else "\n\n(Note: Network SSL inspection / corporate proxy detected; download integrity will be verified via SHA-256.)"
+                    )
                 reply = QMessageBox.question(
                     self, "Update Available",
                     f"A new version ({version}) is available.\n\n"
-                    f"{notes}\n\n"
+                    f"{notes}{ssl_note}\n\n"
                     f"Download and install now?",
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
                 )
@@ -2814,8 +2842,20 @@ class MainWindow(QMainWindow,
                     self._download_and_install(result)
             elif result.get("error"):
                 if not silent:
+                    err_str = str(result["error"])
+                    err_lower = err_str.lower()
+                    if "certificate_verify_failed" in err_lower or "certificate verify failed" in err_lower:
+                        is_tr = getattr(self, "trans", None) and getattr(self.trans, "language", "") == "tr"
+                        extra_hint = (
+                            "\n\nİpucu: Ağınızda veya antivirüsünüzde SSL denetimi / kurumsal filtre bulunuyor olabilir."
+                            f"\nGüncellemeyi doğrudan GitHub üzerinden de indirebilirsiniz:\nhttps://github.com/{GITHUB_REPO}/releases/latest"
+                        ) if is_tr else (
+                            "\n\nHint: A corporate proxy, firewall, or antivirus HTTPS inspection was detected."
+                            f"\nYou can also download the update directly from:\nhttps://github.com/{GITHUB_REPO}/releases/latest"
+                        )
+                        err_str += extra_hint
                     QMessageBox.warning(self, "Update Check Failed",
-                                        f"Could not check for updates:\n{result['error']}")
+                                        f"Could not check for updates:\n{err_str}")
             else:
                 if not silent:
                     QMessageBox.information(self, "No Updates",
@@ -2957,18 +2997,20 @@ class MainWindow(QMainWindow,
                 QGroupBox {
                     border: 2px solid #313244;
                     border-radius: 8px;
-                    margin-top: 12px;
-                    padding-top: 12px;
+                    margin-top: 14px;
+                    padding-top: 14px;
                     color: #fab387;
                     font-weight: bold;
-                    font-size: 12px;
+                    font-size: 14px;
                     background-color: #181825;
                 }
                 QGroupBox::title {
                     subcontrol-origin: margin;
                     subcontrol-position: top left;
-                    padding: 0 3px;
+                    padding: 0 5px;
                     left: 10px;
+                    font-weight: bold;
+                    font-size: 14px;
                 }
                 QLabel {
                     color: #cdd6f4;
@@ -3117,18 +3159,20 @@ class MainWindow(QMainWindow,
                 QGroupBox {
                     border: 2px solid #cfd8dc;
                     border-radius: 8px;
-                    margin-top: 12px;
-                    padding-top: 12px;
+                    margin-top: 14px;
+                    padding-top: 14px;
                     color: #0d47a1;
                     font-weight: bold;
-                    font-size: 12px;
+                    font-size: 14px;
                     background-color: #fafafa;
                 }
                 QGroupBox::title {
                     subcontrol-origin: margin;
                     subcontrol-position: top left;
-                    padding: 0 3px;
+                    padding: 0 5px;
                     left: 10px;
+                    font-weight: bold;
+                    font-size: 14px;
                 }
                 QLabel {
                     color: #37474f;

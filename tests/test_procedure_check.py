@@ -78,8 +78,19 @@ class TestProcedureComplianceChecker(unittest.TestCase):
         res = self.checker.check_compliance(inputs, calculated, applied, lvl3, "en")
         self.assertFalse(res["is_compliant"])
 
-        # Case 2: Density above Class B limit
+        # Case 2: Density within valid range (2.3 - 4.0)
         applied["applied_quality"] = 2.4
+        res = self.checker.check_compliance(inputs, calculated, applied, lvl3, "en")
+        self.assertTrue(res["is_compliant"])
+
+        # Case 3: Density exceeds standard maximum limit (4.0)
+        applied["applied_quality"] = 4.3
+        res = self.checker.check_compliance(inputs, calculated, applied, lvl3, "en")
+        self.assertFalse(res["is_compliant"])
+        self.assertTrue(any("EXCEEDED" in c["details"] for c in res["checks"] if c["name"] == "quality"))
+
+        # Case 4: Upper boundary valid density (4.0)
+        applied["applied_quality"] = 4.0
         res = self.checker.check_compliance(inputs, calculated, applied, lvl3, "en")
         self.assertTrue(res["is_compliant"])
 

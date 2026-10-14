@@ -26,6 +26,8 @@ RT_Inspection_Report_*.pdf
 # Standard reference PDFs (copyrighted, not distributed)
 ISO 17636-*.pdf
 pdfcoffee.com_*.pdf
+ASME*.pdf
+TODO_*.md
 
 # Coverage
 .coverage
