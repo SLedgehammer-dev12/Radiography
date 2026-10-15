@@ -11,6 +11,10 @@ except ImportError:
     resource_path = lambda p: p
 
 class RTCalculator:
+    # DWDI elliptical limits — ISO 17636-1:2022 Cl. 7.1.6 Fig.11 (same in -2).
+    DWDI_T_OVER_DE_LIMIT = 0.12
+    DWDI_T_MAX = 8.0
+    DWDI_DE_MAX = 100.0
     # -----------------------------------------------------------------------
     # Film Speed Factors — ISO 11699-1 film system classification
     # Reference: C1 as baseline (factor = 1.0, slowest, finest grain, e.g. DR50).
@@ -1257,7 +1261,7 @@ class RTCalculator:
         try:
             if od <= 0.0 or t <= 0.0:
                 return 2
-            return 3 if (t / od) >= 0.12 else 2
+            return 3 if (t / od) >= self.DWDI_T_OVER_DE_LIMIT else 2
         except (TypeError, ZeroDivisionError):
             return 2
 
@@ -1272,17 +1276,17 @@ class RTCalculator:
         Returns a structured dict (booleans + exposures) so the caller can build
         localized warning messages.
         """
-        od_ok = od is not None and 0.0 < od <= 100.0
+        od_ok = od is not None and 0.0 < od <= self.DWDI_DE_MAX
         exposures = 3 if geometry == "dwdi_super" else self.get_dwdi_elliptical_exposures(od, t)
         needs_three = False
         t_ok = True
         weld_width_ok = True
         if geometry == "dwdi_elliptic":
-            t_ok = t is not None and t <= 8.0
+            t_ok = t is not None and t <= self.DWDI_T_MAX
             if weld_width is not None:
                 weld_width_ok = weld_width <= (od / 4.0)
             if od is not None and od > 0.0 and t is not None and t > 0.0:
-                needs_three = (t / od) >= 0.12
+                needs_three = (t / od) >= self.DWDI_T_OVER_DE_LIMIT
         return {
             "valid": od_ok and t_ok and weld_width_ok,
             "od_ok": od_ok,
@@ -1549,7 +1553,7 @@ class RTCalculator:
             "f_min_applied": f_min_applied,
         }
 
-    def calculate_film_exposures(self, od, film_length, overlap_mm=10.0, geometry="dwsi"):
+    def calculate_film_exposures(self, od, film_length, overlap_mm=10.0, geometry="dwsi", t=None):
         """
         Calculates the minimum number of film exposures required to cover
         the entire weld circumference (ISO 17636-1:2022 Clause 6.6 & Annex A).
@@ -1574,7 +1578,12 @@ class RTCalculator:
         c_weld = math.pi * od
 
         if geometry in ("dwdi_elliptic", "dwdi_super"):
-            n_fixed = 3 if geometry == "dwdi_super" else (3 if (od > 0 and 8.0 / od >= 0.12) else 2)
+            if geometry == "dwdi_super":
+                n_fixed = 3
+            elif t is None:
+                n_fixed = 3  # shortcut: t unknown -> conservative N, pass t to upgrade
+            else:
+                n_fixed = self.get_dwdi_elliptical_exposures(od, t)
             return {
                 "n_film": n_fixed,
                 "circumference_mm": round(c_weld, 1),

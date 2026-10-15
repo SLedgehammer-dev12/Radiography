@@ -1052,7 +1052,7 @@ class CalculationEngine:
             film_res = None
             raw_len = max(float(f.get("film_height") or 0.0), float(f.get("film_width") or 0.0))
             if raw_len > 0.0 and od > 0.0 and not calc.is_central_projection(geometry, std_figure):
-                film_res = calc.calculate_film_exposures(od, raw_len, overlap_mm, geometry)
+                film_res = calc.calculate_film_exposures(od, raw_len, overlap_mm, geometry, t)
                 n_film = film_res["n_film"]
             cmp_res = calc.evaluate_exposure_comparison(
                 exposures, n_panel=None, n_applied=n_applied, n_film=n_film

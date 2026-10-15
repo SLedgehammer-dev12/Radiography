@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.0.2] - 2026-10-15
+
+### Fixed (DWDI elliptical exposure count)
+- **Analog film path used hardcoded 8.0 mm instead of real wall thickness**: `calculate_film_exposures` for `dwdi_elliptic` evaluated `8.0/De >= 0.12`, so e.g. `De=60.3, t=5.5` (t/De=0.091) wrongly returned 3 instead of 2 and overrode the correct Annex A baseline via `max()`. Now passes real `t` from the engine and delegates to `get_dwdi_elliptical_exposures`.
+- **DWDI limits centralized**: `DWDI_T_OVER_DE_LIMIT=0.12`, `DWDI_T_MAX=8.0`, `DWDI_DE_MAX=100.0` constants; unknown-`t` film call falls back to conservative N=3.
+
 ## [2.0.1] - 2026-10-14
 
 ### Fixed (Windows desktop updater & SSL)
