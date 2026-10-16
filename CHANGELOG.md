@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.0.3] - 2026-10-16
+
+### Added
+- **Dynamic exception & compensation provenance**: Detailed interactive calculation provenance and formula breakdowns for $f_{\min}$, $SFD_{\min}$ (candidate governing logic & Level 3 distance compensation factor), ISO 17636-1 Clause 6.9 isotope exceptions (Ir-192 wire shift, Se-75 optical density $D \ge 3.0$ and C3 film class upgrade), and geometric unsharpness ($U_g$).
+- **Desktop & Web parity test suite**: Added comprehensive automated matrix test suite (`tests/test_desktop_web_parity.py`) verifying parity across 100+ real-world RT inspection scenarios.
+
+### Fixed
+- **Web version & update checker**: Synchronized Web app shell, Service Worker cache (`radiography-v2.0.3`), and update modal to report the correct installed version.
+- **CI release pipeline**: Streamlined automated GitHub releases by excluding Android APK packaging.
+
 ## [2.0.2] - 2026-10-15
 
 ### Fixed (DWDI elliptical exposure count)

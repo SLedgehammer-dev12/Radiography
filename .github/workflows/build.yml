@@ -183,7 +183,8 @@ jobs:
   build-android:
     name: Build Android APK
     needs: [check-version, test]
-    if: needs.check-version.outputs.should_release == 'true'
+    # APK excluded from automated GitHub releases per configuration
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -321,7 +322,7 @@ jobs:
 
   create-release:
     name: Create GitHub Release
-    needs: [check-version, build-windows, build-macos, build-android, build-web-launcher]
+    needs: [check-version, build-windows, build-macos, build-web-launcher]
     if: |
       always() &&
       !cancelled() &&
@@ -344,18 +345,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: Radiography-macOS-Universal
-          path: release-artifacts
-      - name: Download Android APK artifact
-        continue-on-error: true
-        uses: actions/download-artifact@v4
-        with:
-          name: Radiography-Android-APK
-          path: release-artifacts
-      - name: Download Android AAB artifact
-        continue-on-error: true
-        uses: actions/download-artifact@v4
-        with:
-          name: Radiography-Android-AAB
           path: release-artifacts
       - name: Download Web launcher (Windows)
         continue-on-error: true
