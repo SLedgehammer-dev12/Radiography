@@ -121,17 +121,28 @@ def _build_report_outputs(calculated, display, source="x_ray"):
         "base_multiplier": calculated.get("base_multiplier"),
         "detector_quality": display.get("detector_quality"),
         "filter_recommendation": display.get("filter_recommendation"),
-        "f_min_provenance_text": format_f_min_provenance(
-            calculated.get("f_min_provenance"), _trans),
-        "sfd_min_provenance_text": format_sfd_provenance(
-            calculated.get("sfd_min_provenance"), _trans),
-        "exposures_provenance_text": format_exposures_provenance(
-            calculated.get("exposures_provenance"), _trans),
+        "f_min_provenance_text": (
+            calculated.get("f_min_provenance_text")
+            or format_f_min_provenance(calculated.get("f_min_provenance"), _trans)
+        ),
+        "sfd_min_provenance_text": (
+            calculated.get("sfd_min_provenance_text")
+            or format_sfd_provenance(calculated.get("sfd_min_provenance"), _trans)
+        ),
+        "exposures_provenance_text": (
+            calculated.get("exposures_provenance_text")
+            or format_exposures_provenance(calculated.get("exposures_provenance"), _trans)
+        ),
         "exposure_time_provenance_text": (
             calculated.get("exposure_time_provenance_text")
-            or format_exposure_time_provenance(
-                calculated.get("exposure_time_provenance"), _trans)
+            or format_exposure_time_provenance(calculated.get("exposure_time_provenance"), _trans)
         ),
+        "single_wire_iqi_provenance_text": calculated.get("single_wire_iqi_provenance_text"),
+        "duplex_iqi_provenance_text": calculated.get("duplex_iqi_provenance_text"),
+        "quality_target_provenance_text": calculated.get("quality_target_provenance_text"),
+        "detector_quality_provenance_text": calculated.get("detector_quality_provenance_text"),
+        "u_max_provenance_text": calculated.get("u_max_provenance_text"),
+        "ug_provenance_text": calculated.get("ug_provenance_text"),
     }
 
 

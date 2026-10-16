@@ -2293,28 +2293,17 @@ class MainWindow(QMainWindow,
         self._update_output_visibility()
         self.last_calculated = result["calculated"]
 
-        # Dynamic SFD_min/SDD_min provenance tooltip (which candidate governs).
-        provenance = result["values"].get("sfd_min_provenance")
-        if provenance and "sfd_min" in getattr(self, "info_buttons", {}):
-            self.info_buttons["sfd_min"].setToolTip(
-                self._format_sfd_provenance(provenance))
-
-        # Dynamic f_min provenance tooltip (base formula + Level 3 reductions).
-        fmin_prov = result["values"].get("f_min_provenance")
-        if fmin_prov and "f_min" in getattr(self, "info_buttons", {}):
-            self.info_buttons["f_min"].setToolTip(
-                format_f_min_provenance(fmin_prov, self.trans))
-
-        # Dynamic required-exposure-count provenance tooltip.
-        exposures_prov = result["values"].get("exposures_provenance")
-        if exposures_prov and "req_exposures" in getattr(self, "info_buttons", {}):
-            self.info_buttons["req_exposures"].setToolTip(
-                self._format_exposures_provenance(exposures_prov))
-
-        # Dynamic exposure-time formula & parameter provenance tooltip.
-        exp_time_text = result["values"].get("exposure_time_provenance_text")
-        if exp_time_text and "calc_time" in getattr(self, "info_buttons", {}):
-            self.info_buttons["calc_time"].setToolTip(exp_time_text)
+        # Dynamic provenance tooltips for output items (including exceptions & compensations).
+        for out_name in (
+            "sfd_min", "f_min", "req_exposures", "calc_time",
+            "single_wire_iqi", "duplex_iqi", "quality_target",
+            "detector_quality", "u_max", "ug"
+        ):
+            prov_text = result["values"].get(f"{out_name}_provenance_text")
+            if prov_text and out_name in getattr(self, "info_buttons", {}):
+                base_tt = self.trans.get(f"tt_{out_name}", "")
+                combined = f"{base_tt}\n\n{prov_text}".strip() if base_tt else prov_text
+                self.info_buttons[out_name].setToolTip(combined)
 
         if warnings:
             self.txt_warnings.setText("\n".join(warnings))

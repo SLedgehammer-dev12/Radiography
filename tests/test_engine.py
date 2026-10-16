@@ -438,4 +438,55 @@ def test_analog_max_density_warning(engine):
     assert any("optik yoğunluk" in w.lower() and "4.00" in w for w in res_high["warnings"])
 
 
+def test_dynamic_provenance_and_exceptions_info(engine):
+    """Verifies that exceptions and compensations are dynamically formatted into provenance info."""
+    # Scenario: 7.9 mm steel, DWSI, Class B, analog film, Ir-192 isotope, SFD < SFD_min
+    res = engine.calculate({
+        "od": 114.3, "t": 7.9, "cap": 2.5, "tech": "analog", "testing_class": "class_b",
+        "geometry": "dwsi", "source": "isotope_ir192", "sfd": 100.0, "d": 2.0,
+    }, {"dw_reduction": True, "sfd_comp": True}, "tr")
 
+    v = res["values"]
+
+    # 1. f_min dynamic provenance
+    fmin_txt = v["f_min_provenance_text"]
+    assert "Formül" in fmin_txt
+    assert "Temel f_min" in fmin_txt
+    assert "Level 3 Çift Duvar İndirimi" in fmin_txt
+    assert "Geçerli f_min" in fmin_txt
+
+    # 2. sfd_min dynamic provenance & distance compensation
+    sfd_txt = v["sfd_min_provenance_text"]
+    assert "Asgari Mesafe Adayları" in sfd_txt
+    assert "f_min + b" in sfd_txt
+    assert "DWSI fiziksel tabanı" in sfd_txt
+    assert "Mesafe Telafisi (Level 3 Distance Compensation) AKTİF" in sfd_txt
+
+    # 3. single_wire_iqi dynamic provenance (Clause 6.9 exception for Ir-192 with w=15.8mm)
+    wire_txt = v["single_wire_iqi_provenance_text"]
+    assert "ISO 17636-1 Tablo B.3" in wire_txt
+    assert "w = 2·t" in wire_txt
+    assert "Madde 6.9 İzotop İstisnası" in wire_txt
+    assert "Ir-192" in wire_txt
+
+    # 4. Se-75 Clause 6.9 exception (w < 12mm Class B optical density >= 3.0 & film upgrade)
+    res_se75 = engine.calculate({
+        "od": 88.9, "t": 5.0, "cap": 1.0, "tech": "analog", "testing_class": "class_b",
+        "geometry": "dwsi", "source": "isotope_se75", "sfd": 600.0,
+    }, {}, "tr")
+    se75_qual_txt = res_se75["values"]["quality_target_provenance_text"]
+    assert "Madde 6.9 İstisnası" in se75_qual_txt
+    assert "D ≥ 3.0" in se75_qual_txt
+
+    se75_det_txt = res_se75["values"]["detector_quality_provenance_text"]
+    assert "Madde 6.9 İstisnası" in se75_det_txt
+    assert "C3" in se75_det_txt
+
+    # 5. Digital distance compensation & ug provenance
+    res_dig = engine.calculate({
+        "od": 114.3, "t": 6.0, "cap": 1.5, "tech": "digital", "testing_class": "class_b",
+        "geometry": "dwsi", "source": "x_ray", "sfd": 400.0, "d": 2.0, "app_srb": 80.0,
+    }, {"sfd_comp": True}, "tr")
+    ug_txt = res_dig["values"]["ug_provenance_text"]
+    assert "Formül: Ug = d · b / f" in ug_txt
+    assert "Hesaplanan Değer: Ug =" in ug_txt

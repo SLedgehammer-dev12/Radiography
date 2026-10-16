@@ -40,48 +40,566 @@ from src.core.translation import Translation, format_filter_recommendation
 logger = logging.getLogger("radiography.core.engine")
 
 
-def format_sfd_provenance(provenance, trans):
-    """Localized text listing the SFD_min/SDD_min candidates and the active one."""
-    if not provenance:
+def format_sfd_provenance(prov, trans):
+    """Localized breakdown of SFD_min candidates, governing criterion, and distance compensation."""
+    if not prov:
         return ""
+    lang = getattr(trans, "language", "tr") if not isinstance(trans, dict) else trans.get("language", "tr")
+    tr = (lang == "tr")
+
     def label(candidate):
         key = candidate.get("key")
         if key == "f_min_plus_b":
-            return trans.get("sfd_prov_f_min")
+            return trans.get("sfd_prov_f_min") if hasattr(trans, "get") else "f_min + b"
         if key == "coverage":
-            return trans.get(
-                "sfd_prov_coverage_panel" if candidate.get("receptor") == "dd"
-                else "sfd_prov_coverage_film")
-        return trans.get("sfd_prov_dwsi_floor")
+            is_dd = (candidate.get("receptor") == "dd")
+            if hasattr(trans, "get"):
+                return trans.get("sfd_prov_coverage_panel" if is_dd else "sfd_prov_coverage_film")
+            return "1.4·dd" if is_dd else "1.4·df"
+        return trans.get("sfd_prov_dwsi_floor") if hasattr(trans, "get") else "DWSI floor"
 
     lines = []
-    active_key = provenance.get("active")
-    for candidate in provenance.get("candidates", []):
-        text = (f"{label(candidate)} = {candidate.get('value', 0.0):.1f} mm "
-                f"[{trans.get(candidate.get('formula_key', ''))}]")
-        if candidate.get("key") == active_key:
+    lines.append("Asgari Mesafe Adayları (SFD/SDD):" if tr else "Minimum Distance Candidates (SFD/SDD):")
+    active_key = prov.get("active")
+    for candidate in prov.get("candidates", []):
+        key = candidate.get("key")
+        val = candidate.get("value", 0.0)
+        f_key = candidate.get("formula_key", "")
+        f_lbl = trans.get(f_key) if hasattr(trans, "get") and f_key else f_key
+
+        if key == "f_min_plus_b" and "f_min" in candidate and "b" in candidate:
+            detail = f"{candidate['f_min']:.1f} + {candidate['b']:.1f} = {val:.1f} mm"
+        elif key == "coverage" and "size" in candidate:
+            detail = f"1.4 × {candidate['size']:.1f} = {val:.1f} mm"
+        else:
+            detail = f"{val:.1f} mm"
+
+        text = f"  • {label(candidate)}: {detail} [{f_lbl}]"
+        if key == active_key:
+            l3_note = ""
             if candidate.get("l3_dw") or candidate.get("l3_central"):
-                text += " — " + trans.get("sfd_prov_l3")
-            text = trans.get("sfd_prov_active", text)
+                l3_note = " — " + (trans.get("sfd_prov_l3") if hasattr(trans, "get") else "L3")
+            gov_tag = " ★ [KISITLAYICI / GOVERNING]" if tr else " ★ [GOVERNING]"
+            text += f"{l3_note}{gov_tag}"
         lines.append(text)
+
+    if prov.get("is_panoramic"):
+        lines.append(
+            "  (Panoramik / merkezi projeksiyonda ışın 360° radyal olduğundan 1,4·df düzlemsel kapsaması uygulanmaz)"
+            if tr else
+            "  (In panoramic / central projection, 360° radial radiation exempts planar 1.4·df coverage)"
+        )
+
+    # Comparison with applied SFD & distance compensation
+    sfd_app = prov.get("sfd_applied")
+    sfd_min = prov.get("sfd_min")
+    if sfd_app is not None and sfd_min is not None:
+        lines.append("")
+        if sfd_app < sfd_min - 0.05:
+            if prov.get("lvl3_sfd_comp"):
+                k_snr = sfd_min / max(10.0, sfd_app)
+                t_mult = prov.get("time_multiplier", k_snr ** 2)
+                if tr:
+                    lines.append(
+                        f"Mesafe Telafisi (Level 3 Distance Compensation) AKTİF:\n"
+                        f"  Uygulanan SFD ({sfd_app:.1f} mm) < SFD_min ({sfd_min:.1f} mm).\n"
+                        f"  Dedektör çözünürlük kaybı telafisi: SNR_N hedefi ×{k_snr:.2f} ((SFD_min/SFD)), "
+                        f"Pozlama süresi ×{t_mult:.2f} ((SFD_min/SFD)²) artırılmıştır."
+                    )
+                else:
+                    lines.append(
+                        f"Distance Compensation (Level 3 Distance Compensation) ACTIVE:\n"
+                        f"  Applied SFD ({sfd_app:.1f} mm) < SFD_min ({sfd_min:.1f} mm).\n"
+                        f"  Resolution loss compensation: Target SNR_N ×{k_snr:.2f} ((SFD_min/SFD)), "
+                        f"Exposure time ×{t_mult:.2f} ((SFD_min/SFD)²) increased."
+                    )
+            else:
+                if tr:
+                    lines.append(
+                        f"DURUM: Uygulanan SFD ({sfd_app:.1f} mm) < SFD_min ({sfd_min:.1f} mm).\n"
+                        f"  Standart geometrik şartı karşılanmıyor! Seviye 3 yetkisiyle Mesafe Telafisi (Distance Compensation) açılabilir."
+                    )
+                else:
+                    lines.append(
+                        f"STATUS: Applied SFD ({sfd_app:.1f} mm) < SFD_min ({sfd_min:.1f} mm).\n"
+                        f"  Standard geometric requirement not met! Distance Compensation can be enabled with Level 3 approval."
+                    )
+        else:
+            if tr:
+                lines.append(f"DURUM: Uygulanan SFD ({sfd_app:.1f} mm) ≥ SFD_min ({sfd_min:.1f} mm) (Geometrik mesafe şartı sağlanıyor).")
+            else:
+                lines.append(f"STATUS: Applied SFD ({sfd_app:.1f} mm) >= SFD_min ({sfd_min:.1f} mm) (Geometric distance requirement is met).")
+
     return "\n".join(lines)
 
 
 def format_f_min_provenance(prov, trans):
-    """Localized f_min explanation: base value, formula and Level 3 reductions."""
+    """Localized step-by-step formula, variables, exceptions and reductions for f_min."""
     if not prov:
         return ""
-    text = trans.get(
-        "fmin_prov_base", prov.get("base", 0.0),
-        trans.get(prov.get("formula_key", "")))
-    reduced = bool(prov.get("l3_dw") or prov.get("l3_central"))
+    lang = getattr(trans, "language", "tr") if not isinstance(trans, dict) else trans.get("language", "tr")
+    tr = (lang == "tr")
+
+    standard = prov.get("standard", "iso")
+    d = prov.get("d", 2.0)
+    b = prov.get("b", 0.0)
+    t = prov.get("t", 0.0)
+    testing_class = prov.get("testing_class", "class_b")
+    f_base = prov.get("base", 0.0)
+    f_final = prov.get("value", 0.0)
+    b_rule = prov.get("b_rule_applied", False)
+    f_star = prov.get("f_min_star")
+    ci = prov.get("ci_factor")
+    formula_key = prov.get("formula_key", "")
+    formula_lbl = trans.get(formula_key) if hasattr(trans, "get") and formula_key else formula_key
+
+    lines = []
+    base_label = f"Temel f_min = {f_base:.1f} mm [{formula_lbl}]" if tr else f"Base f_min = {f_base:.1f} mm [{formula_lbl}]"
+    lines.append(base_label)
+
+    if standard == "asme":
+        ug_limit = 0.51 if t <= 50.8 else (0.76 if t <= 76.2 else (1.02 if t <= 101.6 else 1.78))
+        if tr:
+            lines.append(f"Formül: ASME Sec V Art 2 T-274.2 [f_min = d · b / Ug_limit]")
+            lines.append(f"Değişkenler: d = {d:.1f} mm, b = {b:.1f} mm, Ug_limit = {ug_limit:.2f} mm (t = {t:.1f} mm)")
+            lines.append(f"Hesaplama: {d:.1f} × {b:.1f} / {ug_limit:.2f} = {f_base:.1f} mm")
+        else:
+            lines.append(f"Formula: ASME Sec V Art 2 T-274.2 [f_min = d · b / Ug_limit]")
+            lines.append(f"Variables: d = {d:.1f} mm, b = {b:.1f} mm, Ug_limit = {ug_limit:.2f} mm (t = {t:.1f} mm)")
+            lines.append(f"Calculation: {d:.1f} × {b:.1f} / {ug_limit:.2f} = {f_base:.1f} mm")
+    elif f_star is not None and ci is not None:
+        c_val = 7.5 if testing_class == "class_a" else 15.0
+        if tr:
+            lines.append(f"Formül: ISO 17636-2 Formül (13) Planar Dedektör [f_min* = f_min(b=t) · Ci]")
+            lines.append(f"Değişkenler: d = {d:.1f} mm, b = {b:.1f} mm, t = {t:.1f} mm (b/t > 1.2), C = {c_val:.1f}, Ci = {ci:.3f}")
+        else:
+            lines.append(f"Formula: ISO 17636-2 Formula (13) Planar Detector [f_min* = f_min(b=t) · Ci]")
+            lines.append(f"Variables: d = {d:.1f} mm, b = {b:.1f} mm, t = {t:.1f} mm (b/t > 1.2), C = {c_val:.1f}, Ci = {ci:.3f}")
+    else:
+        c_val = 7.5 if testing_class == "class_a" else 15.0
+        b_note = (" (b < 1.2t kuralı: b = t)" if b_rule else "") if tr else (" (b < 1.2t rule: b = t)" if b_rule else "")
+        std_num = "2" if prov.get("is_digital") else "1"
+        cls_lbl = "Sınıf A" if testing_class == "class_a" else "Sınıf B"
+        if not tr:
+            cls_lbl = "Class A" if testing_class == "class_a" else "Class B"
+        if tr:
+            lines.append(f"Formül: ISO 17636-{std_num} Formül (2) [f_min = C · d · b^(2/3)]")
+            lines.append(f"Değişkenler: C = {c_val:.1f} ({cls_lbl}), d = {d:.1f} mm, b = {b:.1f} mm{b_note}")
+            lines.append(f"Hesaplama: {c_val:.1f} × {d:.1f} × ({b:.1f})^(2/3) = {f_base:.1f} mm")
+        else:
+            lines.append(f"Formula: ISO 17636-{std_num} Formula (2) [f_min = C · d · b^(2/3)]")
+            lines.append(f"Variables: C = {c_val:.1f} ({cls_lbl}), d = {d:.1f} mm, b = {b:.1f} mm{b_note}")
+            lines.append(f"Calculation: {c_val:.1f} × {d:.1f} × ({b:.1f})^(2/3) = {f_base:.1f} mm")
+
+    # Exceptions & Reductions
+    reductions = []
     if prov.get("l3_dw"):
-        text += " → " + trans.get("fmin_prov_dw")
+        reductions.append("Level 3 Çift Duvar İndirimi (%20: ×0.80)" if tr else "Level 3 Double-Wall Reduction (20%: ×0.80)")
     if prov.get("l3_central"):
-        text += " → " + trans.get("fmin_prov_central")
-    if reduced:
-        text += " → " + trans.get("fmin_prov_final", prov.get("value", 0.0))
-    return text
+        reductions.append("Level 3 Merkezi Projeksiyon İndirimi (%50: ×0.50)" if tr else "Level 3 Central Projection Reduction (50%: ×0.50)")
+    if reductions:
+        lines.append(("Uygulanan İstisnalar: " if tr else "Applied Exceptions: ") + " + ".join(reductions))
+
+    # Annex F detector unsharpness compensation
+    if prov.get("annex_f_compensated"):
+        af_req = prov.get("annex_f_req", 0.0)
+        srb_val = prov.get("annex_f_srb", 0.0)
+        if tr:
+            lines.append(f"Annex F Telafisi: Dedektör bulanıklığı (SRb = {srb_val:.0f} µm) nedeniyle f_min {af_req:.1f} mm değerine yükseltildi.")
+        else:
+            lines.append(f"Annex F Compensation: f_min increased to {af_req:.1f} mm to compensate detector unsharpness (SRb = {srb_val:.0f} µm).")
+
+    lines.append(f"Sonuç: Geçerli f_min = {f_final:.1f} mm" if tr else f"Result: Governing f_min = {f_final:.1f} mm")
+    return "\n".join(lines)
+
+
+def format_single_wire_iqi_provenance(values, trans):
+    """Localized breakdown of single wire IQI table, reference thickness, and Clause 6.9 exception."""
+    if not values:
+        return ""
+    lang = getattr(trans, "language", "tr") if not isinstance(trans, dict) else trans.get("language", "tr")
+    tr = (lang == "tr")
+
+    standard = values.get("standard", "iso")
+    tech = values.get("tech", "digital")
+    geometry = values.get("geometry", "dwsi")
+    testing_class = values.get("testing_class", "class_b")
+    film_side = values.get("film_side", False)
+    material = values.get("material", "steel")
+    source = values.get("source", "x_ray")
+    t = values.get("t", 0.0)
+    w_nom = values.get("w_nom", t)
+    wire_no = values.get("wire_no")
+    wire_str = values.get("wire_str", "")
+    iqi_type = values.get("iqi_type", "wire")
+
+    if standard == "asme":
+        asme_str = values.get("asme_iqi_str", "")
+        return (
+            f"Standart: ASME Sec V Art 2 / ASTM E747 | Belirlenen IQI: {asme_str}"
+            if tr else
+            f"Standard: ASME Sec V Art 2 / ASTM E747 | Determined IQI: {asme_str}"
+        )
+
+    lines = []
+    std_part = "1" if tech == "analog" else "2"
+    if film_side:
+        tbl = "Tablo B.10" if (iqi_type == "step_hole" and testing_class == "class_a") else (
+            "Tablo B.12" if iqi_type == "step_hole" else (
+                "Tablo B.9" if testing_class == "class_a" else "Tablo B.11"
+            )
+        )
+    else:
+        if geometry in ["dwdi_elliptic", "dwdi_super"]:
+            tbl = "Tablo B.6" if (iqi_type == "step_hole" and testing_class == "class_a") else (
+                "Tablo B.8" if iqi_type == "step_hole" else (
+                    "Tablo B.5" if testing_class == "class_a" else "Tablo B.7"
+                )
+            )
+        else:
+            tbl = "Tablo B.2" if (iqi_type == "step_hole" and testing_class == "class_a") else (
+                "Tablo B.4" if iqi_type == "step_hole" else (
+                    "Tablo B.1" if testing_class == "class_a" else "Tablo B.3"
+                )
+            )
+    tbl_en = tbl.replace("Tablo", "Table")
+
+    loc_tr = "Dedektör/Film Tarafı" if film_side else "Kaynak Tarafı"
+    loc_en = "Detector/Film Side" if film_side else "Source Side"
+    t_rule_tr = "w = 2·t (çift cidar, kaynak dikiş yüksekliği kep/kök hariç)" if geometry in ("dwsi", "dwdi_elliptic", "dwdi_super") else "w = t (tek cidar, kaynak dikiş yüksekliği kep/kök hariç)"
+    t_rule_en = "w = 2·t (double wall, weld reinforcement excluded)" if geometry in ("dwsi", "dwdi_elliptic", "dwdi_super") else "w = t (single wall, weld reinforcement excluded)"
+
+    if tr:
+        lines.append(f"Standart: ISO 17636-{std_part} {tbl} ({'Sınıf A' if testing_class == 'class_a' else 'Sınıf B'}, {loc_tr})")
+        lines.append(f"Referans Kalınlık: {t_rule_tr} = {w_nom:.2f} mm")
+        lines.append(f"Tablo Gereksinimi: {wire_str}")
+    else:
+        lines.append(f"Standard: ISO 17636-{std_part} {tbl_en} ({'Class A' if testing_class == 'class_a' else 'Class B'}, {loc_en})")
+        lines.append(f"Reference Thickness: {t_rule_en} = {w_nom:.2f} mm")
+        lines.append(f"Table Requirement: {wire_str}")
+
+    # Clause 6.9 Isotope Exception
+    allowed_offset = 0
+    w_pen = 2 * t if geometry in ("dwsi", "dwdi_elliptic", "dwdi_super") else t
+    if material in ("steel", "copper_nickel"):
+        if geometry in ("dwdi_elliptic", "dwdi_super"):
+            if source == "isotope_ir192" and 10.0 < w_pen <= 25.0:
+                allowed_offset = 1
+            elif source == "isotope_se75" and w_pen <= 12.0:
+                allowed_offset = 1
+        else:
+            if testing_class == "class_a":
+                if source == "isotope_ir192":
+                    if 10.0 < w_pen <= 24.0:
+                        allowed_offset = 2
+                    elif 24.0 < w_pen <= 30.0:
+                        allowed_offset = 1
+                elif source == "isotope_se75" and w_pen <= 24.0:
+                    allowed_offset = 1
+            else:
+                if source == "isotope_ir192" and 10.0 < w_pen <= 40.0:
+                    allowed_offset = 1
+                elif source == "isotope_se75" and w_pen <= 20.0:
+                    allowed_offset = 1
+
+    if allowed_offset > 0 and wire_no is not None:
+        src_lbl = "Ir-192" if source == "isotope_ir192" else "Se-75"
+        adj_wire = wire_no - allowed_offset if iqi_type == "wire" else wire_no + allowed_offset
+        prefix = "W" if iqi_type == "wire" else "H"
+        if tr:
+            lines.append(
+                f"Madde 6.9 İzotop İstisnası: {src_lbl} kaynağı ve {material} için Madde 6.9 "
+                f"uyarınca şartname/anlaşma ile {allowed_offset} basamak daha kalın tel "
+                f"({prefix} {adj_wire}) kabul edilebilir."
+            )
+        else:
+            lines.append(
+                f"Clause 6.9 Isotope Exception: For {src_lbl} source and {material}, "
+                f"Clause 6.9 allows {allowed_offset} step(s) coarser IQI value "
+                f"({prefix} {adj_wire}) subject to contractual agreement."
+            )
+
+    return "\n".join(lines)
+
+
+def format_duplex_iqi_provenance(values, trans):
+    """Localized breakdown of duplex wire IQI and panoramic tolerance."""
+    if not values:
+        return ""
+    lang = getattr(trans, "language", "tr") if not isinstance(trans, dict) else trans.get("language", "tr")
+    tr = (lang == "tr")
+
+    tech = values.get("tech", "digital")
+    if tech != "digital":
+        return trans.get("na", "N/A") if hasattr(trans, "get") else "N/A"
+
+    duplex_str = values.get("duplex_str", "")
+    duplex_no = values.get("duplex_no")
+    w_nom = values.get("w_nom", 0.0)
+    geometry = values.get("geometry", "dwsi")
+    std_figure = values.get("std_figure")
+    testing_class = values.get("testing_class", "class_b")
+
+    lines = []
+    tbl = "Tablo B.13 (Sınıf A)" if testing_class == "class_a" else "Tablo B.14 (Sınıf B)"
+    if not tr:
+        tbl = tbl.replace("Tablo", "Table").replace("Sınıf", "Class")
+
+    if tr:
+        lines.append(f"Standart: ISO 17636-2 {tbl} | Penetrasyon Kalınlığı: w_nom = {w_nom:.2f} mm")
+        lines.append(f"Gereken İkili Tel: {duplex_str}")
+    else:
+        lines.append(f"Standard: ISO 17636-2 {tbl} | Penetrated Thickness: w_nom = {w_nom:.2f} mm")
+        lines.append(f"Required Duplex Wire: {duplex_str}")
+
+    if geometry == "swsi" and std_figure in ("fig5", "fig5a", "fig5b"):
+        adj_d = max(1, duplex_no - 1) if duplex_no else None
+        if tr:
+            lines.append(
+                f"Madde 6.9 / 7.6 İstisnası: SWSI panoramik (merkezi izdüşüm - Şekil 5) çekimde "
+                f"1 duplex adım toleransı (D {adj_d}) kabul edilebilir."
+            )
+        else:
+            lines.append(
+                f"Clause 6.9 / 7.6 Exception: In SWSI panoramic (central projection - Figure 5), "
+                f"1 duplex wire step tolerance (D {adj_d}) is permitted."
+            )
+
+    return "\n".join(lines)
+
+
+def format_quality_target_provenance(values, trans):
+    """Localized breakdown of optical density / SNR_N target, Se-75 rule and distance compensation."""
+    if not values:
+        return ""
+    lang = getattr(trans, "language", "tr") if not isinstance(trans, dict) else trans.get("language", "tr")
+    tr = (lang == "tr")
+
+    tech = values.get("tech", "digital")
+    testing_class = values.get("testing_class", "class_b")
+    material = values.get("material", "steel")
+    source = values.get("source", "x_ray")
+    w_nom = values.get("w_nom", 0.0)
+    cap = values.get("cap", 0.0)
+    sfd = values.get("sfd", 600.0)
+    sfd_min = values.get("sfd_min", 600.0)
+    sfd_comp_target = values.get("sfd_comp_target")
+    snr_location = values.get("snr_location", "weld")
+    target_quality = values.get("target_quality", "")
+
+    lines = []
+    if tech == "analog":
+        req_d = values.get("required_density", 2.3 if testing_class == "class_b" else 2.0)
+        se75_thin = (material in ("steel", "copper_nickel") and source == "isotope_se75" and w_nom < 12.0 and testing_class == "class_b")
+        if tr:
+            lines.append("Standart: ISO 17636-1 Madde 7.8 & Tablo 5 (Optik Yoğunluk Sınırları)")
+            lines.append(f"Hedef Yoğunluk: D ≥ {req_d:.1f} (İzin verilen maksimum: 4.0)")
+            if se75_thin:
+                lines.append(
+                    "Madde 6.9 İstisnası: Se-75 kaynağı ve w < 12 mm Sınıf B için asgari "
+                    "optik yoğunluk D ≥ 3.0'a yükseltilmiştir (standart Sınıf B tabanı: 2.3)."
+                )
+        else:
+            lines.append("Standard: ISO 17636-1 Clause 7.8 & Table 5 (Optical Density Limits)")
+            lines.append(f"Target Density: D >= {req_d:.1f} (Maximum permitted: 4.0)")
+            if se75_thin:
+                lines.append(
+                    "Clause 6.9 Exception: For Se-75 source with w < 12 mm Class B, minimum "
+                    "optical density is raised to D >= 3.0 (standard Class B baseline: 2.3)."
+                )
+    else:
+        table_name = values.get("table_name", "Tablo 3/4")
+        se75_thin = (material in ("steel", "copper_nickel") and source == "isotope_se75" and w_nom < 12.0 and testing_class == "class_b")
+        adj_loc = (snr_location == "adjacent" and cap > 0.0)
+
+        if tr:
+            lines.append(f"Standart: ISO 17636-2 Madde 7.3.1 [{table_name}] (Normalize SNR_N)")
+            lines.append(f"Geçerli SNR_N Hedefi: {target_quality}")
+            if se75_thin:
+                lines.append(
+                    "Madde 6.9 İstisnası: Se-75 kaynağı ve w < 12 mm Sınıf B için hedef "
+                    "SNR_N değeri 1.4× artırılmıştır."
+                )
+            if adj_loc:
+                lines.append(
+                    "Madde 7.3.1 Kuralı: SNR_N ana malzemede (kaynak dikişi bitişiğinde) "
+                    "ölçüldüğünden hedef SNR_N 1.4× artırılmıştır."
+                )
+            if sfd_comp_target is not None and sfd < sfd_min:
+                k_val = sfd_min / max(10.0, sfd)
+                lines.append(
+                    f"Seviye 3 Mesafe Telafisi (Distance Compensation): SFD ({sfd:.1f} mm) < "
+                    f"SFD_min ({sfd_min:.1f} mm) nedeniyle SNR_N hedefi ×{k_val:.2f} ((SFD_min/SFD)) "
+                    f"artırılarak {sfd_comp_target:.1f} değerine telafi edilmiştir."
+                )
+        else:
+            lines.append(f"Standard: ISO 17636-2 Clause 7.3.1 [{table_name}] (Normalized SNR_N)")
+            lines.append(f"Current SNR_N Target: {target_quality}")
+            if se75_thin:
+                lines.append(
+                    "Clause 6.9 Exception: For Se-75 source with w < 12 mm Class B, target "
+                    "SNR_N is increased by 1.4x."
+                )
+            if adj_loc:
+                lines.append(
+                    "Clause 7.3.1 Rule: Target SNR_N is multiplied by 1.4x because SNR_N is "
+                    "measured in the parent metal adjacent to the weld."
+                )
+            if sfd_comp_target is not None and sfd < sfd_min:
+                k_val = sfd_min / max(10.0, sfd)
+                lines.append(
+                    f"Level 3 Distance Compensation: Because SFD ({sfd:.1f} mm) < "
+                    f"SFD_min ({sfd_min:.1f} mm), SNR_N target is compensated ×{k_val:.2f} ((SFD_min/SFD)) "
+                    f"to {sfd_comp_target:.1f}."
+                )
+
+    return "\n".join(lines)
+
+
+def format_detector_quality_provenance(values, trans):
+    """Localized breakdown of film class / max SRb and Annex F compensation status."""
+    if not values:
+        return ""
+    lang = getattr(trans, "language", "tr") if not isinstance(trans, dict) else trans.get("language", "tr")
+    tr = (lang == "tr")
+
+    tech = values.get("tech", "digital")
+    testing_class = values.get("testing_class", "class_b")
+    material = values.get("material", "steel")
+    source = values.get("source", "x_ray")
+    w_nom = values.get("w_nom", 0.0)
+
+    lines = []
+    if tech == "analog":
+        req_film = values.get("film_class_req", "C5")
+        se75_thin = (material in ("steel", "copper_nickel") and source == "isotope_se75" and w_nom < 12.0 and testing_class == "class_b")
+        if tr:
+            lines.append("Standart: ISO 17636-1:2022 Madde 7.3 & Tablo 3/4 (ISO 11699-1 Film Sistemi Sınıfı)")
+            lines.append(f"Asgari Gereken Film Sınıfı: {req_film}")
+            if se75_thin:
+                lines.append(
+                    "Madde 6.9 İstisnası: Se-75 kaynağı ve w < 12 mm Sınıf B için bir üst film "
+                    "sistemi sınıfı zorunludur (C4 yerine C3 olarak belirlendi)."
+                )
+        else:
+            lines.append("Standard: ISO 17636-1:2022 Clause 7.3 & Table 3/4 (ISO 11699-1 Film System Class)")
+            lines.append(f"Minimum Required Film Class: {req_film}")
+            if se75_thin:
+                lines.append(
+                    "Clause 6.9 Exception: For Se-75 source with w < 12 mm Class B, a film system "
+                    "class one grade better is mandatory (upgraded from C4 to C3)."
+                )
+    else:
+        max_srb = values.get("max_srb", 100.0)
+        ug_val = values.get("ug", 0.0)
+        tbl = "Tablo B.13 (Sınıf A)" if testing_class == "class_a" else "Tablo B.14 (Sınıf B)"
+        if not tr:
+            tbl = tbl.replace("Tablo", "Table").replace("Sınıf", "Class")
+
+        ratio = (ug_val * 1000.0) / max(1.0, float(max_srb)) if max_srb else 1.0
+        if tr:
+            lines.append(f"Standart: ISO 17636-2:2022 {tbl} (Temel Uzaysal Çözünürlük)")
+            lines.append(f"Asgari Çözünürlük: Azami SRb = {max_srb:.0f} µm (u_d = 2·SRb = {2*float(max_srb):.0f} µm)")
+            if ratio <= 2.0:
+                lines.append(f"Annex F Kontrolü: Ug / SRb = {ratio:.2f} ≤ 2.0 (Dedektör ve geometrik bulanıklık dengeli)")
+            else:
+                lines.append(f"Annex F Telafisi: Ug / SRb = {ratio:.2f} > 2.0 (Dedektör bulanıklığını telafi etmek için f_min artırılması önerilir)")
+        else:
+            lines.append(f"Standard: ISO 17636-2:2022 {tbl} (Basic Spatial Resolution)")
+            lines.append(f"Minimum Resolution: Maximum SRb = {max_srb:.0f} µm (u_d = 2·SRb = {2*float(max_srb):.0f} µm)")
+            if ratio <= 2.0:
+                lines.append(f"Annex F Check: Ug / SRb = {ratio:.2f} <= 2.0 (Detector and geometric unsharpness balanced)")
+            else:
+                lines.append(f"Annex F Compensation: Ug / SRb = {ratio:.2f} > 2.0 (Increasing f_min recommended to compensate detector unsharpness)")
+
+    return "\n".join(lines)
+
+
+def format_u_max_provenance(values, trans):
+    """Localized breakdown of maximum tube voltage and Level 3 override note."""
+    if not values:
+        return ""
+    lang = getattr(trans, "language", "tr") if not isinstance(trans, dict) else trans.get("language", "tr")
+    tr = (lang == "tr")
+
+    source = values.get("source", "x_ray")
+    if source != "x_ray":
+        return trans.get("na", "N/A") if hasattr(trans, "get") else "N/A"
+
+    u_max = values.get("u_max")
+    input_kv = values.get("input_kv")
+    material = values.get("material", "steel")
+    w_nom = values.get("w_nom", 0.0)
+    lvl3 = values.get("lvl3") or {}
+    voltage_override = lvl3.get("voltage_override", False)
+
+    lines = []
+    if tr:
+        lines.append(f"Standart: ISO 17636-1:2022 Şekil 1 / Çizelge 1 & Ek C ({material}, w_nom={w_nom:.1f} mm)")
+        if u_max is not None:
+            lines.append(f"Azami İzin Verilen Gerilim: U_max = {u_max:.0f} kV")
+        if input_kv is not None and u_max is not None:
+            if input_kv > u_max:
+                if voltage_override:
+                    lines.append(f"Seviye 3 Onayı (Voltage Override): Uygulanan {input_kv:.0f} kV > {u_max:.0f} kV (Seviye 3 onayı ile izin verildi).")
+                else:
+                    lines.append(f"DURUM: Uygulanan voltaj ({input_kv:.0f} kV) U_max sınırını ({u_max:.0f} kV) aşıyor!")
+            else:
+                lines.append(f"DURUM: Uygulanan voltaj ({input_kv:.0f} kV) ≤ U_max ({u_max:.0f} kV) (Standart sınırı içinde).")
+    else:
+        lines.append(f"Standard: ISO 17636-1:2022 Figure 1 / Table 1 & Annex C ({material}, w_nom={w_nom:.1f} mm)")
+        if u_max is not None:
+            lines.append(f"Maximum Allowed Voltage: U_max = {u_max:.0f} kV")
+        if input_kv is not None and u_max is not None:
+            if input_kv > u_max:
+                if voltage_override:
+                    lines.append(f"Level 3 Approval (Voltage Override): Applied {input_kv:.0f} kV > {u_max:.0f} kV (Approved by Level 3 authority).")
+                else:
+                    lines.append(f"STATUS: Applied voltage ({input_kv:.0f} kV) exceeds U_max limit ({u_max:.0f} kV)!")
+            else:
+                lines.append(f"STATUS: Applied voltage ({input_kv:.0f} kV) <= U_max ({u_max:.0f} kV) (Within standard limit).")
+
+    return "\n".join(lines)
+
+
+def format_ug_provenance(values, trans):
+    """Localized breakdown of geometric unsharpness formula, limit, and Annex F ratio."""
+    if not values:
+        return ""
+    lang = getattr(trans, "language", "tr") if not isinstance(trans, dict) else trans.get("language", "tr")
+    tr = (lang == "tr")
+
+    d = values.get("d", 2.0)
+    b = values.get("b_dist", 0.0)
+    sfd = values.get("sfd", 600.0)
+    ug = values.get("ug", 0.0)
+    ug_limit = values.get("ug_limit")
+    ug_ok = values.get("ug_ok")
+    standard = values.get("standard", "iso")
+    f_source = max(1.0, sfd - b)
+
+    lines = []
+    if tr:
+        lines.append(f"Formül: Ug = d · b / f = d · b / (SFD − b)")
+        lines.append(f"Değişkenler: d = {d:.1f} mm, b = {b:.1f} mm, f = {f_source:.1f} mm (SFD = {sfd:.0f} mm)")
+        lines.append(f"Hesaplanan Değer: Ug = {d:.1f} × {b:.1f} / {f_source:.1f} = {ug:.3f} mm")
+        if ug_limit is not None:
+            std_name = "ASME Sec V Art 2 T-274.2" if standard == "asme" else "ISO 17636"
+            lines.append(f"Limit ({std_name}): Ug,azami = {ug_limit:.2f} mm")
+            status_txt = "UYGUN (Ug <= Ug,azami)" if ug_ok else "UYGUN DEĞİL (Ug > Ug,azami)"
+            lines.append(f"Değerlendirme: {status_txt}")
+    else:
+        lines.append(f"Formula: Ug = d · b / f = d · b / (SFD - b)")
+        lines.append(f"Variables: d = {d:.1f} mm, b = {b:.1f} mm, f = {f_source:.1f} mm (SFD = {sfd:.0f} mm)")
+        lines.append(f"Calculated Value: Ug = {d:.1f} × {b:.1f} / {f_source:.1f} = {ug:.3f} mm")
+        if ug_limit is not None:
+            std_name = "ASME Sec V Art 2 T-274.2" if standard == "asme" else "ISO 17636"
+            lines.append(f"Limit ({std_name}): Ug,max = {ug_limit:.2f} mm")
+            status_txt = "COMPLIANT (Ug <= Ug,max)" if ug_ok else "NON-COMPLIANT (Ug > Ug,max)"
+            lines.append(f"Evaluation: {status_txt}")
+
+    return "\n".join(lines)
+
 
 
 def format_exposures_provenance(prov, trans):
@@ -736,6 +1254,15 @@ class CalculationEngine:
             "active": active_source,
             "is_panoramic": is_panoramic,
             "candidates": candidates,
+            "sfd_applied": sfd,
+            "sfd_min": sfd_min,
+            "b": b_geom,
+            "f_min": f_min,
+            "dwsi_physical_min": dwsi_physical_min,
+            "coverage_min": coverage_min,
+            "is_digital": is_digital,
+            "receptor_size": receptor_size,
+            "lvl3_sfd_comp": bool(lvl3.get("sfd_comp")) if lvl3 else False,
         }
 
         ug = calc.calculate_geometric_unsharpness_from_sfd(d, b_geom, sfd)
@@ -759,7 +1286,14 @@ class CalculationEngine:
             "factor": l3_factor,
             "b": b_geom,
             "d": d,
+            "t": t,
+            "b_rule_applied": b_rule_applied,
+            "f_min_star": f_min_star,
+            "ci_factor": ci_factor,
+            "testing_class": testing_class,
+            "geometry": geometry,
             "is_planar": is_planar,
+            "is_digital": is_digital,
         }
 
         return {
@@ -1388,6 +1922,9 @@ class CalculationEngine:
             srb_for_annex_f = f.get("app_srb") or max_srb_req or 0.0
             annex_f_req = calc.calculate_annex_f_fmin(
                 d, geo["b_dist"], srb_for_annex_f, testing_class)
+            geo["f_min_provenance"]["annex_f_req"] = annex_f_req
+            geo["f_min_provenance"]["annex_f_srb"] = srb_for_annex_f
+            geo["f_min_provenance"]["annex_f_compensated"] = bool(annex_f_req and annex_f_req > f_min + 1e-9)
             if annex_f_req is None:
                 if trans.language == "tr":
                     warnings.append(
@@ -1720,6 +2257,12 @@ class CalculationEngine:
             calculated["required_density"] = required_density
             calculated["max_density"] = 4.0
 
+        geo["sfd_min_provenance"]["sfd_applied"] = sfd
+        geo["sfd_min_provenance"]["sfd_min"] = sfd_min
+        geo["sfd_min_provenance"]["sfd_comp_target"] = sfd_comp_target
+        geo["sfd_min_provenance"]["time_multiplier"] = time_multiplier
+        geo["sfd_min_provenance"]["lvl3_sfd_comp"] = bool(lvl3.get("sfd_comp")) if lvl3 else False
+
         # Provenance for the PDF/screen explanations.
         calculated["sfd_min_provenance"] = geo["sfd_min_provenance"]
         calculated["exposures_provenance"] = exposures_prov
@@ -1828,6 +2371,41 @@ class CalculationEngine:
             "film_overlap": overlap_mm,
             "suggestions": suggestions,
         }
+
+        values["lvl3"] = lvl3
+        values["table_name"] = table_name
+
+        f_min_prov_text = format_f_min_provenance(geo["f_min_provenance"], trans)
+        sfd_min_prov_text = format_sfd_provenance(geo["sfd_min_provenance"], trans)
+        single_wire_prov_text = format_single_wire_iqi_provenance(values, trans)
+        duplex_prov_text = format_duplex_iqi_provenance(values, trans)
+        quality_target_prov_text = format_quality_target_provenance(values, trans)
+        detector_quality_prov_text = format_detector_quality_provenance(values, trans)
+        u_max_prov_text = format_u_max_provenance(values, trans)
+        ug_prov_text = format_ug_provenance(values, trans)
+        exposures_prov_text = format_exposures_provenance(exposures_prov, trans)
+
+        values["f_min_provenance_text"] = f_min_prov_text
+        values["sfd_min_provenance_text"] = sfd_min_prov_text
+        values["single_wire_iqi_provenance_text"] = single_wire_prov_text
+        values["duplex_iqi_provenance_text"] = duplex_prov_text
+        values["quality_target_provenance_text"] = quality_target_prov_text
+        values["detector_quality_provenance_text"] = detector_quality_prov_text
+        values["u_max_provenance_text"] = u_max_prov_text
+        values["ug_provenance_text"] = ug_prov_text
+        values["req_exposures_provenance_text"] = exposures_prov_text
+        values["calc_time_provenance_text"] = exposure_time_prov_text
+
+        calculated["f_min_provenance_text"] = f_min_prov_text
+        calculated["sfd_min_provenance_text"] = sfd_min_prov_text
+        calculated["single_wire_iqi_provenance_text"] = single_wire_prov_text
+        calculated["duplex_iqi_provenance_text"] = duplex_prov_text
+        calculated["quality_target_provenance_text"] = quality_target_prov_text
+        calculated["detector_quality_provenance_text"] = detector_quality_prov_text
+        calculated["u_max_provenance_text"] = u_max_prov_text
+        calculated["ug_provenance_text"] = ug_prov_text
+        calculated["req_exposures_provenance_text"] = exposures_prov_text
+        calculated["calc_time_provenance_text"] = exposure_time_prov_text
 
         return {
             "calculated": calculated,

@@ -641,14 +641,14 @@ export default function App() {
   const exportPreset = () =>
     downloadJson("rt_preset.json", {
       type: "radiography_preset",
-      version: pyClient.version ?? "2.0.1",
+      version: pyClient.version ?? "2.0.2",
       state: formToDesktopState(form, reportInfo, pipeData, lang),
     });
 
   const exportProject = () =>
     downloadJson("rt_project.json", {
       type: "radiography_project",
-      version: pyClient.version ?? "2.0.1",
+      version: pyClient.version ?? "2.0.2",
       state: formToDesktopState(form, reportInfo, pipeData, lang),
       calculated: result?.calculated ?? {},
       warnings: (result?.warnings ?? []).join("\n"),
@@ -2281,19 +2281,17 @@ export default function App() {
                   testId={`output-${key}`}
                   label={outputLabel(key)}
                   value={result?.display[key] ?? "-"}
-                  tooltip={
-                    key === "sfd_min" && provenanceText
-                      ? `${strings[`tt_${key}`] ?? ""} ${provenanceText}`.trim()
-                      : key === "f_min" && fMinProvenanceText
-                        ? `${strings[`tt_${key}`] ?? ""} ${fMinProvenanceText}`.trim()
-                        : key === "req_exposures" && exposuresProvenanceText
-                          ? `${strings[`tt_${key}`] ?? ""} ${exposuresProvenanceText}`.trim()
-                          : key === "calc_time" && exposureTimeProvenanceText
-                            ? `${strings[`tt_${key}`] ?? ""}\n${exposureTimeProvenanceText}`.trim()
-                            : key === "exposures_panel"
-                              ? (strings[digital ? "tt_exposures_panel" : "tt_exposures_film"] ?? "")
-                              : strings[`tt_${key}`]
-                  }
+                  tooltip={(() => {
+                    const dynamicProv = result?.values?.[`${key}_provenance_text`] as string | undefined;
+                    if (dynamicProv) {
+                      const base = strings[`tt_${key}`] ?? "";
+                      return `${base}\n\n${dynamicProv}`.trim();
+                    }
+                    if (key === "exposures_panel") {
+                      return strings[digital ? "tt_exposures_panel" : "tt_exposures_film"] ?? "";
+                    }
+                    return strings[`tt_${key}`];
+                  })()}
                 />
               ))}
             </Group>
@@ -2691,14 +2689,14 @@ export default function App() {
         {showAbout && (
           <AboutModal
             t={t}
-            currentVersion={pyClient.version ?? "2.0.1"}
+            currentVersion={pyClient.version ?? "2.0.2"}
             onClose={() => setShowAbout(false)}
           />
         )}
         {showUpdates && (
           <UpdateModal
             t={t}
-            currentVersion={pyClient.version ?? "2.0.1"}
+            currentVersion={pyClient.version ?? "2.0.2"}
             onClose={() => setShowUpdates(false)}
           />
         )}
@@ -2919,7 +2917,7 @@ interface AboutModalProps {
   currentVersion?: string;
 }
 
-function AboutModal({ t, onClose, currentVersion = "2.0.1" }: AboutModalProps) {
+function AboutModal({ t, onClose, currentVersion = "2.0.2" }: AboutModalProps) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal about-modal" onClick={(e) => e.stopPropagation()}>
@@ -2991,7 +2989,7 @@ interface UpdateModalProps {
   currentVersion?: string;
 }
 
-function UpdateModal({ t, onClose, currentVersion = "2.0.1" }: UpdateModalProps) {
+function UpdateModal({ t, onClose, currentVersion = "2.0.2" }: UpdateModalProps) {
   const [updateState, setUpdateState] = useState<{
     status: "checking" | "up_to_date" | "available" | "error";
     latestVersion?: string;
