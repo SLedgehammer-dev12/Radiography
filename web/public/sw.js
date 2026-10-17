@@ -7,7 +7,7 @@
  */
 
 const BASE = new URL(self.registration.scope).pathname; // "/" or "/Radiography/"
-const CACHE = "radiography-v2.0.3";
+const CACHE = "radiography-v2.0.4";
 
 const CORE_ASSETS = [
   `${BASE}index.html`,
@@ -70,20 +70,28 @@ self.addEventListener("fetch", (event) => {
     url.pathname === BASE ||
     url.pathname.endsWith("/index.html");
 
-  // Navigation: network-first so a freshly built app is always served when
-  // online; the cache is only a fallback for offline use.
-  if (isNavigation) {
+  // Navigation or unhashed Python/data assets: network-first so freshly updated
+  // code and calculation logic are always served immediately when online.
+  const isDynamicAsset =
+    isNavigation ||
+    url.pathname.includes("/python/") ||
+    url.pathname.endsWith("/files.json") ||
+    url.pathname.endsWith("/bridge.py");
+
+  if (isDynamicAsset) {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put(request, copy));
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE).then((cache) => cache.put(request, copy));
+          }
           return response;
         })
         .catch(() =>
           caches
             .match(request)
-            .then((cached) => cached || caches.match(`${BASE}index.html`)),
+            .then((cached) => cached || (isNavigation ? caches.match(`${BASE}index.html`) : undefined)),
         ),
     );
     return;
