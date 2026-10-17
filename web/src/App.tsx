@@ -1294,6 +1294,7 @@ export default function App() {
                 !result.values.dwdi_coverage.is_sufficient && (
                   <div
                     className="field-help warn"
+                    role="alert"
                     style={{
                       color: "var(--color-warn, #d97706)",
                       fontWeight: 600,

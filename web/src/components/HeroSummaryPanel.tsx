@@ -449,6 +449,7 @@ export function HeroSummaryPanel({
               !dwdiCoverage.is_sufficient && (
                 <div
                   className="hero-alert-banner"
+                  role="alert"
                   style={{
                     color: "var(--color-warn, #d97706)",
                     fontWeight: 600,
