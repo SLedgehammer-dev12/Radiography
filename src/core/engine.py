@@ -148,49 +148,61 @@ def format_f_min_provenance(prov, trans):
     testing_class = prov.get("testing_class", "class_b")
     f_base = prov.get("base", 0.0)
     f_final = prov.get("value", 0.0)
+    f_iso = prov.get("f_min_iso", f_base)
+    f_asme = prov.get("f_min_asme", f_base)
+    f_iso_base = prov.get("f_min_iso_base", f_iso)
+    f_asme_base = prov.get("f_min_asme_base", f_asme)
     b_rule = prov.get("b_rule_applied", False)
     f_star = prov.get("f_min_star")
     ci = prov.get("ci_factor")
     formula_key = prov.get("formula_key", "")
     formula_lbl = trans.get(formula_key) if hasattr(trans, "get") and formula_key else formula_key
+    ug_limit = prov.get("ug_limit_asme") or (0.51 if t <= 50.8 else (0.76 if t <= 76.2 else (1.02 if t <= 101.6 else 1.78)))
 
     lines = []
     base_label = f"Temel f_min = {f_base:.1f} mm [{formula_lbl}]" if tr else f"Base f_min = {f_base:.1f} mm [{formula_lbl}]"
     lines.append(base_label)
 
-    if standard == "asme":
-        ug_limit = 0.51 if t <= 50.8 else (0.76 if t <= 76.2 else (1.02 if t <= 101.6 else 1.78))
-        if tr:
-            lines.append(f"Formül: ASME Sec V Art 2 T-274.2 [f_min = d · b / Ug_limit]")
-            lines.append(f"Değişkenler: d = {d:.1f} mm, b = {b:.1f} mm, Ug_limit = {ug_limit:.2f} mm (t = {t:.1f} mm)")
-            lines.append(f"Hesaplama: {d:.1f} × {b:.1f} / {ug_limit:.2f} = {f_base:.1f} mm")
-        else:
-            lines.append(f"Formula: ASME Sec V Art 2 T-274.2 [f_min = d · b / Ug_limit]")
-            lines.append(f"Variables: d = {d:.1f} mm, b = {b:.1f} mm, Ug_limit = {ug_limit:.2f} mm (t = {t:.1f} mm)")
-            lines.append(f"Calculation: {d:.1f} × {b:.1f} / {ug_limit:.2f} = {f_base:.1f} mm")
-    elif f_star is not None and ci is not None:
-        c_val = 7.5 if testing_class == "class_a" else 15.0
-        if tr:
-            lines.append(f"Formül: ISO 17636-2 Formül (13) Planar Dedektör [f_min* = f_min(b=t) · Ci]")
-            lines.append(f"Değişkenler: d = {d:.1f} mm, b = {b:.1f} mm, t = {t:.1f} mm (b/t > 1.2), C = {c_val:.1f}, Ci = {ci:.3f}")
-        else:
-            lines.append(f"Formula: ISO 17636-2 Formula (13) Planar Detector [f_min* = f_min(b=t) · Ci]")
-            lines.append(f"Variables: d = {d:.1f} mm, b = {b:.1f} mm, t = {t:.1f} mm (b/t > 1.2), C = {c_val:.1f}, Ci = {ci:.3f}")
+    # Dynamic summary of both calculated values
+    if tr:
+        lines.append(f"Dinamik Hesaplanan Değerler: ISO = {f_iso:.1f} mm | ASME = {f_asme:.1f} mm")
     else:
-        c_val = 7.5 if testing_class == "class_a" else 15.0
-        b_note = (" (b < 1.2t kuralı: b = t)" if b_rule else "") if tr else (" (b < 1.2t rule: b = t)" if b_rule else "")
-        std_num = "2" if prov.get("is_digital") else "1"
-        cls_lbl = "Sınıf A" if testing_class == "class_a" else "Sınıf B"
-        if not tr:
-            cls_lbl = "Class A" if testing_class == "class_a" else "Class B"
+        lines.append(f"Dynamically Calculated Values: ISO = {f_iso:.1f} mm | ASME = {f_asme:.1f} mm")
+
+    # 1. ISO 17636 Breakdown
+    c_val = 7.5 if testing_class == "class_a" else 15.0
+    cls_lbl = ("Sınıf A" if testing_class == "class_a" else "Sınıf B") if tr else ("Class A" if testing_class == "class_a" else "Class B")
+    std_num = "2" if prov.get("is_digital") else "1"
+
+    if f_star is not None and ci is not None:
         if tr:
-            lines.append(f"Formül: ISO 17636-{std_num} Formül (2) [f_min = C · d · b^(2/3)]")
-            lines.append(f"Değişkenler: C = {c_val:.1f} ({cls_lbl}), d = {d:.1f} mm, b = {b:.1f} mm{b_note}")
-            lines.append(f"Hesaplama: {c_val:.1f} × {d:.1f} × ({b:.1f})^(2/3) = {f_base:.1f} mm")
+            lines.append(f"1) Formül: ISO 17636-2 Formül (13) Planar Dedektör [f_min* = f_min(b=t) · Ci]")
+            lines.append(f"   • Değişkenler: C = {c_val:.1f} ({cls_lbl}), d = {d:.1f} mm, b = {b:.1f} mm, t = {t:.1f} mm (b/t > 1.2), Ci = {ci:.3f}")
+            lines.append(f"   • Hesaplama: [{c_val:.1f} × {d:.1f} × ({t:.1f})^(2/3)] × {ci:.3f} = {f_iso_base:.1f} mm")
         else:
-            lines.append(f"Formula: ISO 17636-{std_num} Formula (2) [f_min = C · d · b^(2/3)]")
-            lines.append(f"Variables: C = {c_val:.1f} ({cls_lbl}), d = {d:.1f} mm, b = {b:.1f} mm{b_note}")
-            lines.append(f"Calculation: {c_val:.1f} × {d:.1f} × ({b:.1f})^(2/3) = {f_base:.1f} mm")
+            lines.append(f"1) Formula: ISO 17636-2 Formula (13) Planar Detector [f_min* = f_min(b=t) · Ci]")
+            lines.append(f"   • Variables: C = {c_val:.1f} ({cls_lbl}), d = {d:.1f} mm, b = {b:.1f} mm, t = {t:.1f} mm (b/t > 1.2), Ci = {ci:.3f}")
+            lines.append(f"   • Calculation: [{c_val:.1f} × {d:.1f} × ({t:.1f})^(2/3)] × {ci:.3f} = {f_iso_base:.1f} mm")
+    else:
+        b_note = (" (b < 1.2t kuralı: b = t)" if b_rule else "") if tr else (" (b < 1.2t rule: b = t)" if b_rule else "")
+        if tr:
+            lines.append(f"1) Formül: ISO 17636-{std_num} Formül (2) [f_min = C · d · b^(2/3)]")
+            lines.append(f"   • Değişkenler: C = {c_val:.1f} ({cls_lbl}), d = {d:.1f} mm, b = {b:.1f} mm{b_note}")
+            lines.append(f"   • Hesaplama: {c_val:.1f} × {d:.1f} × ({b:.1f})^(2/3) = {f_iso_base:.1f} mm")
+        else:
+            lines.append(f"1) Formula: ISO 17636-{std_num} Formula (2) [f_min = C · d · b^(2/3)]")
+            lines.append(f"   • Variables: C = {c_val:.1f} ({cls_lbl}), d = {d:.1f} mm, b = {b:.1f} mm{b_note}")
+            lines.append(f"   • Calculation: {c_val:.1f} × {d:.1f} × ({b:.1f})^(2/3) = {f_iso_base:.1f} mm")
+
+    # 2. ASME Sec V Breakdown
+    if tr:
+        lines.append(f"2) Formül: ASME Sec V Art 2 T-274.2 [f_min = d · b / Ug_limit]")
+        lines.append(f"   • Değişkenler: d = {d:.1f} mm, b = {b:.1f} mm, Ug_limit = {ug_limit:.2f} mm (t = {t:.1f} mm)")
+        lines.append(f"   • Hesaplama: {d:.1f} × {b:.1f} / {ug_limit:.2f} = {f_asme_base:.1f} mm")
+    else:
+        lines.append(f"2) Formula: ASME Sec V Art 2 T-274.2 [f_min = d · b / Ug_limit]")
+        lines.append(f"   • Variables: d = {d:.1f} mm, b = {b:.1f} mm, Ug_limit = {ug_limit:.2f} mm (t = {t:.1f} mm)")
+        lines.append(f"   • Calculation: {d:.1f} × {b:.1f} / {ug_limit:.2f} = {f_asme_base:.1f} mm")
 
     # Exceptions & Reductions
     reductions = []
@@ -210,7 +222,8 @@ def format_f_min_provenance(prov, trans):
         else:
             lines.append(f"Annex F Compensation: f_min increased to {af_req:.1f} mm to compensate detector unsharpness (SRb = {srb_val:.0f} µm).")
 
-    lines.append(f"Sonuç: Geçerli f_min = {f_final:.1f} mm" if tr else f"Result: Governing f_min = {f_final:.1f} mm")
+    std_lbl = "ASME Sec V" if standard == "asme" else f"ISO 17636-{std_num}"
+    lines.append(f"Sonuç: Seçili Standart ({std_lbl}) uyarınca Geçerli f_min = {f_final:.1f} mm" if tr else f"Result: Governing f_min per selected standard ({std_lbl}) = {f_final:.1f} mm")
     return "\n".join(lines)
 
 
@@ -1178,9 +1191,7 @@ class CalculationEngine:
         b_eff, b_rule_applied = calc.get_effective_b(b_dist, t, cap=cap_for_b)
         b_geom = b_dist if is_planar else (b_eff if (b_rule_applied or b_eff > b_dist) else max(b_dist, b_eff if cap_exceeds_rule else b_dist))
 
-        f_min_asme_base = None
-        if standard == "asme":
-            f_min_asme_base = calc.calculate_asme_f_min(d, b_geom, t)
+        f_min_asme_base = calc.calculate_asme_f_min(d, b_geom, t)
 
         if is_digital:
             panel_w = f["panel_width"]
@@ -1206,8 +1217,9 @@ class CalculationEngine:
         l3_factor = (0.8 if lvl3_dw else 1.0) * (0.5 if lvl3_central else 1.0)
 
         f_min_iso = f_min_iso_base * l3_factor
-        f_min_asme = f_min_asme_base * l3_factor if f_min_asme_base is not None else None
-        f_min = f_min_asme if standard == "asme" else f_min_iso
+        f_min_asme_calc = f_min_asme_base * l3_factor
+        f_min_asme = f_min_asme_calc if standard == "asme" else None
+        f_min = f_min_asme_calc if standard == "asme" else f_min_iso
 
         sfd_min_iso_b = f_min + b_geom
         sfd_min = sfd_min_iso_b
@@ -1284,6 +1296,11 @@ class CalculationEngine:
         f_min_provenance = {
             "base": f_min_base,
             "value": f_min,
+            "f_min_iso": f_min_iso,
+            "f_min_asme": f_min_asme_calc,
+            "f_min_iso_base": f_min_iso_base,
+            "f_min_asme_base": f_min_asme_base,
+            "ug_limit_asme": calc.get_asme_ug_limit(t),
             "formula_key": f_min_formula,
             "standard": standard,
             "l3_dw": lvl3_dw,
@@ -1308,6 +1325,7 @@ class CalculationEngine:
             "f_min": f_min,
             "f_min_iso": f_min_iso,
             "f_min_asme": f_min_asme,
+            "f_min_asme_calc": f_min_asme_calc,
             "f_min_iso_base": f_min_iso_base,
             "f_min_asme_base": f_min_asme_base,
             "sfd_min": sfd_min,
@@ -2185,7 +2203,7 @@ class CalculationEngine:
             "w_nom": f"{w_nom:.2f} mm",
             "w_eff": f"{w_eff:.2f} mm",
             "u_max": f"{u_max:.1f} kV" if source == "x_ray" else "N/A",
-            "f_min": f"{f_min_iso:.1f} mm",
+            "f_min": f"{f_min:.1f} mm",
             "f_min_asme": f"{f_min_asme:.1f} mm" if (standard == "asme" and f_min_asme is not None) else "N/A",
             "sfd_min": f"{sfd_min:.1f} mm",
             "ug": f"{ug:.3f} mm",
@@ -2311,7 +2329,7 @@ class CalculationEngine:
             "u_max": u_max,
             "f_min": f_min,
             "f_min_iso": f_min_iso,
-            "f_min_asme": f_min_asme,
+            "f_min_asme": geo.get("f_min_asme_calc", f_min_asme or 0.0),
             "sfd_min": sfd_min,
             "sdd_min": sdd_min,
             "coverage_min": coverage_min,

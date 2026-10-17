@@ -156,6 +156,11 @@ cd web && npx playwright test           # 34 passed (22 + 3 mobile + 9 feedback)
   - **Collapsible Input Sub-Sections**: Separated the monolithic 400-line inputs column into 3 semantic collapsible `<Group>` blocks (`1. Boru ve Kaynak Geometrisi`, `2. Radyasyon ve Çekim Tekniği`, `3. Standart ve IQI Şartları`) plus applied parameters, significantly reducing vertical scrolling on laptops and tablets.
   - **Copy to Clipboard & Inspection Summary**: Added "📋 Özeti Kopyala" (copies full standardized RT field notes to clipboard) and click-to-copy handlers on calculated hero values with success toast notifications.
   - Verified with 35 Playwright E2E tests, 0 `oxlint` errors, and clean TypeScript build.
+- **Dual Dynamic $f_{\min}$ Calculation & Step-by-Step Info Modal**:
+  - Concurrently calculates both **ISO 17636-1/2** ($f_{\min} = C \cdot d \cdot b^{2/3}$ or Formula 13 planar $f_{\min}^* = f_{\min}(b=t) \cdot C_i$) and **ASME Sec V Art 2 T-274.2** ($f_{\min} = d \cdot b / U_{g,\text{limit}}$).
+  - Wires an accessible `<InfoTip>` directly on the $f_{\min}$ hero card opening an interactive dialog containing the dynamic values line, step-by-step arithmetic substitutions ($C \times d \times b^{2/3}$ and $d \times b / U_{g,\text{limit}}$), active Level 3 exceptions (%20 DW / %50 central reduction), and governing standard resolution.
+  - Displays dual ISO & ASME metrics simultaneously in `.hero-sub` (`ISO: ... mm | ASME: ... mm • b = ... mm`) with the governing standard active badge (`ISO ✓` or `ASME ✓`).
+  - Passes all 925 Python tests and 35 Playwright E2E tests.
 
 ## Pending / next
 

@@ -85,6 +85,8 @@ export function HeroSummaryPanel({
         l3_central?: boolean;
       }
     | undefined;
+  const fMinDetail =
+    (result?.values?.f_min_provenance_text as string | undefined) || "";
   const fMinProvenanceText = (() => {
     if (!fMinProvenance) return "";
     let text = t("fmin_prov_base", fMinProvenance.base, t(fMinProvenance.formula_key));
@@ -315,15 +317,49 @@ export function HeroSummaryPanel({
         </div>
         <div className="hero-card">
           <div className="hero-main">
-            <div className="hero-label">{t("f_min").replace(/:\s*$/, "")}</div>
-            {fMinProvenanceText && (
-              <div className="hero-sub">
-                {fMinProvenanceText}
-                {result
-                  ? ` • b = ${result.values.b_dist.toFixed(1)} mm (b_eff = ${result.values.b_eff.toFixed(1)} mm)`
-                  : ""}
-              </div>
-            )}
+            <div className="hero-label">
+              <span>{t("f_min").replace(/:\s*$/, "")}</span>
+              {fMinDetail && (
+                <InfoTip
+                  text={fMinDetail}
+                  title={t("f_min").replace(/:\s*$/, "")}
+                />
+              )}
+            </div>
+            <div className="hero-sub">
+              {fMinProvenanceText}
+              {result &&
+              result.values?.f_min_iso != null &&
+              result.values?.f_min_asme != null ? (
+                <>
+                  {" • "}
+                  <span
+                    title={
+                      lang === "tr"
+                        ? "ISO 17636-1/2 asgari odak-nesne mesafesi"
+                        : "ISO 17636-1/2 minimum source-to-object distance"
+                    }
+                  >
+                    ISO: <strong>{Number(result.values.f_min_iso).toFixed(1)} mm</strong>
+                  </span>
+                  {" | "}
+                  <span
+                    title={
+                      lang === "tr"
+                        ? "ASME Sec V Art 2 T-274.2 asgari mesafesi"
+                        : "ASME Sec V Art 2 T-274.2 minimum distance"
+                    }
+                  >
+                    ASME: <strong>{Number(result.values.f_min_asme).toFixed(1)} mm</strong>
+                  </span>
+                  {` • b = ${Number(result.values.b_dist ?? 0).toFixed(1)} mm`}
+                </>
+              ) : (
+                result
+                  ? ` • b = ${Number(result.values?.b_dist ?? 0).toFixed(1)} mm`
+                  : ""
+              )}
+            </div>
           </div>
           <div className="hero-right">
             <div
@@ -338,6 +374,11 @@ export function HeroSummaryPanel({
             >
               {result?.display.f_min ?? "-"}
             </div>
+            {result && (
+              <span className="hero-status ok">
+                {isAsme ? "ASME" : "ISO"} ✓
+              </span>
+            )}
           </div>
         </div>
         <div className="hero-card">
