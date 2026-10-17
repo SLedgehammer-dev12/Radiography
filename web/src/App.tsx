@@ -1271,6 +1271,45 @@ export default function App() {
                   )}
                 </>
               )}
+              {digital && (
+                <div className="field-row-2">
+                  <LengthField
+                    label={t("panel_width")}
+                    value={form.panel_width}
+                    min={1}
+                    max={2000}
+                    onChange={(value) => patch("panel_width", value ?? 200)}
+                  />
+                  <LengthField
+                    label={t("panel_height")}
+                    value={form.panel_height}
+                    min={1}
+                    max={2000}
+                    onChange={(value) => patch("panel_height", value ?? 200)}
+                  />
+                </div>
+              )}
+              {dwdi &&
+                result?.values?.dwdi_coverage &&
+                !result.values.dwdi_coverage.is_sufficient && (
+                  <div
+                    className="field-help warn"
+                    style={{
+                      color: "var(--color-warn, #d97706)",
+                      fontWeight: 600,
+                      marginTop: "6px",
+                      padding: "6px 10px",
+                      background: "rgba(217, 119, 6, 0.12)",
+                      borderRadius: "4px",
+                      border: "1px solid rgba(217, 119, 6, 0.3)",
+                      lineHeight: 1.35,
+                    }}
+                  >
+                    ⚠ {lang === "tr"
+                      ? `Girilen ${analog ? "film" : "panel"} boyutu (${result.values.dwdi_coverage.available_across} mm), borunun büyütülmüş izdüşümünü (${result.values.dwdi_coverage.w_min_req.toFixed(1)} mm) kurtarmıyor! Kesilme olmaması için en az ${result.values.dwdi_coverage.w_min_req.toFixed(1)} mm gereklidir.`
+                      : `Entered ${analog ? "film" : "panel"} size (${result.values.dwdi_coverage.available_across} mm) does not cover projected pipe image (${result.values.dwdi_coverage.w_min_req.toFixed(1)} mm)! Minimum ${result.values.dwdi_coverage.w_min_req.toFixed(1)} mm required.`}
+                  </div>
+                )}
             </Group>
 
             <Group title={t("standards_iqi_section")}>
@@ -1911,14 +1950,14 @@ export default function App() {
                     <LengthField
                       label={t("panel_width")}
                       value={form.panel_width}
-                      min={10}
+                      min={1}
                       max={2000}
                       onChange={(value) => patch("panel_width", value ?? 200)}
                     />
                     <LengthField
                       label={t("panel_height")}
                       value={form.panel_height}
-                      min={10}
+                      min={1}
                       max={2000}
                       onChange={(value) => patch("panel_height", value ?? 200)}
                     />

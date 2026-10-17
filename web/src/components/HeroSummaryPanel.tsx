@@ -444,6 +444,24 @@ export function HeroSummaryPanel({
             {exposuresProvenanceText && (
               <div className="hero-sub">{exposuresProvenanceText}</div>
             )}
+            {dwdiCoverage &&
+              dwdiCoverage.available_across > 0 &&
+              !dwdiCoverage.is_sufficient && (
+                <div
+                  className="hero-alert-banner"
+                  style={{
+                    color: "var(--color-warn, #d97706)",
+                    fontWeight: 600,
+                    fontSize: "0.82rem",
+                    marginTop: "6px",
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {lang === "tr"
+                    ? `⚠ Boyut Yetersiz: Boru izdüşümü (${dwdiCoverage.w_min_req.toFixed(1)} mm) seçilen kaset/panel boyutunu (${dwdiCoverage.available_across.toFixed(0)} mm) aşıyor! En az ${dwdiCoverage.w_min_req.toFixed(1)} mm gerekir.`
+                    : `⚠ Size Insufficient: Pipe projection (${dwdiCoverage.w_min_req.toFixed(1)} mm) exceeds receptor size (${dwdiCoverage.available_across.toFixed(0)} mm)! Minimum ${dwdiCoverage.w_min_req.toFixed(1)} mm required.`}
+                </div>
+              )}
           </div>
           <div className="hero-right">
             <div

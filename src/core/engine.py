@@ -2644,6 +2644,13 @@ class CalculationEngine:
             "t": f["t"],
             "od": f["od"],
             "std_figure": f.get("std_figure"),
+            "film_width": f.get("film_width"),
+            "film_height": f.get("film_height"),
+            "panel_width": f.get("panel_width"),
+            "panel_height": f.get("panel_height"),
+            "bgap": f.get("bgap"),
+            "cap": f.get("cap"),
+            "sfd": f.get("sfd"),
         }
         applied = {
             "applied_kv": f["app_kv"],
