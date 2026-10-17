@@ -664,6 +664,9 @@ def format_exposure_time_provenance(prov, trans):
 
     if method == "rfactor":
         film_key = prov.get("film_key", "AA400")
+        film_brand = prov.get("film_brand", "Carestream")
+        chart_film_class = prov.get("chart_film_class", "")
+        cls_tag = f", {chart_film_class}" if chart_film_class else ""
         r_raw = prov.get("r_factor_raw", 0.46)
         r_eff = prov.get("r_factor_eff", r_raw)
         hvl = prov.get("hvl", 13.2)
@@ -673,7 +676,7 @@ def format_exposure_time_provenance(prov, trans):
         grad = prov.get("gradient", 2.0) or 2.0
         if tr:
             parts.append(
-                f"Yöntem: Carestream R-Faktör / SCRATA Cetveli ({film_key}) | "
+                f"Yöntem: {film_brand} R-Faktör / SCRATA Cetveli ({film_key}{cls_tag}) | "
                 f"Formül: T[dk] = 60 × [R_eff × 10^((D−2)/G̅) × (SFD/1000)² × 2^(w_eq/HVL)] / (A × Γ)"
             )
             ref_txt = f", REF={ref_factor:.2f} → w_eq={w_eq:.2f} mm" if abs(ref_factor - 1.0) > 1e-3 else ""
@@ -684,7 +687,7 @@ def format_exposure_time_provenance(prov, trans):
             )
         else:
             parts.append(
-                f"Method: Carestream R-Factor / SCRATA Slide Rule ({film_key}) | "
+                f"Method: {film_brand} R-Factor / SCRATA Slide Rule ({film_key}{cls_tag}) | "
                 f"Formula: T[min] = 60 × [R_eff × 10^((D−2)/G̅) × (SFD/1000)² × 2^(w_eq/HVL)] / (A × Γ)"
             )
             ref_txt = f", REF={ref_factor:.2f} → w_eq={w_eq:.2f} mm" if abs(ref_factor - 1.0) > 1e-3 else ""
@@ -2080,9 +2083,7 @@ class CalculationEngine:
                     warnings.append(f"UYARI: Kullanılan film sınıfı ({film_class_used}) standart gereksinimini karşılamıyor! Asgari gereken: {film_class_req}")
                 else:
                     warnings.append(f"WARNING: Used film class ({film_class_used}) does not meet standard requirement! Required minimum: {film_class_req}")
-            chart_film_cls = {
-                "M100": "C2", "MX125": "C3", "T200": "C4", "AA400": "C5", "HS800": "C6",
-            }.get(chart_source)
+            chart_film_cls = getattr(self.chart_db, "FILM_CLASS_BY_MODEL", {}).get(chart_source)
             if chart_film_cls and chart_film_cls != film_class_used:
                 if trans.language == "tr":
                     warnings.append(

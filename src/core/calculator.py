@@ -1965,7 +1965,8 @@ class RTCalculator:
 
             # If in digital mode and an analog film chart was passed, redirect to digital chart
             eff_chart = chart_source
-            if tech == "digital" and chart_source in ("AA400", "MX125", "T200", "HS800", "M100", "rfactor"):
+            film_models = getattr(chart_db, "FILM_CLASS_BY_MODEL", {})
+            if tech == "digital" and (chart_source in film_models or chart_source == "rfactor"):
                 eff_chart = "dda_panel_chart" if is_dda else "cr_ips_chart"
 
             # 1) Digital CR IPS (ISO 16371-1) or DDA Panel (ASTM E2698) Chart Path
@@ -2208,9 +2209,12 @@ class RTCalculator:
                         od_for_rfactor = float(density) if (density is not None and float(density) > 0.0) else (
                             2.0 if density == 2.0 else target_od
                         )
-                        chart_film_class = {
-                            "M100": "C2", "MX125": "C3", "T200": "C4", "AA400": "C5", "HS800": "C6",
-                        }.get(resolved_film, film_class)
+                        chart_film_class = getattr(chart_db, "FILM_CLASS_BY_MODEL", {}).get(
+                            resolved_film, film_class
+                        )
+                        film_brand = getattr(chart_db, "FILM_BRAND_BY_MODEL", {}).get(
+                            resolved_film, "Carestream"
+                        )
                         chart_gradient = self.FILM_GRADIENT.get(chart_film_class, gradient)
                         result = self._calc_from_rfactor(
                             chart_db, resolved_film, source, sfd, w_eff, output_safe,
@@ -2247,6 +2251,7 @@ class RTCalculator:
                                 "sfd": sfd,
                                 "output_val": output_safe,
                                 "film_key": resolved_film,
+                                "film_brand": film_brand,
                                 "film_class": film_class,
                                 "chart_film_class": chart_film_class,
                                 "gradient": chart_gradient,
@@ -2429,12 +2434,16 @@ class RTCalculator:
     def _resolve_chart_film(self, chart_source, film_model, film_class):
         if film_model is not None:
             return film_model
-        if chart_source in ("AA400", "MX125", "T200", "HS800", "M100"):
-            return chart_source
         if ExposureChartDatabase is not None:
+            if chart_source in ExposureChartDatabase.FILM_CLASS_BY_MODEL or chart_source in ExposureChartDatabase.R_FACTOR_TABLE:
+                return chart_source
+            if chart_source == "rfactor" and film_class in ExposureChartDatabase.FILM_TO_CHART_KEY:
+                return ExposureChartDatabase.FILM_TO_CHART_KEY[film_class]
             rev_map = {v: k for k, v in ExposureChartDatabase.FILM_TO_CHART_KEY.items()}
             if film_class in rev_map:
                 return rev_map[film_class]
+        elif chart_source in ("DR50", "M100", "MX125", "T200", "AA400", "HS800"):
+            return chart_source
         return None
 
     def _calc_from_rfactor(self, chart_db, film_key, source, sfd, w, activity,

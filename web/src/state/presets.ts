@@ -14,7 +14,84 @@ export const GEOMETRIES = ["dwsi", "swsi", "dwdi_elliptic", "dwdi_super"];
 const STANDARDS = ["iso", "asme"];
 export const DETECTORS = ["cr_standard", "cr_highres", "dda_si", "dda_se", "dda_gdos"];
 const ANALOG_XRAY_CHARTS = ["model", "type_x"];
-const ANALOG_ISOTOPE_CHARTS = ["model", "AA400", "MX125", "T200", "HS800", "M100"];
+export const ANALOG_ISOTOPE_CHARTS = [
+  "model",
+  // Carestream (Kodak Industrex) — indices 1..5 preserved for desktop preset compat
+  "AA400",
+  "MX125",
+  "T200",
+  "HS800",
+  "M100",
+  "DR50",
+  // Agfa Structurix (Waygate Technologies)
+  "D7",
+  "D5",
+  "D4",
+  "D3",
+  "D2",
+  "D8",
+  // Fujifilm IX (Industrial X-Ray)
+  "IX150",
+  "IX100",
+  "IX80",
+  "IX50",
+  "IX25",
+  // Foma Fomadux
+  "R7",
+  "R5",
+  "R4",
+  "R2",
+  "R8",
+];
+export const CHART_TO_FILM_CLASS: Record<string, string> = {
+  DR50: "C1",
+  M100: "C2",
+  MX125: "C3",
+  T200: "C4",
+  AA400: "C5",
+  HS800: "C6",
+  D2: "C1",
+  D3: "C2",
+  D4: "C3",
+  D5: "C4",
+  D7: "C5",
+  D8: "C6",
+  IX25: "C1",
+  IX50: "C2",
+  IX80: "C3",
+  IX100: "C4",
+  IX150: "C5",
+  R2: "C1",
+  R4: "C3",
+  R5: "C4",
+  R7: "C5",
+  R8: "C6",
+};
+export const FILM_CLASS_LABELS: Record<string, string> = {
+  C1: "C1 — Carestream DR50 / Agfa D2 / Fuji IX25 / Foma R2",
+  C2: "C2 — Carestream M100 / Agfa D3 / Fuji IX50",
+  C3: "C3 — Carestream MX125 / Agfa D4 / Fuji IX80 / Foma R4",
+  C4: "C4 — Carestream T200 / Agfa D5 / Fuji IX100 / Foma R5",
+  C5: "C5 — Carestream AA400 / Agfa D7 / Fuji IX150 / Foma R7",
+  C6: "C6 — Carestream HS800 / Agfa D8 / Foma R8",
+};
+const BRAND_CLASS_MAP: Record<string, Record<string, string>> = {
+  carestream: { C1: "DR50", C2: "M100", C3: "MX125", C4: "T200", C5: "AA400", C6: "HS800" },
+  agfa: { C1: "D2", C2: "D3", C3: "D4", C4: "D5", C5: "D7", C6: "D8" },
+  fuji: { C1: "IX25", C2: "IX50", C3: "IX80", C4: "IX100", C5: "IX150", C6: "HS800" },
+  foma: { C1: "R2", C2: "M100", C3: "R4", C4: "R5", C5: "R7", C6: "R8" },
+};
+export function resolveFilmChartForClass(filmClass: string, currentChart?: string): string {
+  const brand =
+    currentChart?.startsWith("D") && currentChart !== "DR50"
+      ? "agfa"
+      : currentChart?.startsWith("IX")
+        ? "fuji"
+        : currentChart?.startsWith("R")
+          ? "foma"
+          : "carestream";
+  return BRAND_CLASS_MAP[brand]?.[filmClass] ?? BRAND_CLASS_MAP.carestream[filmClass] ?? "AA400";
+}
 const DIGITAL_CR_XRAY_CHARTS = ["model", "digital_xray_chart"];
 const DIGITAL_CR_ISOTOPE_CHARTS = ["model", "cr_ips_chart"];
 const DIGITAL_DDA_XRAY_CHARTS = [

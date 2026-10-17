@@ -46,7 +46,13 @@
     to compare `(kV_ref / kV)^5` against `exp((mu_cur - mu_ref) * w_eff)`; updated
     `dda_se` Co-60 R-factor to `0.065`; bidirectional `chart_source` ↔ `film_class_used`
     sync in `web/src/App.tsx` + mismatch warning in `engine.py`.
-  - Covered by 7 new regression tests in `tests/test_exposure_charts.py` and
+  - Expanded industrial NDT film catalog from 1 brand / 5 models to **4 brands / 22 models**
+    across ISO 11699-1 classes `C1`–`C6`: **Carestream** (`DR50`, `M100`, `MX125`, `T200`,
+    `AA400`, `HS800`), **Agfa Structurix** (`D2`, `D3`, `D4`, `D5`, `D7`, `D8`),
+    **Fujifilm IX** (`IX25`, `IX50`, `IX80`, `IX100`, `IX150`), and **Foma Fomadux**
+    (`R2`, `R4`, `R5`, `R7`, `R8`) with brand-preserving class/chart synchronization in
+    `web/src/state/presets.ts` and `web/src/App.tsx`.
+  - Covered by 8 new regression tests in `tests/test_exposure_charts.py` and
     `tests/test_engine.py`.
 - **DDA saturation advisory** — `dda_frame.t_frame_ideal` exposed; `engine.py`
   warns when `< 0.08 s` (reduce mA / increase SFD). Covered by
@@ -118,7 +124,7 @@
 ## Verification (re-run before continuing)
 
 ```bash
-python3 -m pytest -q                    # 922 passed, 6 skipped, 849 subtests
+python3 -m pytest -q                    # 923 passed, 6 skipped, 849 subtests
 cd web && npx tsc -b                    # clean
 cd web && npx oxlint src/               # 0 warnings, 0 errors
 cd web && npx playwright test           # 33 passed (21 + 3 mobile + 9 feedback)

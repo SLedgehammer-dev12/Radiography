@@ -542,6 +542,31 @@ class TestRTCalculatorWithCharts(unittest.TestCase):
         )
         self.assertAlmostEqual(t_custom / t_default, 1.5, places=4)
 
+    def test_multi_brand_film_catalog_and_monotonicity(self):
+        """All 22 film models across Carestream, Agfa, Fujifilm, and Foma must resolve and maintain C1->C6 exposure monotonicity per brand."""
+        brand_series = {
+            "Carestream": ["DR50", "M100", "MX125", "T200", "AA400", "HS800"],
+            "Agfa Structurix": ["D2", "D3", "D4", "D5", "D7", "D8"],
+            "Fujifilm": ["IX25", "IX50", "IX80", "IX100", "IX150"],
+            "Foma Fomadux": ["R2", "R4", "R5", "R7", "R8"],
+        }
+        for brand, models in brand_series.items():
+            prev_time = None
+            for film in models:
+                cls = self.db.FILM_CLASS_BY_MODEL[film]
+                res = self.calc.calculate_exposure_time_details(
+                    600.0, 20.0, "isotope_ir192", 40.0, 30.0, "analog",
+                    film_class=cls, chart_source=film, chart_db=self.db
+                )
+                self.assertEqual(res["provenance"]["method"], "rfactor")
+                self.assertEqual(res["provenance"]["film_key"], film)
+                self.assertEqual(res["provenance"]["film_brand"], brand)
+                self.assertEqual(res["provenance"]["chart_film_class"], cls)
+                self.assertGreater(res["time_seconds"], 0.0)
+                if prev_time is not None:
+                    self.assertLess(res["time_seconds"], prev_time)
+                prev_time = res["time_seconds"]
+
 
 if __name__ == "__main__":
     unittest.main()

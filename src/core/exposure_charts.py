@@ -15,8 +15,16 @@ def resource_path(relative_path):
 
 
 class ExposureChartDatabase:
-    # Carestream R-Factor table (R values at D=2.0)
+    # Industrial NDT Film R-Factor table (R values at D=2.0 across Carestream, Agfa, Fujifilm, Foma)
     R_FACTOR_TABLE = {
+        # Carestream (Kodak Industrex) — ISO 11699-1 C1..C6
+        "DR50": {
+            "isotope_ir192": 0.32,
+            "isotope_se75": 0.17,
+            "isotope_co60": 0.06,
+            "isotope_yb169": 0.10,
+            "isotope_tm170": 0.065,
+        },
         "M100": {
             "isotope_ir192": 0.36,
             "isotope_se75": 0.20,
@@ -52,10 +60,126 @@ class ExposureChartDatabase:
             "isotope_yb169": 0.20,
             "isotope_tm170": 0.135,
         },
+        # Agfa Structurix (Waygate Technologies) — ISO 11699-1 C1..C6
+        "D2": {
+            "isotope_ir192": 0.31,
+            "isotope_se75": 0.165,
+            "isotope_co60": 0.058,
+            "isotope_yb169": 0.095,
+            "isotope_tm170": 0.062,
+        },
+        "D3": {
+            "isotope_ir192": 0.35,
+            "isotope_se75": 0.195,
+            "isotope_co60": 0.068,
+            "isotope_yb169": 0.115,
+            "isotope_tm170": 0.078,
+        },
+        "D4": {
+            "isotope_ir192": 0.39,
+            "isotope_se75": 0.225,
+            "isotope_co60": 0.078,
+            "isotope_yb169": 0.135,
+            "isotope_tm170": 0.088,
+        },
+        "D5": {
+            "isotope_ir192": 0.42,
+            "isotope_se75": 0.26,
+            "isotope_co60": 0.096,
+            "isotope_yb169": 0.155,
+            "isotope_tm170": 0.10,
+        },
+        "D7": {
+            "isotope_ir192": 0.44,
+            "isotope_se75": 0.29,
+            "isotope_co60": 0.125,
+            "isotope_yb169": 0.17,
+            "isotope_tm170": 0.115,
+        },
+        "D8": {
+            "isotope_ir192": 0.48,
+            "isotope_se75": 0.33,
+            "isotope_co60": 0.145,
+            "isotope_yb169": 0.195,
+            "isotope_tm170": 0.13,
+        },
+        # Fujifilm IX (Industrial X-Ray) — ISO 11699-1 C1..C5
+        "IX25": {
+            "isotope_ir192": 0.33,
+            "isotope_se75": 0.175,
+            "isotope_co60": 0.062,
+            "isotope_yb169": 0.105,
+            "isotope_tm170": 0.068,
+        },
+        "IX50": {
+            "isotope_ir192": 0.37,
+            "isotope_se75": 0.205,
+            "isotope_co60": 0.072,
+            "isotope_yb169": 0.125,
+            "isotope_tm170": 0.082,
+        },
+        "IX80": {
+            "isotope_ir192": 0.41,
+            "isotope_se75": 0.235,
+            "isotope_co60": 0.082,
+            "isotope_yb169": 0.145,
+            "isotope_tm170": 0.092,
+        },
+        "IX100": {
+            "isotope_ir192": 0.44,
+            "isotope_se75": 0.275,
+            "isotope_co60": 0.102,
+            "isotope_yb169": 0.165,
+            "isotope_tm170": 0.108,
+        },
+        "IX150": {
+            "isotope_ir192": 0.48,
+            "isotope_se75": 0.31,
+            "isotope_co60": 0.135,
+            "isotope_yb169": 0.185,
+            "isotope_tm170": 0.125,
+        },
+        # Foma Fomadux — ISO 11699-1 C1, C3..C6
+        "R2": {
+            "isotope_ir192": 0.32,
+            "isotope_se75": 0.17,
+            "isotope_co60": 0.06,
+            "isotope_yb169": 0.10,
+            "isotope_tm170": 0.065,
+        },
+        "R4": {
+            "isotope_ir192": 0.40,
+            "isotope_se75": 0.23,
+            "isotope_co60": 0.08,
+            "isotope_yb169": 0.14,
+            "isotope_tm170": 0.09,
+        },
+        "R5": {
+            "isotope_ir192": 0.43,
+            "isotope_se75": 0.27,
+            "isotope_co60": 0.10,
+            "isotope_yb169": 0.16,
+            "isotope_tm170": 0.105,
+        },
+        "R7": {
+            "isotope_ir192": 0.46,
+            "isotope_se75": 0.30,
+            "isotope_co60": 0.13,
+            "isotope_yb169": 0.18,
+            "isotope_tm170": 0.12,
+        },
+        "R8": {
+            "isotope_ir192": 0.49,
+            "isotope_se75": 0.34,
+            "isotope_co60": 0.15,
+            "isotope_yb169": 0.20,
+            "isotope_tm170": 0.135,
+        },
     }
 
-    # Film model to R-Factor film key mapping
+    # Default ISO 11699-1 film class to R-Factor film key mapping
     FILM_TO_CHART_KEY = {
+        "C1": "DR50",
         "C2": "M100",
         "C3": "MX125",
         "C4": "T200",
@@ -63,14 +187,55 @@ class ExposureChartDatabase:
         "C6": "HS800",
     }
 
+    # Film model -> ISO 11699-1 film system class
+    FILM_CLASS_BY_MODEL = {
+        "DR50": "C1", "M100": "C2", "MX125": "C3", "T200": "C4", "AA400": "C5", "HS800": "C6",
+        "D2": "C1", "D3": "C2", "D4": "C3", "D5": "C4", "D7": "C5", "D8": "C6",
+        "IX25": "C1", "IX50": "C2", "IX80": "C3", "IX100": "C4", "IX150": "C5",
+        "R2": "C1", "R4": "C3", "R5": "C4", "R7": "C5", "R8": "C6",
+    }
+
+    # Film model -> Manufacturer brand
+    FILM_BRAND_BY_MODEL = {
+        "DR50": "Carestream", "M100": "Carestream", "MX125": "Carestream",
+        "T200": "Carestream", "AA400": "Carestream", "HS800": "Carestream",
+        "D2": "Agfa Structurix", "D3": "Agfa Structurix", "D4": "Agfa Structurix",
+        "D5": "Agfa Structurix", "D7": "Agfa Structurix", "D8": "Agfa Structurix",
+        "IX25": "Fujifilm", "IX50": "Fujifilm", "IX80": "Fujifilm",
+        "IX100": "Fujifilm", "IX150": "Fujifilm",
+        "R2": "Foma Fomadux", "R4": "Foma Fomadux", "R5": "Foma Fomadux",
+        "R7": "Foma Fomadux", "R8": "Foma Fomadux",
+    }
+
     # ISO 11699-1 relative film speed normalized to AA400 (C5 = 1.0).
-    # Slower films (M100/MX125/T200) require more dose; faster (HS800) less.
+    # Slower films require more dose; faster films require less.
     FILM_RELATIVE_SPEED = {
+        # Carestream Industrex
+        "DR50": 0.0625,  # C1 (speed 1 / 16) -> 16x exposure vs AA400
         "M100": 0.125,   # C2 (speed 2 / 16) -> 8x exposure vs AA400
         "MX125": 0.25,   # C3 (speed 4 / 16) -> 4x exposure vs AA400
         "T200": 0.50,    # C4 (speed 8 / 16) -> 2x exposure vs AA400
         "AA400": 1.00,   # C5 (speed 16 / 16) -> 1x baseline
         "HS800": 2.00,   # C6 (speed 32 / 16) -> 0.5x exposure vs AA400
+        # Agfa Structurix
+        "D2": 0.065,     # C1 (~4% faster than DR50)
+        "D3": 0.130,     # C2
+        "D4": 0.260,     # C3
+        "D5": 0.520,     # C4
+        "D7": 1.040,     # C5 (~4% faster than AA400)
+        "D8": 2.050,     # C6
+        # Fujifilm IX
+        "IX25": 0.060,   # C1
+        "IX50": 0.120,   # C2
+        "IX80": 0.240,   # C3
+        "IX100": 0.480,  # C4
+        "IX150": 0.960,  # C5
+        # Foma Fomadux
+        "R2": 0.0625,    # C1
+        "R4": 0.250,     # C3
+        "R5": 0.500,     # C4
+        "R7": 1.000,     # C5
+        "R8": 2.000,     # C6
     }
 
     # SCRATA slide rule constants (broad-beam effective HVL, mm steel)

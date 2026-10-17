@@ -30,8 +30,10 @@ import { makeTranslator } from "./i18n";
 import { downloadBase64, svgToPngBase64 } from "./lib/sketchExport";
 import { pyClient } from "./pyodide/client";
 import {
+  CHART_TO_FILM_CLASS,
   DEFAULT_BASE_E_BY_SOURCE,
   DETECTORS as DETECTOR_KEYS,
+  FILM_CLASS_LABELS,
   FILM_SIZES as FILM_PRESETS,
   GEOMETRIES,
   MATERIALS,
@@ -43,6 +45,7 @@ import {
   formToDesktopState,
   getActiveChartKeys,
   parseCsv,
+  resolveFilmChartForClass,
   selectedOdKey,
 } from "./state/presets";
 import { useEngine } from "./state/useEngine";
@@ -67,31 +70,37 @@ const DETECTOR_TKEYS = [
 ];
 const CHART_OPTION_META: Record<string, { labelKey?: string; label?: string }> = {
   model: { labelKey: "chart_model" },
-  AA400: { label: "AA400 (C5)" },
-  MX125: { label: "MX125 (C3)" },
-  T200: { label: "T200 (C4)" },
-  HS800: { label: "HS800 (C6)" },
-  M100: { label: "M100 (C2)" },
+  // Carestream (Kodak Industrex)
+  DR50: { label: "Carestream DR50 (C1)" },
+  M100: { label: "Carestream M100 (C2)" },
+  MX125: { label: "Carestream MX125 (C3)" },
+  T200: { label: "Carestream T200 (C4)" },
+  AA400: { label: "Carestream AA400 (C5)" },
+  HS800: { label: "Carestream HS800 (C6)" },
+  // Agfa Structurix (Waygate Technologies)
+  D2: { label: "Agfa Structurix D2 (C1)" },
+  D3: { label: "Agfa Structurix D3 (C2)" },
+  D4: { label: "Agfa Structurix D4 (C3)" },
+  D5: { label: "Agfa Structurix D5 (C4)" },
+  D7: { label: "Agfa Structurix D7 (C5)" },
+  D8: { label: "Agfa Structurix D8 (C6)" },
+  // Fujifilm IX (Industrial X-Ray)
+  IX25: { label: "Fujifilm IX25 (C1)" },
+  IX50: { label: "Fujifilm IX50 (C2)" },
+  IX80: { label: "Fujifilm IX80 (C3)" },
+  IX100: { label: "Fujifilm IX100 (C4)" },
+  IX150: { label: "Fujifilm IX150 (C5)" },
+  // Foma Fomadux
+  R2: { label: "Foma Fomadux R2 (C1)" },
+  R4: { label: "Foma Fomadux R4 (C3)" },
+  R5: { label: "Foma Fomadux R5 (C4)" },
+  R7: { label: "Foma Fomadux R7 (C5)" },
+  R8: { label: "Foma Fomadux R8 (C6)" },
   type_x: { labelKey: "chart_type_x" },
   cr_ips_chart: { labelKey: "chart_cr_ips" },
   dda_frame_method: { labelKey: "chart_dda_frame" },
   dda_panel_chart: { labelKey: "chart_dda_panel" },
   digital_xray_chart: { labelKey: "chart_digital_xray" },
-};
-const CHART_TO_FILM_CLASS: Record<string, string> = {
-  M100: "C2",
-  MX125: "C3",
-  T200: "C4",
-  AA400: "C5",
-  HS800: "C6",
-};
-const FILM_CLASS_TO_CHART: Record<string, string> = {
-  C1: "M100",
-  C2: "M100",
-  C3: "MX125",
-  C4: "T200",
-  C5: "AA400",
-  C6: "HS800",
 };
 export default function App() {
   const {
@@ -617,7 +626,10 @@ export default function App() {
                               nextTech !== "digital"
                                 ? nextSource === "x_ray"
                                   ? "type_x"
-                                  : "AA400"
+                                  : resolveFilmChartForClass(
+                                      next.film_class_used,
+                                      next.chart_source,
+                                    )
                                 : validCharts[0] ?? "model";
                           }
                           return next;
@@ -1128,7 +1140,10 @@ export default function App() {
                           nextChart =
                             newSource === "x_ray"
                               ? "type_x"
-                              : (FILM_CLASS_TO_CHART[previous.film_class_used] ?? "AA400");
+                              : resolveFilmChartForClass(
+                                  previous.film_class_used,
+                                  previous.chart_source,
+                                );
                         } else if (nextChart === "digital_xray_chart") {
                           nextChart = previous.detector_type.startsWith("dda_")
                             ? "dda_panel_chart"
@@ -1625,16 +1640,18 @@ export default function App() {
                     value={form.film_class_used}
                     options={["C1", "C2", "C3", "C4", "C5", "C6"].map((value) => ({
                       value,
-                      label: value,
+                      label: FILM_CLASS_LABELS[value] ?? value,
                     }))}
                     onChange={(value) => {
                       patch("film_class_used", value);
                       if (
                         form.source !== "x_ray" &&
-                        form.chart_source in CHART_TO_FILM_CLASS &&
-                        FILM_CLASS_TO_CHART[value]
+                        form.chart_source in CHART_TO_FILM_CLASS
                       ) {
-                        patch("chart_source", FILM_CLASS_TO_CHART[value]);
+                        patch(
+                          "chart_source",
+                          resolveFilmChartForClass(value, form.chart_source),
+                        );
                       }
                     }}
                   />
