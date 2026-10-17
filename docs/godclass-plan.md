@@ -39,8 +39,13 @@ Tek fonksiyonel component, hook'lar inline. Bölmek için:
          + theme dataset) -> state/usePersistedAppState.ts — 2026-10-16,
          2686→2612 satır, 21/21 E2E yeşil
 
-Not: App.tsx hâlâ 2612 satır — render JSX'i ~1937 satır (675'ten sonra); hook
-ayrımıyla küçültülemez, tab/panel alt bileşenlerine bölmek gerekir (ayrı iş).
+Not: App.tsx hâlâ 2469 satır — render JSX'i büyük; hook ayrımıyla küçültülemez,
+tab/panel alt bileşenlerine bölünüyor:
+
+  H. [x] DefectPanel (defect Group JSX + DEFECT_TYPES/STANDARDS) ->
+         components/DefectPanel.tsx — 2026-10-16, 2612→2469 satır, 21/21 E2E yeşil
+  I. [ ] Kalan paneller: Outputs (2181), Procedure/compliance (2202), Warnings (2424),
+         Report info (1941), Inputs (1130) — props yüzeyi geniş, sırayla
 
 ## Kural
 Her bölme adımı tek commit, test suite yeşil kalır, davranış değişmez.
