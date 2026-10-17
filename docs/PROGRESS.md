@@ -47,6 +47,8 @@
 - `60bdf65` G: form/lvl3/lang/theme/reportInfo + persistence → `web/src/state/usePersistedAppState.ts`
 - `78a422a` H: defect Group → `web/src/components/DefectPanel.tsx`
 - `286dd7b` I: outputs Group + `OUTPUT_KEYS` + `outputLabel` → `web/src/components/OutputsPanel.tsx`
+- (J, in progress) Compliance + Warnings Groups → `web/src/components/CompliancePanel.tsx`,
+  `web/src/components/WarningsPanel.tsx` (App.tsx → 2383)
 
 ## Verification (re-run before continuing)
 
@@ -59,9 +61,10 @@ cd web && npx playwright test           # 21 passed
 
 ## Pending / next
 
-- [ ] **J: remaining web panels** — Procedure/compliance, Warnings, Report info,
-      Inputs Groups → components. Wide prop surfaces (form + patch + handlers);
-      do one panel per commit, keep E2E green.
+- [ ] **J: remaining web panels** — remaining: Report info Group, Inputs Group,
+      right-column sketch tabs (3D/2D/ISO/Annex A). Wide prop surfaces
+      (form + patch + handlers); do one panel per commit, keep E2E green.
+      Done so far: Compliance + Warnings.
       (see `docs/godclass-plan.md` step J)
 - [ ] **Web feature development** — direction not yet chosen. Options offered:
       (a) continue panel decomposition, (b) a specific new web feature,

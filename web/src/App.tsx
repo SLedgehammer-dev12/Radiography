@@ -22,6 +22,8 @@ import {
 import { WeldSetup3D } from "./components/WeldSetup3D";
 import { DefectPanel } from "./components/DefectPanel";
 import { OutputsPanel } from "./components/OutputsPanel";
+import { CompliancePanel } from "./components/CompliancePanel";
+import { WarningsPanel } from "./components/WarningsPanel";
 import {
   AboutModal,
   DecayDialog,
@@ -2131,35 +2133,7 @@ export default function App() {
               digital={digital}
               hiddenOutputs={hiddenOutputs}
             />
-            <Group title={t("procedure_section")}>
-              {error ? (
-                <div className="badge non-compliant" role="alert">
-                  ⚠ {error}
-                </div>
-              ) : (
-                <>
-                  <div
-                    className={
-                      compliance?.is_compliant
-                        ? "badge compliant"
-                        : "badge non-compliant"
-                    }
-                  >
-                    {compliance?.is_compliant ? t("compliant") : t("non_compliant")}
-                  </div>
-                  <ul className="check-list">
-                    {compliance?.checks.map((check) => (
-                      <li key={check.name} className={check.status ? "ok" : "fail"}>
-                        {check.status ? "✓" : "✗"} {check.details}
-                      </li>
-                    ))}
-                    {compliance?.activity_warning && (
-                      <li className="warn">⚠ {compliance.activity_warning}</li>
-                    )}
-                  </ul>
-                </>
-              )}
-            </Group>
+            <CompliancePanel t={t} error={error} compliance={compliance} />
           </div>
 
           <div className="column warnings">
@@ -2353,17 +2327,7 @@ export default function App() {
               </Group>
             )}
 
-            <Group title={t("warnings")}>
-              {result?.warnings.length ? (
-                <ul className="warning-list">
-                  {result.warnings.map((warning, index) => (
-                    <li key={index}>{warning}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="muted">No active warnings.</p>
-              )}
-            </Group>
+            <WarningsPanel t={t} warnings={result?.warnings ?? []} />
 
             <DefectPanel
               t={t}

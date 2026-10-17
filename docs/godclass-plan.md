@@ -46,8 +46,11 @@ tab/panel alt bileşenlerine bölünüyor:
          components/DefectPanel.tsx — 2026-10-16, 2612→2469 satır, 21/21 E2E yeşil
   I. [x] OutputsPanel (outputs Group + OUTPUT_KEYS + outputLabel) ->
          components/OutputsPanel.tsx — 2026-10-16, 2469→2419 satır, 21/21 E2E yeşil
-  J. [ ] Kalan paneller: Procedure/compliance (2202), Warnings (2424),
-         Report info (1941), Inputs (1130) — props yüzeyi geniş, sırayla
+  J. [~] Kalan paneller:
+         [x] CompliancePanel (procedure_section Group) + WarningsPanel (warnings Group)
+             -> components/CompliancePanel.tsx, components/WarningsPanel.tsx — 2419→2383
+         [ ] Report info Group (1941), Inputs Group (1130), right-column sketch tabs (2165)
+             — props yüzeyi geniş, sırayla
 
 ## Kural
 Her bölme adımı tek commit, test suite yeşil kalır, davranış değişmez.
