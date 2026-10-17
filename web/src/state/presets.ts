@@ -440,3 +440,17 @@ export function parseCsv(text: string): Record<string, string> {
   }
   return state;
 }
+
+/** Finds the standard pipe key whose OD matches `od`, or `__custom__`. */
+export function selectedOdKey(
+  od: number,
+  pipeTable: Record<string, { od: number; schedules: [number, string][] }> | null,
+): string {
+  if (!pipeTable) return '4" (NPS 4)';
+  for (const [key, entry] of Object.entries(pipeTable)) {
+    if (Math.abs(entry.od - od) < 0.15) {
+      return key;
+    }
+  }
+  return "__custom__";
+}

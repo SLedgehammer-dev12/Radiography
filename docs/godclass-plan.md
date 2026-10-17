@@ -30,6 +30,9 @@ Tek fonksiyonel component, hook'lar inline. Bölmek için:
   E. [x] Modal bileşenleri (DecayDialog, Lvl3Dialog, AboutModal, UpdateModal) +
          FALLBACK_VERSION -> components/Modals.tsx — 2026-10-16, 3149→2788 satır,
          tsc + oxlint + vite build yeşil
+  E2.[x] Saf yardımcılar (svgToPngBase64, downloadBase64 -> lib/sketchExport.ts;
+         selectedOdKey -> state/presets.ts) — 2026-10-16, 2788→2716 satır,
+         21/21 Playwright E2E yeşil
   F. [ ] useState gruplarını useAppForm/useReportInfo/useDefectState hook'larına ayır (hook kuralları riskli — E2E şart)
 
 ## Kural
