@@ -35,7 +35,12 @@ Tek fonksiyonel component, hook'lar inline. Bölmek için:
          21/21 Playwright E2E yeşil
   F. [x] useDefect hook (defect state + reactive re-evaluation + runDefect) ->
          state/useDefect.ts — 2026-10-16, 2716→2686 satır, 21/21 E2E yeşil
-      [ ] useAppForm/useReportInfo ayrımı (kalan useState grupları) — daha geniş yüzey
+  G. [x] usePersistedAppState hook (form/lvl3/lang/theme/reportInfo + localStorage
+         + theme dataset) -> state/usePersistedAppState.ts — 2026-10-16,
+         2686→2612 satır, 21/21 E2E yeşil
+
+Not: App.tsx hâlâ 2612 satır — render JSX'i ~1937 satır (675'ten sonra); hook
+ayrımıyla küçültülemez, tab/panel alt bileşenlerine bölmek gerekir (ayrı iş).
 
 ## Kural
 Her bölme adımı tek commit, test suite yeşil kalır, davranış değişmez.
