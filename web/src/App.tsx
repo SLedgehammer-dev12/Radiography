@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   CheckField,
@@ -123,7 +123,14 @@ export default function App() {
   const [filmSizeMode, setFilmSizeMode] = useState<string>("100x400");
   const [showDecay, setShowDecay] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<
+    { text: string; kind: "info" | "success" | "error" } | null
+  >(null);
+  const notify = useCallback(
+    (text: string, kind: "info" | "success" | "error" = "info") =>
+      setNotice({ text, kind }),
+    [],
+  );
   const presetInput = useRef<HTMLInputElement>(null);
   const projectInput = useRef<HTMLInputElement>(null);
   const csvInput = useRef<HTMLInputElement>(null);
@@ -154,6 +161,16 @@ export default function App() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [openMenu]);
+
+  // Auto-dismiss the toast: errors linger longer than success/info.
+  useEffect(() => {
+    if (!notice) return;
+    const handle = setTimeout(
+      () => setNotice(null),
+      notice.kind === "error" ? 8000 : 4500,
+    );
+    return () => clearTimeout(handle);
+  }, [notice]);
 
   const { result, compliance, error, busy, ready } = useEngine(form, lvl3, lang);
   const t = useMemo(() => makeTranslator(strings), [strings]);
@@ -222,7 +239,7 @@ export default function App() {
     defectResult,
     setDefectActive,
     runDefect,
-  } = useDefect({ form, lang, ready, onError: setNotice });
+  } = useDefect({ form, lang, ready, onError: (message) => notify(message, "error") });
 
   const digital = form.tech === "digital";
   const analog = !digital;
@@ -465,10 +482,11 @@ export default function App() {
           ? Number(v.max_srb)
           : prev.app_srb,
     }));
-    setNotice(
+    notify(
       lang === "tr"
         ? "Hesaplanan hedef değerler uygulanan pozlama alanlarına aktarıldı."
         : "Calculated target values synced to applied exposure fields.",
+      "success",
     );
   };
 
@@ -503,7 +521,7 @@ export default function App() {
 
   const exportPdf = async () => {
     if (!result) {
-      setNotice("Hesaplama hazır değil / Calculation not ready");
+      notify("Hesaplama hazır değil / Calculation not ready", "error");
       return;
     }
     setPdfBusy(true);
@@ -559,9 +577,9 @@ export default function App() {
         filename: `RT_Inspection_Report_${stamp}.pdf`,
       });
       downloadBase64(data.pdf_base64, data.filename);
-      setNotice(t("report_saved", data.filename));
+      notify(t("report_saved", data.filename), "success");
     } catch (caught) {
-      setNotice(String(caught));
+      notify(String(caught), "error");
     } finally {
       setPdfBusy(false);
     }
@@ -603,8 +621,19 @@ export default function App() {
           </div>
         </header>
         {notice && (
-          <div className="toast" onClick={() => setNotice(null)} role="status">
-            {notice}
+          <div
+            className={`toast toast-${notice.kind}`}
+            role={notice.kind === "error" ? "alert" : "status"}
+          >
+            <span className="toast-text">{notice.text}</span>
+            <button
+              type="button"
+              className="toast-close"
+              aria-label="Kapat / Close"
+              onClick={() => setNotice(null)}
+            >
+              ✕
+            </button>
           </div>
         )}
         <div className="toolbar menubar" ref={menuContainerRef}>
@@ -679,10 +708,11 @@ export default function App() {
                           }
                           return next;
                         });
-                        setNotice(
+                        notify(
                           lang === "tr"
                             ? `"${event.target.value}" şablonu uygulandı.`
                             : `Applied "${event.target.value}" preset.`,
+                          "success",
                         );
                       }
                       event.target.value = "";
@@ -998,9 +1028,9 @@ export default function App() {
                   throw new Error("Not a valid Radiography preset file.");
                 }
                 applyDesktopState(data.state ?? {});
-                setNotice(lang === "tr" ? "Şablon yüklendi." : "Preset loaded.");
+                notify(lang === "tr" ? "Şablon yüklendi." : "Preset loaded.", "success");
               } catch (caught) {
-                setNotice(String(caught));
+                notify(String(caught), "error");
               }
               event.target.value = "";
             }}
@@ -1017,9 +1047,9 @@ export default function App() {
                   throw new Error("Not a valid Radiography project file.");
                 }
                 applyDesktopState(data.state ?? {});
-                setNotice(lang === "tr" ? "Proje içe aktarıldı." : "Project imported.");
+                notify(lang === "tr" ? "Proje içe aktarıldı." : "Project imported.", "success");
               } catch (caught) {
-                setNotice(String(caught));
+                notify(String(caught), "error");
               }
               event.target.value = "";
             }}
@@ -1032,9 +1062,9 @@ export default function App() {
             onChange={async (event) => {
               try {
                 applyDesktopState(parseCsv(await readFile(event.target.files?.[0])));
-                setNotice(lang === "tr" ? "CSV içe aktarıldı." : "CSV imported.");
+                notify(lang === "tr" ? "CSV içe aktarıldı." : "CSV imported.", "success");
               } catch (caught) {
-                setNotice(String(caught));
+                notify(String(caught), "error");
               }
               event.target.value = "";
             }}

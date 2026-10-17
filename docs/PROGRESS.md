@@ -55,6 +55,10 @@
   (App.tsx → 2164); `ExposuresProvenance` type added to `types.ts`
 
 ### Features (web)
+- **Interaction & feedback** — toast now carries a kind (info/success/error) with
+  colour-coded left border, a close button, `role="alert"` for errors, and
+  auto-dismiss (4.5s info/success, 8s error). New E2E:
+  `web/tests/e2e/feedback.spec.ts`.
 - **Mobile / responsive UX** — `web/src/App.css` gains a touch/mobile block:
   hides the desktop-only custom scrollbar on coarse pointers; 16px form controls
   on phones (stops iOS focus auto-zoom); ≥40px tap targets for buttons, tabs,
@@ -68,7 +72,7 @@
 python3 -m pytest -q                    # 915 passed, 6 skipped, 849 subtests
 cd web && npx tsc -b                    # clean
 cd web && npx oxlint src/               # 0 errors (6 pre-existing warnings)
-cd web && npx playwright test           # 24 passed (21 + 3 mobile)
+cd web && npx playwright test           # 26 passed (21 + 3 mobile + 2 feedback)
 ```
 
 ## Pending / next
@@ -78,9 +82,9 @@ cd web && npx playwright test           # 24 passed (21 + 3 mobile)
       with no cohesion gain. Done: Compliance, Warnings, Report info, Sketch tabs.
       App.tsx stands at 2164 lines (−31%). Do not resume without a new approach
       (semantic sub-panels or a form context). See `docs/godclass-plan.md` step J.
-- [ ] **Web feature development** — direction chosen: **mobile/responsive web UX**
-      (first pass done, see Features above). Possible next: landscape/tablet
-      tuning, sticky action bar, collapsible form groups on phones.
+- [ ] **Web feature development** — direction chosen: **interaction & feedback**
+      (toast variants + auto-dismiss done). Possible next: sticky action bar
+      (PDF/reset), loading/skeleton states, empty/error states.
 - [ ] Decide whether to record the web-only scope in `AGENTS.md`.
 
 ## Notes & risks
