@@ -433,6 +433,115 @@ class TestRTCalculatorWithCharts(unittest.TestCase):
         self.assertEqual(res_dx["provenance"]["method"], "digital_xray_chart")
         self.assertGreater(res_dx["time_seconds"], 0.0)
 
+    def test_digital_xray_chart_restores_c5_baseline_no_16x_underexposure(self):
+        """TYPE_X_CHART is pre-divided by C5 film speed (16.0); digital_xray_chart must restore that 16x factor."""
+        res_model = self.calc.calculate_exposure_time_details(
+            700.0, 20.0, "x_ray", 5.0, 3.0, "digital",
+            testing_class="class_a", detector_type="cr_standard",
+            kv=200.0, chart_source="model", chart_db=self.db,
+            target_snr=70.0, app_srb=100.0
+        )
+        res_chart = self.calc.calculate_exposure_time_details(
+            700.0, 20.0, "x_ray", 5.0, 3.0, "digital",
+            testing_class="class_a", detector_type="cr_standard",
+            kv=200.0, chart_source="digital_xray_chart", chart_db=self.db,
+            target_snr=70.0, app_srb=100.0
+        )
+        self.assertAlmostEqual(
+            res_chart["time_seconds"], res_model["time_seconds"],
+            delta=res_model["time_seconds"] * 0.05
+        )
+        # Selecting dda_panel_chart with x_ray must report digital_xray_chart, not analog type_x
+        res_dda_x = self.calc.calculate_exposure_time_details(
+            700.0, 20.0, "x_ray", 5.0, 3.0, "digital",
+            testing_class="class_a", detector_type="dda_si",
+            kv=200.0, chart_source="dda_panel_chart", chart_db=self.db,
+            target_snr=70.0, app_srb=100.0
+        )
+        self.assertEqual(res_dda_x["provenance"]["method"], "digital_xray_chart")
+
+    def test_xray_chart_material_equivalence_scaling(self):
+        """type_x and digital_xray_chart must scale thickness by energy-dependent mu(kV, mat)/mu(kV, steel)."""
+        _, _, t_al = self.calc.calculate_exposure_time(
+            700.0, 20.0, "x_ray", 5.0, 3.0, "analog",
+            film_class="C5", kv=200.0, chart_source="type_x",
+            chart_db=self.db, material="aluminum"
+        )
+        _, _, t_st = self.calc.calculate_exposure_time(
+            700.0, 20.0, "x_ray", 5.0, 3.0, "analog",
+            film_class="C5", kv=200.0, chart_source="type_x",
+            chart_db=self.db, material="steel"
+        )
+        _, _, t_cu = self.calc.calculate_exposure_time(
+            700.0, 20.0, "x_ray", 5.0, 3.0, "analog",
+            film_class="C5", kv=200.0, chart_source="type_x",
+            chart_db=self.db, material="copper_nickel"
+        )
+        self.assertLess(t_al, t_st)
+        self.assertGreater(t_cu, t_st)
+
+    def test_dda_panel_chart_gamma_passes_testing_class_and_floor(self):
+        """dda_panel_chart with isotope must pass testing_class to DDA frame integration (16 vs 32 frames) and enforce hardware floor."""
+        res_a = self.calc.calculate_exposure_time_details(
+            400.0, 6.0, "isotope_ir192", 80.0, 30.0, "digital",
+            testing_class="class_a", detector_type="dda_si",
+            chart_source="dda_panel_chart", chart_db=self.db, app_srb=100.0
+        )
+        res_b = self.calc.calculate_exposure_time_details(
+            400.0, 6.0, "isotope_ir192", 80.0, 30.0, "digital",
+            testing_class="class_b", detector_type="dda_si",
+            chart_source="dda_panel_chart", chart_db=self.db, app_srb=100.0
+        )
+        self.assertEqual(res_a["provenance"]["dda_frame"]["n_frames"], 16)
+        self.assertEqual(res_b["provenance"]["dda_frame"]["n_frames"], 32)
+        self.assertGreaterEqual(res_a["time_seconds"], 16 * 0.10)
+        self.assertGreaterEqual(res_b["time_seconds"], 32 * 0.10)
+
+    def test_rfactor_chart_uses_film_specific_gradient(self):
+        """calculate_exposure_time_details must use ISO 11699-1 film gradient G_D (3.5 for M100/C2, 2.5 for HS800/C6) in R-factor mode."""
+        res_m100 = self.calc.calculate_exposure_time_details(
+            600.0, 20.0, "isotope_ir192", 40.0, 30.0, "analog",
+            film_class="C2", chart_source="M100", chart_db=self.db, density=3.0
+        )
+        res_hs800 = self.calc.calculate_exposure_time_details(
+            600.0, 20.0, "isotope_ir192", 40.0, 30.0, "analog",
+            film_class="C6", chart_source="HS800", chart_db=self.db, density=3.0
+        )
+        self.assertAlmostEqual(
+            res_m100["provenance"]["od_factor"], 10 ** ((3.0 - 2.0) / 3.5), places=4
+        )
+        self.assertAlmostEqual(
+            res_hs800["provenance"]["od_factor"], 10 ** ((3.0 - 2.0) / 2.5), places=4
+        )
+
+    def test_extra_multiplier_scales_dda_frame_method(self):
+        """extra_multiplier (e.g. Field Factor F or Level 3 SFD compensation) must scale dda_frame_method before hardware floor."""
+        res_1x = self.calc.calculate_exposure_time_details(
+            700.0, 25.0, "x_ray", 5.0, 3.0, "digital",
+            detector_type="dda_si", kv=200.0, chart_source="dda_frame_method",
+            chart_db=self.db, app_srb=100.0, extra_multiplier=1.0
+        )
+        res_2x = self.calc.calculate_exposure_time_details(
+            700.0, 25.0, "x_ray", 5.0, 3.0, "digital",
+            detector_type="dda_si", kv=200.0, chart_source="dda_frame_method",
+            chart_db=self.db, app_srb=100.0, extra_multiplier=2.0
+        )
+        self.assertAlmostEqual(res_2x["time_seconds"] / res_1x["time_seconds"], 2.0, delta=0.02)
+
+    def test_custom_rfactor_override_scales_non_aa400_film(self):
+        """Custom R_FACTOR_TABLE overrides for non-AA400 films must scale calculate_exposure_time_rfactor proportionally."""
+        db_custom = ExposureChartDatabase()
+        t_default = db_custom.calculate_exposure_time_rfactor(
+            600.0, 20.0, "isotope_ir192", 40.0, "MX125", density=2.0
+        )
+        db_custom.R_FACTOR_TABLE["MX125"]["isotope_ir192"] = (
+            db_custom.R_FACTOR_TABLE["MX125"]["isotope_ir192"] * 1.5
+        )
+        t_custom = db_custom.calculate_exposure_time_rfactor(
+            600.0, 20.0, "isotope_ir192", 40.0, "MX125", density=2.0
+        )
+        self.assertAlmostEqual(t_custom / t_default, 1.5, places=4)
+
 
 if __name__ == "__main__":
     unittest.main()

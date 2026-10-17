@@ -98,7 +98,8 @@ def format_sfd_provenance(prov, trans):
         if sfd_app < sfd_min - 0.05:
             if prov.get("lvl3_sfd_comp"):
                 k_snr = sfd_min / max(10.0, sfd_app)
-                t_mult = prov.get("time_multiplier", k_snr ** 2)
+                raw_tm = prov.get("time_multiplier", 1.0) or 1.0
+                t_mult = raw_tm if raw_tm > 1.001 else (k_snr ** 2)
                 if tr:
                     lines.append(
                         f"Mesafe Telafisi (Level 3 Distance Compensation) AKTİF:\n"
@@ -669,27 +670,28 @@ def format_exposure_time_provenance(prov, trans):
         gamma = prov.get("gamma", 0.48)
         target_od = prov.get("target_od", 2.0)
         od_factor = prov.get("od_factor", 1.0)
+        grad = prov.get("gradient", 2.0) or 2.0
         if tr:
             parts.append(
                 f"Yöntem: Carestream R-Faktör / SCRATA Cetveli ({film_key}) | "
-                f"Formül: T[dk] = 60 × [R_eff × 10^((D−2)/2) × (SFD/1000)² × 2^(w_eq/HVL)] / (A × Γ)"
+                f"Formül: T[dk] = 60 × [R_eff × 10^((D−2)/G̅) × (SFD/1000)² × 2^(w_eq/HVL)] / (A × Γ)"
             )
             ref_txt = f", REF={ref_factor:.2f} → w_eq={w_eq:.2f} mm" if abs(ref_factor - 1.0) > 1e-3 else ""
             parts.append(
                 f"Parametreler: Malzeme={mat_label} (w_eff={w_eff:.2f} mm{ref_txt}), "
                 f"R_eff={r_eff:.3f} (tablo R={r_raw:.2f}), HVL={hvl:.1f} mm, Γ={gamma:.3f} R·m²/(Ci·h), "
-                f"Hedef D={target_od:.1f} (k_OD={od_factor:.2f}×), SFD={sfd:.0f} mm, A={output_val:.1f} Ci"
+                f"Hedef D={target_od:.1f} (G̅={grad:.1f}, k_OD={od_factor:.2f}×), SFD={sfd:.0f} mm, A={output_val:.1f} Ci"
             )
         else:
             parts.append(
                 f"Method: Carestream R-Factor / SCRATA Slide Rule ({film_key}) | "
-                f"Formula: T[min] = 60 × [R_eff × 10^((D−2)/2) × (SFD/1000)² × 2^(w_eq/HVL)] / (A × Γ)"
+                f"Formula: T[min] = 60 × [R_eff × 10^((D−2)/G̅) × (SFD/1000)² × 2^(w_eq/HVL)] / (A × Γ)"
             )
             ref_txt = f", REF={ref_factor:.2f} → w_eq={w_eq:.2f} mm" if abs(ref_factor - 1.0) > 1e-3 else ""
             parts.append(
                 f"Parameters: Material={mat_label} (w_eff={w_eff:.2f} mm{ref_txt}), "
                 f"R_eff={r_eff:.3f} (table R={r_raw:.2f}), HVL={hvl:.1f} mm, Γ={gamma:.3f} R·m²/(Ci·h), "
-                f"Target D={target_od:.1f} (k_OD={od_factor:.2f}×), SFD={sfd:.0f} mm, A={output_val:.1f} Ci"
+                f"Target D={target_od:.1f} (G̅={grad:.1f}, k_OD={od_factor:.2f}×), SFD={sfd:.0f} mm, A={output_val:.1f} Ci"
             )
     elif method in ("cr_ips_chart", "dda_panel_chart"):
         det_lbl = prov.get("detector_class_label", prov.get("detector_type", "CR/DDA"))
@@ -1670,17 +1672,13 @@ class CalculationEngine:
             base_snr, table_name, _desc = calc.get_target_snr(material, source, input_kv, w_nom, testing_class, lang=trans.language)
             is_flush = (cap == 0.0)
             se75_thin_class_b = (material in ("steel", "copper_nickel") and source == "isotope_se75" and w_nom < 12.0 and testing_class == "class_b")
-            apply_multiplier = False
-            if snr_location == "adjacent" and not is_flush:
-                apply_multiplier = True
+            snr_mult = 1.0
             if se75_thin_class_b:
-                apply_multiplier = True
-            if apply_multiplier:
-                target_snr_val = base_snr * 1.4
-                if snr_location == "adjacent" and not is_flush:
-                    warnings.append(trans.get("warn_snr_adjacent_factor"))
-            else:
-                target_snr_val = base_snr
+                snr_mult *= 1.4
+            if snr_location == "adjacent" and not is_flush:
+                snr_mult *= 1.4
+                warnings.append(trans.get("warn_snr_adjacent_factor"))
+            target_snr_val = base_snr * snr_mult
 
             if sfd < sfd_min and lvl3.get("sfd_comp"):
                 k_factor = sfd_min / max(10.0, sfd)
@@ -1688,33 +1686,9 @@ class CalculationEngine:
                 target_quality = f"{target_snr_val:.1f} -> {sfd_comp_target:.1f} (Lvl 3 Comp) [{table_name}]"
                 time_multiplier = k_factor ** 2
             else:
-                target_quality = f">= {int(target_snr_val)} [{table_name}]"
+                target_quality = f">= {int(round(target_snr_val))} [{table_name}]"
 
-        # 10. Calculated exposure time + formula provenance
-        exp_details = calc.calculate_exposure_time_details(
-            sfd, w_eff, source, output_val, base_e, tech,
-            testing_class=testing_class,
-            film_class=film_class_used,
-            detector_type=detector_type,
-            kv=input_kv,
-            material=material,
-            chart_source=chart_source if chart_source != "model" else None,
-            chart_db=self.chart_db,
-            density=required_density,
-            target_snr=target_snr_val if tech == "digital" else None,
-            app_srb=f.get("app_srb") if tech == "digital" else None,
-        )
-        min_calc = exp_details["minutes"]
-        sec_calc = exp_details["seconds"]
-        raw_time = exp_details["time_seconds"]
-        exposure_time_prov = dict(exp_details["provenance"])
-
-        if sfd_comp_target is not None:
-            raw_time = raw_time * time_multiplier
-            min_calc = int(raw_time // 60)
-            sec_calc = int(raw_time % 60)
-
-        # 11. Field correction factor
+        # 10. Field correction factor & calculated exposure time + formula provenance
         base_multiplier = f["base_multiplier"]
         if base_multiplier <= 0.0:
             base_multiplier = 1.0
@@ -1730,27 +1704,46 @@ class CalculationEngine:
                 warnings.append(f"UYARI: Saha Düzeltme Çarpanı (F={base_multiplier:.2f}) olağan aralığın (0.5–2.0) dışında; değer teknik/ekipman doğrulama kaydıyla desteklenmelidir.")
             else:
                 warnings.append(f"WARNING: Field Correction Factor (F={base_multiplier:.2f}) is outside the usual range (0.5–2.0); the value should be supported by a technique/equipment qualification record.")
-        if base_multiplier != 1.0:
-            raw_time = raw_time * base_multiplier
-            min_calc = int(raw_time // 60)
-            sec_calc = int(raw_time % 60)
 
-        # Keep DDA frame integration in sync if Level 3 SFD comp or Field Factor F scaled raw_time
-        if tech == "digital" and exposure_time_prov.get("dda_frame"):
-            if sfd_comp_target is not None or base_multiplier != 1.0:
-                det_for_dda = detector_type if detector_type in ("dda_si", "dda_se", "dda_gdos") else "dda_si"
-                exposure_time_prov["dda_frame"] = calc.calculate_dda_frame_integration(
-                    raw_time, sfd, w_eff, source, output_val,
-                    det_for_dda, sfd_comp_target or target_snr_val, kv=input_kv,
-                    material=material,
-                    srb_factor=exposure_time_prov.get("srb_factor", 1.0),
-                    dqe_factor=exposure_time_prov.get("det_factor", 3.5),
-                    testing_class=testing_class,
-                )
+        extra_multiplier = time_multiplier * base_multiplier
+        exp_details = calc.calculate_exposure_time_details(
+            sfd, w_eff, source, output_val, base_e, tech,
+            testing_class=testing_class,
+            film_class=film_class_used,
+            detector_type=detector_type,
+            kv=input_kv,
+            material=material,
+            chart_source=chart_source if chart_source != "model" else None,
+            chart_db=self.chart_db,
+            density=required_density,
+            target_snr=target_snr_val if tech == "digital" else None,
+            app_srb=f.get("app_srb") if tech == "digital" else None,
+            extra_multiplier=extra_multiplier,
+        )
+        min_calc = exp_details["minutes"]
+        sec_calc = exp_details["seconds"]
+        raw_time = exp_details["time_seconds"]
+        exposure_time_prov = dict(exp_details["provenance"])
+
+        # Keep DDA frame integration in sync if Level 3 SFD comp increased the required SNR_N target
+        if tech == "digital" and exposure_time_prov.get("dda_frame") and sfd_comp_target is not None:
+            det_for_dda = detector_type if detector_type in ("dda_si", "dda_se", "dda_gdos") else "dda_si"
+            exposure_time_prov["dda_frame"] = calc.calculate_dda_frame_integration(
+                raw_time, sfd, w_eff, source, output_val,
+                det_for_dda, sfd_comp_target, kv=input_kv,
+                material=material,
+                srb_factor=exposure_time_prov.get("srb_factor", 1.0),
+                dqe_factor=exposure_time_prov.get("det_factor", 3.5),
+                testing_class=testing_class,
+            )
             if chart_source == "dda_frame_method":
                 raw_time = min(864000.0, exposure_time_prov["dda_frame"]["total_acq_sec"])
             else:
-                raw_time = max(raw_time, exposure_time_prov["dda_frame"]["total_acq_sec"])
+                min_acq_floor = max(
+                    2.0 if source == "x_ray" else 0.0,
+                    float(exposure_time_prov["dda_frame"]["n_frames"]) * 0.10,
+                )
+                raw_time = max(raw_time, min_acq_floor)
             min_calc = int(raw_time // 60)
             sec_calc = int(raw_time % 60)
 
@@ -2087,6 +2080,18 @@ class CalculationEngine:
                     warnings.append(f"UYARI: Kullanılan film sınıfı ({film_class_used}) standart gereksinimini karşılamıyor! Asgari gereken: {film_class_req}")
                 else:
                     warnings.append(f"WARNING: Used film class ({film_class_used}) does not meet standard requirement! Required minimum: {film_class_req}")
+            chart_film_cls = {
+                "M100": "C2", "MX125": "C3", "T200": "C4", "AA400": "C5", "HS800": "C6",
+            }.get(chart_source)
+            if chart_film_cls and chart_film_cls != film_class_used:
+                if trans.language == "tr":
+                    warnings.append(
+                        f"BİLGİ: Seçilen R-Faktör diyagramı ({chart_source} → {chart_film_cls}) ile kullanılan film sınıfı ({film_class_used}) farklıdır; poz süresi {chart_source} diyagramına göre hesaplandı."
+                    )
+                else:
+                    warnings.append(
+                        f"NOTE: Selected R-Factor chart ({chart_source} → {chart_film_cls}) differs from used film class ({film_class_used}); exposure time was calculated using the {chart_source} chart."
+                    )
 
         if tech == "analog":
             overlap = f.get("app_overlap_warn", f["app_overlap"])

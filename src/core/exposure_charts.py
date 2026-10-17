@@ -148,7 +148,7 @@ class ExposureChartDatabase:
             "r_factors": {
                 "isotope_ir192": 0.085,
                 "isotope_se75": 0.042,
-                "isotope_co60": 0.055,
+                "isotope_co60": 0.065,
                 "isotope_yb169": 0.018,
                 "isotope_tm170": 0.011,
             },
@@ -247,11 +247,14 @@ class ExposureChartDatabase:
             return None
 
         # Effective dose factor: normalized so AA400 (C5) uses its exact R-factor,
-        # while slower/faster films scale inversely with ISO 11699-1 film speed.
+        # while slower/faster films scale inversely with ISO 11699-1 film speed
+        # and honor custom per-film R-factor overrides relative to built-in defaults.
         rel_speed = self.FILM_RELATIVE_SPEED.get(film_key, 1.0)
         r_aa400 = self.lookup_r_factor("AA400", source)
         if r_aa400 is not None and rel_speed > 0 and film_key != "AA400":
-            effective_r = r_aa400 / rel_speed
+            default_r = self.__class__.R_FACTOR_TABLE.get(film_key, {}).get(source)
+            custom_ratio = (r_factor / default_r) if (default_r and default_r > 0) else 1.0
+            effective_r = (r_aa400 / rel_speed) * custom_ratio
         else:
             effective_r = r_factor
 
@@ -302,7 +305,7 @@ class ExposureChartDatabase:
         if t_val >= t_keys[-1]:
             if len(t_keys) >= 2 and kv_data[t_keys[-2]] > 0 and kv_data[t_keys[-1]] > 0:
                 slope = math.log(kv_data[t_keys[-1]] / kv_data[t_keys[-2]]) / (t_keys[-1] - t_keys[-2])
-                return kv_data[t_keys[-1]] * math.exp(slope * min(100.0, t_val - t_keys[-1]))
+                return kv_data[t_keys[-1]] * math.exp(min(700.0, slope * (t_val - t_keys[-1])))
             return kv_data[t_keys[-1]]
         for i in range(len(t_keys) - 1):
             t1, t2 = t_keys[i], t_keys[i + 1]

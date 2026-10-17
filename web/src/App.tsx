@@ -78,6 +78,21 @@ const CHART_OPTION_META: Record<string, { labelKey?: string; label?: string }> =
   dda_panel_chart: { labelKey: "chart_dda_panel" },
   digital_xray_chart: { labelKey: "chart_digital_xray" },
 };
+const CHART_TO_FILM_CLASS: Record<string, string> = {
+  M100: "C2",
+  MX125: "C3",
+  T200: "C4",
+  AA400: "C5",
+  HS800: "C6",
+};
+const FILM_CLASS_TO_CHART: Record<string, string> = {
+  C1: "M100",
+  C2: "M100",
+  C3: "MX125",
+  C4: "T200",
+  C5: "AA400",
+  C6: "HS800",
+};
 export default function App() {
   const {
     form,
@@ -1101,12 +1116,25 @@ export default function App() {
                   options={sourceOptions}
                   onChange={(value) => {
                     const newSource = value as FormState["source"];
-                    const validCharts = getActiveChartKeys(form.tech, form.detector_type, newSource);
                     setForm((previous) => {
+                      const validCharts = getActiveChartKeys(
+                        previous.tech,
+                        previous.detector_type,
+                        newSource,
+                      );
                       let nextChart = previous.chart_source;
                       if (!validCharts.includes(nextChart)) {
                         if (previous.tech !== "digital") {
-                          nextChart = newSource === "x_ray" ? "type_x" : "AA400";
+                          nextChart =
+                            newSource === "x_ray"
+                              ? "type_x"
+                              : (FILM_CLASS_TO_CHART[previous.film_class_used] ?? "AA400");
+                        } else if (nextChart === "digital_xray_chart") {
+                          nextChart = previous.detector_type.startsWith("dda_")
+                            ? "dda_panel_chart"
+                            : "cr_ips_chart";
+                        } else if (nextChart === "cr_ips_chart") {
+                          nextChart = "digital_xray_chart";
                         } else {
                           nextChart = validCharts[0] ?? "model";
                         }
@@ -1582,7 +1610,13 @@ export default function App() {
                     label: meta?.labelKey ? t(meta.labelKey) : (meta?.label ?? key),
                   };
                 })}
-                onChange={(value) => patch("chart_source", value)}
+                onChange={(value) => {
+                  patch("chart_source", value);
+                  const mappedClass = CHART_TO_FILM_CLASS[value];
+                  if (analog && mappedClass) {
+                    patch("film_class_used", mappedClass);
+                  }
+                }}
               />
               {analog && (
                 <div className="field-row-2">
@@ -1593,7 +1627,16 @@ export default function App() {
                       value,
                       label: value,
                     }))}
-                    onChange={(value) => patch("film_class_used", value)}
+                    onChange={(value) => {
+                      patch("film_class_used", value);
+                      if (
+                        form.source !== "x_ray" &&
+                        form.chart_source in CHART_TO_FILM_CLASS &&
+                        FILM_CLASS_TO_CHART[value]
+                      ) {
+                        patch("chart_source", FILM_CLASS_TO_CHART[value]);
+                      }
+                    }}
                   />
                   <LengthField
                     label={t("applied_overlap")}

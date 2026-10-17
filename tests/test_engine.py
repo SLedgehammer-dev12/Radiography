@@ -510,3 +510,38 @@ def test_dda_high_dose_rate_saturation_advisory(engine):
         "od": 114.3, "t": 6.02, "sfd": 600.0, "app_srb": 100.0,
     }, {}, "en")
     assert not any("saturation" in w for w in normal["warnings"])
+
+
+def test_se75_thin_class_b_compounds_with_adjacent_snr(engine):
+    """Se-75 thin-wall Class B (×1.4 per Clause 6.9) and adjacent base-metal SNR measurement (×1.4 per Table B.14) must compound (×1.96)."""
+    res_weld = engine.calculate({
+        "tech": "digital", "testing_class": "class_b", "source": "isotope_se75",
+        "geometry": "swsi", "od": 114.3, "t": 8.0, "cap": 1.0,
+        "snr_location": "weld",
+    }, {}, "tr")
+    res_adj = engine.calculate({
+        "tech": "digital", "testing_class": "class_b", "source": "isotope_se75",
+        "geometry": "swsi", "od": 114.3, "t": 8.0, "cap": 1.0,
+        "snr_location": "adjacent",
+    }, {}, "tr")
+    snr_weld = res_weld["values"]["exposure_time_provenance"]["target_snr"]
+    snr_adj = res_adj["values"]["exposure_time_provenance"]["target_snr"]
+    assert abs(snr_adj / snr_weld - 1.4) < 0.02
+
+
+def test_analog_chart_film_class_mismatch_warning(engine):
+    """Selecting an analog isotope chart (e.g. M100 -> C2) whose film class differs from film_class_used (e.g. C5) emits an informational warning."""
+    res_mismatch = engine.calculate({
+        "tech": "analog", "source": "isotope_ir192",
+        "chart_source": "M100", "film_class_used": "C5",
+        "od": 114.3, "t": 8.0,
+    }, {}, "tr")
+    assert any("M100" in w and "C2" in w and "C5" in w for w in res_mismatch["warnings"])
+
+    res_match = engine.calculate({
+        "tech": "analog", "source": "isotope_ir192",
+        "chart_source": "M100", "film_class_used": "C2",
+        "od": 114.3, "t": 8.0,
+    }, {}, "tr")
+    assert not any("M100" in w and "C2" in w for w in res_match["warnings"])
+

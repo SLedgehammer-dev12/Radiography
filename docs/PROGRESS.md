@@ -24,6 +24,30 @@
 - Commit `70ab040`.
 
 ### Fixes
+- **Exposure-time calculation engines audit & fixes (Analog/Digital × X-Ray/Gamma)** —
+  - Fixed **16× under-exposure bug** in `digital_xray_chart` / `dda_panel_chart` (X-Ray):
+    `TYPE_X_CHART` is pre-divided by C5 film speed (`16.0`); digital mode now restores
+    `exposure_mamin = raw_chart_mamin * 16.0` (`SNR_N = 70` `cr_standard` baseline) and
+    reports `method = "digital_xray_chart"`.
+  - Added **energy-dependent X-ray material equivalence** (`ref_factor_xray = mu(kV, mat) / mu(kV, steel)`)
+    for non-steel materials in `type_x` and `digital_xray_chart`.
+  - Passed `testing_class` to `calculate_dda_frame_integration` in `dda_panel_chart` (Gamma Ray)
+    so Class A uses `16` frames vs `32` for Class B, and enforced DDA hardware acquisition floor
+    (`max(2.0 if x_ray else 0.0, n_frames * 0.10)`).
+  - Passed ISO 11699-1 film-class gradient `G̅` (`FILM_GRADIENT`) into R-factor density
+    correction (`10^((D - 2.0) / G̅)`) and honored custom per-film R-factor overrides
+    in `ExposureChartDatabase.calculate_exposure_time_rfactor`.
+  - Applied `extra_multiplier` (`time_multiplier * base_multiplier`) inside
+    `calculate_exposure_time_details` before `dda_frame_method` and hardware floor clamping;
+    eliminated DDA `model` sawtooth step rounding by flooring at `min_acq_floor` instead of
+    rounded `total_acq_sec`; computed `dose_rate_ugy_s` from un-clamped `t_frame_ideal`.
+  - Compounded `se75_thin_class_b` (`×1.4`, ISO 17636-2 Clause 6.9) with
+    `snr_location == "adjacent"` (`×1.4`, Table B.14) to `×1.96`; fixed `_check_kvp5`
+    to compare `(kV_ref / kV)^5` against `exp((mu_cur - mu_ref) * w_eff)`; updated
+    `dda_se` Co-60 R-factor to `0.065`; bidirectional `chart_source` ↔ `film_class_used`
+    sync in `web/src/App.tsx` + mismatch warning in `engine.py`.
+  - Covered by 7 new regression tests in `tests/test_exposure_charts.py` and
+    `tests/test_engine.py`.
 - **DDA saturation advisory** — `dda_frame.t_frame_ideal` exposed; `engine.py`
   warns when `< 0.08 s` (reduce mA / increase SFD). Covered by
   `tests/test_engine.py::test_dda_high_dose_rate_saturation_advisory`.
@@ -94,7 +118,7 @@
 ## Verification (re-run before continuing)
 
 ```bash
-python3 -m pytest -q                    # 915 passed, 6 skipped, 849 subtests
+python3 -m pytest -q                    # 922 passed, 6 skipped, 849 subtests
 cd web && npx tsc -b                    # clean
 cd web && npx oxlint src/               # 0 warnings, 0 errors
 cd web && npx playwright test           # 33 passed (21 + 3 mobile + 9 feedback)

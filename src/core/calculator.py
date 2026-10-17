@@ -1856,7 +1856,7 @@ class RTCalculator:
 
         fps = round(1.0 / max(0.01, t_frame_sec), 2)
         t_frame_ms = round(t_frame_sec * 1000.0, 1)
-        dose_rate_ugy_s = frame_dose_target / max(0.05, t_frame_sec)
+        dose_rate_ugy_s = frame_dose_target / max(0.001, t_frame_ideal)
         total_dose_ugy = dose_rate_ugy_s * total_acq_sec
 
         return {
@@ -1881,7 +1881,8 @@ class RTCalculator:
                                  kv=None, material="steel",
                                  chart_source=None, chart_db=None,
                                  film_model=None, density=None,
-                                 target_snr=None, app_srb=None):
+                                 target_snr=None, app_srb=None,
+                                 extra_multiplier=1.0):
         """
         Calculates exposure time in minutes and seconds (Step 10).
         Delegates to `calculate_exposure_time_details` and returns
@@ -1893,7 +1894,7 @@ class RTCalculator:
             film_class=film_class, detector_type=detector_type, kv=kv,
             material=material, chart_source=chart_source, chart_db=chart_db,
             film_model=film_model, density=density, target_snr=target_snr,
-            app_srb=app_srb,
+            app_srb=app_srb, extra_multiplier=extra_multiplier,
         )
         return details["minutes"], details["seconds"], details["time_seconds"]
 
@@ -1903,7 +1904,8 @@ class RTCalculator:
                                         kv=None, material="steel",
                                         chart_source=None, chart_db=None,
                                         film_model=None, density=None,
-                                        target_snr=None, app_srb=None):
+                                        target_snr=None, app_srb=None,
+                                        extra_multiplier=1.0):
         """
         Full exposure-time calculation returning both timing values and a
         structured `provenance` dictionary explaining the active method,
@@ -1913,6 +1915,7 @@ class RTCalculator:
         w_eff = float(w_eff)
         output_safe = max(0.01, float(output_val))
         base_factor = float(base_factor)
+        extra_mult = max(0.001, float(extra_multiplier if extra_multiplier is not None else 1.0))
         ref_factor = self.get_ref_factor(material)
         w_eq_steel = w_eff * ref_factor
 
@@ -1985,15 +1988,23 @@ class RTCalculator:
                         hvl = chart_db.HVL.get(source, 13.2)
                         gamma = chart_db.GAMMA.get(source, 0.48)
                         attenuation = 2.0 ** (w_eq_steel / hvl)
+                        t_min = t_min * extra_mult
                         time_seconds = min(864000.0, t_min * 60.0)
                         dda_frame = (
                             self.calculate_dda_frame_integration(
                                 time_seconds, sfd, w_eff, source, output_safe,
                                 det_for_chart, snr_target_used, kv=kv,
                                 material=material, srb_factor=srb_factor, dqe_factor=det_factor,
+                                testing_class=testing_class,
                             )
                             if (is_dda or eff_chart == "dda_panel_chart") else None
                         )
+                        if (is_dda or eff_chart == "dda_panel_chart") and dda_frame:
+                            min_acq_floor = max(
+                                2.0 if source == "x_ray" else 0.0,
+                                float(dda_frame["n_frames"]) * 0.10,
+                            )
+                            time_seconds = max(time_seconds, min_acq_floor)
                         minutes = int(time_seconds // 60)
                         seconds = int(time_seconds % 60)
                         prov = {
@@ -2051,6 +2062,7 @@ class RTCalculator:
                             hvl = chart_db.HVL.get(source, 13.2)
                             gamma = chart_db.GAMMA.get(source, 0.48)
                             attenuation = 2.0 ** (w_eq_steel / hvl)
+                            t_min = t_min * extra_mult
                             time_seconds = min(864000.0, t_min * 60.0)
                             dda_frame = (
                                 self.calculate_dda_frame_integration(
@@ -2062,7 +2074,11 @@ class RTCalculator:
                                 if is_dda else None
                             )
                             if is_dda and dda_frame:
-                                time_seconds = max(time_seconds, dda_frame["total_acq_sec"])
+                                min_acq_floor = max(
+                                    2.0 if source == "x_ray" else 0.0,
+                                    float(dda_frame["n_frames"]) * 0.10,
+                                )
+                                time_seconds = max(time_seconds, min_acq_floor)
                             minutes = int(time_seconds // 60)
                             seconds = int(time_seconds % 60)
                             prov = {
@@ -2102,18 +2118,28 @@ class RTCalculator:
                     logger.warning("Type X chart is for X-ray only; falling back to physics model")
                     fallback_reason = "type_x_requires_xray"
                 else:
-                    kv_eff = float(kv) if kv is not None else 120.0
-                    exposure_mamin = chart_db.get_type_x_exposure(kv_eff, w_eq_steel, interpolate=True)
-                    if exposure_mamin is not None and exposure_mamin > 0:
+                    kv_eff = float(kv) if (kv is not None and float(kv) > 0) else 120.0
+                    if material != "steel":
+                        mu_st_kv = self.get_mu_from_kv(kv_eff, "steel")
+                        mu_mat_kv = self.get_mu_from_kv(kv_eff, material)
+                        ref_factor_xray = (mu_mat_kv / mu_st_kv) if mu_st_kv > 0 else ref_factor
+                    else:
+                        ref_factor_xray = 1.0
+                    w_eq_xray = w_eff * ref_factor_xray
+                    raw_chart_mamin = chart_db.get_type_x_exposure(kv_eff, w_eq_xray, interpolate=True)
+                    if raw_chart_mamin is not None and raw_chart_mamin > 0:
                         sfd_ref = 700.0
                         sfd_correction = (sfd / sfd_ref) ** 2
                         if tech == "analog":
+                            exposure_mamin = raw_chart_mamin
                             receptor_mod = od_factor * (16.0 / film_speed)
                         else:
+                            # TYPE_X_CHART is tabulated for C5 film (speed=16.0); scale to SNR_N=70 digital baseline (cr_standard=1.0)
+                            exposure_mamin = raw_chart_mamin * 16.0
                             receptor_mod = (snr_factor * srb_factor) / det_factor
-                        t_min = (exposure_mamin * sfd_correction * receptor_mod) / output_safe
+                        t_min = ((exposure_mamin * sfd_correction * receptor_mod) / output_safe) * extra_mult
                         if t_min > 0:
-                            active_method = "digital_xray_chart" if (tech == "digital" and chart_source == "digital_xray_chart") else "type_x"
+                            active_method = "digital_xray_chart" if tech == "digital" else "type_x"
                             time_seconds = min(864000.0, t_min * 60.0)
                             dda_frame = (
                                 self.calculate_dda_frame_integration(
@@ -2125,7 +2151,11 @@ class RTCalculator:
                                 if (tech == "digital" and is_dda) else None
                             )
                             if tech == "digital" and is_dda and dda_frame:
-                                time_seconds = max(time_seconds, dda_frame["total_acq_sec"])
+                                min_acq_floor = max(
+                                    2.0 if source == "x_ray" else 0.0,
+                                    float(dda_frame["n_frames"]) * 0.10,
+                                )
+                                time_seconds = max(time_seconds, min_acq_floor)
                             minutes = int(time_seconds // 60)
                             seconds = int(time_seconds % 60)
                             prov = {
@@ -2135,9 +2165,9 @@ class RTCalculator:
                                 "tech": tech,
                                 "source": source,
                                 "material": material,
-                                "ref_factor": ref_factor,
+                                "ref_factor": ref_factor_xray,
                                 "w_eff": w_eff,
-                                "w_eq_steel": w_eq_steel,
+                                "w_eq_steel": w_eq_xray,
                                 "kv": kv_eff,
                                 "sfd": sfd,
                                 "sfd_ref": sfd_ref,
@@ -2178,23 +2208,29 @@ class RTCalculator:
                         od_for_rfactor = float(density) if (density is not None and float(density) > 0.0) else (
                             2.0 if density == 2.0 else target_od
                         )
+                        chart_film_class = {
+                            "M100": "C2", "MX125": "C3", "T200": "C4", "AA400": "C5", "HS800": "C6",
+                        }.get(resolved_film, film_class)
+                        chart_gradient = self.FILM_GRADIENT.get(chart_film_class, gradient)
                         result = self._calc_from_rfactor(
                             chart_db, resolved_film, source, sfd, w_eff, output_safe,
-                            od_for_rfactor, ref_factor=ref_factor,
+                            od_for_rfactor, ref_factor=ref_factor, gradient=chart_gradient,
                         )
                         if result is not None and result > 0:
+                            result = result * extra_mult
                             active_method = "rfactor"
                             hvl = chart_db.HVL.get(source, 13.2)
                             gamma = chart_db.GAMMA.get(source, 0.48)
                             rel_speed = chart_db.FILM_RELATIVE_SPEED.get(resolved_film, 1.0)
                             r_aa400 = chart_db.lookup_r_factor("AA400", source)
-                            effective_r = (
-                                (r_aa400 / rel_speed)
-                                if (r_aa400 is not None and rel_speed > 0 and resolved_film != "AA400")
-                                else r_factor
-                            )
+                            if r_aa400 is not None and rel_speed > 0 and resolved_film != "AA400":
+                                default_r = chart_db.__class__.R_FACTOR_TABLE.get(resolved_film, {}).get(source)
+                                custom_ratio = (r_factor / default_r) if (default_r and default_r > 0) else 1.0
+                                effective_r = (r_aa400 / rel_speed) * custom_ratio
+                            else:
+                                effective_r = r_factor
                             attenuation = 2.0 ** (w_eq_steel / hvl)
-                            density_corr = 10.0 ** ((od_for_rfactor - 2.0) / 2.0)
+                            density_corr = 10.0 ** ((od_for_rfactor - 2.0) / max(0.1, chart_gradient))
                             time_seconds = min(864000.0, result * 60.0)
                             minutes = int(time_seconds // 60)
                             seconds = int(time_seconds % 60)
@@ -2212,6 +2248,8 @@ class RTCalculator:
                                 "output_val": output_safe,
                                 "film_key": resolved_film,
                                 "film_class": film_class,
+                                "chart_film_class": chart_film_class,
+                                "gradient": chart_gradient,
                                 "r_factor_raw": r_factor,
                                 "r_factor_eff": effective_r,
                                 "rel_speed": rel_speed,
@@ -2276,13 +2314,13 @@ class RTCalculator:
         t_base = (base_factor * (sfd_m ** 2) * attenuation) / output_safe
 
         if tech == "analog":
-            time_minutes = t_base * od_factor / film_speed
+            time_minutes = (t_base * od_factor / film_speed) * extra_mult
         else:  # digital
-            time_minutes = t_base * (snr_factor * srb_factor) / det_factor
+            time_minutes = (t_base * (snr_factor * srb_factor) / det_factor) * extra_mult
 
         # ── kVp⁵ sanity check (X-ray only) ──────────────────────────────────
         if source == "x_ray" and kv_eff is not None and time_minutes > 0:
-            self._check_kvp5(kv_eff, time_minutes, material, tech, film_class, testing_class)
+            self._check_kvp5(kv_eff, time_minutes, material, tech, film_class, testing_class, w_eff=w_eff)
 
         # ── Convert to seconds and cap at 10 days
         time_seconds = min(864000.0, time_minutes * 60.0)
@@ -2303,7 +2341,11 @@ class RTCalculator:
                 time_seconds = min(864000.0, dda_frame["total_acq_sec"])
                 time_minutes = time_seconds / 60.0
             elif is_dda and dda_frame:
-                time_seconds = max(time_seconds, dda_frame["total_acq_sec"])
+                min_acq_floor = max(
+                    2.0 if source == "x_ray" else 0.0,
+                    float(dda_frame["n_frames"]) * 0.10,
+                )
+                time_seconds = max(time_seconds, min_acq_floor)
                 time_minutes = time_seconds / 60.0
 
         minutes = int(time_seconds // 60)
@@ -2396,13 +2438,13 @@ class RTCalculator:
         return None
 
     def _calc_from_rfactor(self, chart_db, film_key, source, sfd, w, activity,
-                           density=2.0, ref_factor=1.0):
+                           density=2.0, ref_factor=1.0, gradient=2.0):
         if source not in chart_db.HVL:
             return None
         t_min = chart_db.calculate_exposure_time_rfactor(
             sfd=sfd, w=w, source=source, activity=activity,
             film_key=film_key, density=density if density is not None else 2.0,
-            ref_factor=ref_factor,
+            ref_factor=ref_factor, gradient=gradient,
         )
         return t_min
 
@@ -2420,7 +2462,7 @@ class RTCalculator:
             return None
         return t_min
 
-    def _check_kvp5(self, kv, time_minutes, material, tech, film_class, testing_class):
+    def _check_kvp5(self, kv, time_minutes, material, tech, film_class, testing_class, w_eff=10.0):
         kv_ref = 200.0
         if kv <= 0.0:
             return
@@ -2429,7 +2471,7 @@ class RTCalculator:
         mu_ref = self.get_mu_from_kv(kv_ref, material)
         mu_cur = self.get_mu_from_kv(kv, material)
         ratio_simple = (kv_ref / kv) ** 5
-        ratio_model = mu_cur / mu_ref if mu_ref > 0 else 1.0
+        ratio_model = math.exp(min(100.0, (mu_cur - mu_ref) * max(1.0, float(w_eff))))
         deviation = abs(ratio_simple - ratio_model) / max(ratio_simple, 1e-10)
         if deviation > 0.30:
             logger.info(
