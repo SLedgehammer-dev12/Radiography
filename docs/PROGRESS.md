@@ -53,8 +53,15 @@
   (App.tsx → 2358)
 - (J, in progress) Right-column sketch tabs → `web/src/components/SketchTabsPanel.tsx`
   (App.tsx → 2164); `ExposuresProvenance` type added to `types.ts`
+- (J, done) Hero summary + DDA integration card + provenance builders →
+  `web/src/components/HeroSummaryPanel.tsx` + `formatExposuresProvenance` in `web/src/i18n.ts`;
+  shared domain constants exported from `web/src/state/presets.ts` (App.tsx → 1883 lines, −40%)
 
-### Features (web)
+### Features & Audit Fixes (web)
+- **Audit & lint pass** — `LengthSliderField` now scales `min` and `max` by `1/25.4`
+  in inch mode (covered by E2E); `WarningsPanel` uses `t("no_warnings")` instead of
+  hardcoded English; `useDefect` tracks `form.od`; all 6 `oxlint` warnings resolved
+  (`0 warnings, 0 errors`).
 - **Accessibility & error/loading polish (`4f84a81`)** — all modals (`DecayDialog`,
   `Lvl3Dialog`, `AboutModal`, `UpdateModal`) expose `role="dialog"` +
   `aria-modal="true"` and close on `Escape`; `InfoTip` supports `Enter`/`Space`
@@ -89,22 +96,22 @@
 ```bash
 python3 -m pytest -q                    # 915 passed, 6 skipped, 849 subtests
 cd web && npx tsc -b                    # clean
-cd web && npx oxlint src/               # 0 errors (6 pre-existing warnings)
-cd web && npx playwright test           # 32 passed (21 + 3 mobile + 8 feedback)
+cd web && npx oxlint src/               # 0 warnings, 0 errors
+cd web && npx playwright test           # 33 passed (21 + 3 mobile + 9 feedback)
 ```
 
 ## Pending / next
 
 - [x] **J: remaining web panels** — **STOPPED by decision (2026-10-17).** The
       remaining Inputs Group has 38 external deps; a component would need 38 props
-      with no cohesion gain. Done: Compliance, Warnings, Report info, Sketch tabs.
-      App.tsx stands at 2244 lines (−29%). Do not resume without a new approach
-      (semantic sub-panels or a form context). See `docs/godclass-plan.md` step J.
+      with no cohesion gain. Done: Compliance, Warnings, Report info, Sketch tabs,
+      HeroSummaryPanel. App.tsx stands at 1883 lines (−40%). Do not resume without
+      a new approach (semantic sub-panels or a form context). See `docs/godclass-plan.md` step J.
 - [x] **Web feature development (interaction, feedback, error-state & accessibility pass)** —
       Done: toast variants + auto-dismiss; sticky header with Reset/PDF; header
       progress bar (`busy || pdfBusy`); outputs & compliance loading/error state polish;
       keyboard shortcuts + modal/busy guards; modal `role="dialog"` + `Escape`-to-close +
-      keyboard `InfoTip`.
+      keyboard `InfoTip`; inch-mode `LengthSliderField` bounds fix; `0` oxlint warnings.
 - [ ] Decide whether to record the web-only scope in `AGENTS.md`.
 
 ## Notes & risks
