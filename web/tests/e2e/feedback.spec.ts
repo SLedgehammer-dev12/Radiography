@@ -112,3 +112,20 @@ test("modals expose role=dialog and close on Escape", async ({ page }) => {
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
 });
+
+test("inch mode scales LengthSliderField min and max bounds", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.locator(".layout")).toBeVisible({ timeout: 150_000 });
+
+  const sfdNumber = page
+    .locator(".field", { hasText: /SFD|SDD/ })
+    .locator('input[type="number"]')
+    .first();
+  await expect(sfdNumber).toHaveAttribute("min", "10");
+
+  await page.getByRole("button", { name: /Ayarlar|Settings/i }).click();
+  await page.locator(".dropdown-item", { hasText: /Ölçü Birimi|Unit/i }).click();
+  await expect(sfdNumber).toHaveAttribute("min", "0.3937");
+});

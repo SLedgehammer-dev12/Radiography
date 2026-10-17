@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 
 import { Group } from "../components";
+import { formatExposuresProvenance } from "../i18n";
 import type { EngineResult, ExposuresProvenance, FormState } from "../types";
 import { AnnexAChartSvg, StandardFigureSvg, WeldSetupSvg } from "./SketchView";
 import { WeldSetup3D } from "./WeldSetup3D";
@@ -16,8 +17,6 @@ interface SketchTabsPanelProps {
   theme: "dark" | "light";
   lang: string;
   t: (key: string, ...args: unknown[]) => string;
-  exposuresProvenance: ExposuresProvenance | undefined;
-  exposuresProvenanceText: string;
 }
 
 export function SketchTabsPanel({
@@ -29,9 +28,14 @@ export function SketchTabsPanel({
   theme,
   lang,
   t,
-  exposuresProvenance,
-  exposuresProvenanceText,
 }: SketchTabsPanelProps) {
+  const exposuresProvenance = result?.values?.exposures_provenance as
+    | ExposuresProvenance
+    | undefined;
+  const exposuresProvenanceText = formatExposuresProvenance(
+    exposuresProvenance,
+    t,
+  );
   return (
     <>
       <div className="tabs">

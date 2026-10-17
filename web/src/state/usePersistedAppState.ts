@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
   DEFAULT_FORM,
@@ -61,7 +61,7 @@ function loadPersisted(): PersistedState {
 
 /** Owns the persisted app state (form/lvl3/lang/theme/reportInfo) + localStorage. */
 export function usePersistedAppState() {
-  const persisted = useMemo(loadPersisted, []);
+  const [persisted] = useState(loadPersisted);
   const [form, setForm] = useState<FormState>({
     ...DEFAULT_FORM,
     ...(persisted.form ?? {}),

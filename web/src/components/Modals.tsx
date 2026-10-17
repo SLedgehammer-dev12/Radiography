@@ -28,12 +28,10 @@ function DecayDialog({ t, source, onApply, onClose }: DecayDialogProps) {
   const [initial, setInitial] = useState(40);
   const [calibDate, setCalibDate] = useState("");
   const [current, setCurrent] = useState<number | null>(null);
+  const displayCurrent = calibDate ? current : null;
 
   useEffect(() => {
-    if (!calibDate) {
-      setCurrent(null);
-      return;
-    }
+    if (!calibDate) return;
     const handle = setTimeout(async () => {
       try {
         const data = await pyClient.request<{
@@ -79,15 +77,17 @@ function DecayDialog({ t, source, onApply, onClose }: DecayDialogProps) {
         </label>
         <p>
           {t("decay_current")}{" "}
-          <strong>{current === null ? "-" : `${current.toFixed(1)} Ci`}</strong>
+          <strong>
+            {displayCurrent === null ? "-" : `${displayCurrent.toFixed(1)} Ci`}
+          </strong>
         </p>
         <div className="modal-actions">
           <button onClick={onClose}>{t("dialog_cancel")}</button>
           <button
             className="primary"
-            disabled={current === null}
+            disabled={displayCurrent === null}
             onClick={() => {
-              if (current !== null) onApply(current);
+              if (displayCurrent !== null) onApply(displayCurrent);
               onClose();
             }}
           >
@@ -244,69 +244,82 @@ interface UpdateModalProps {
   currentVersion?: string;
 }
 
+type UpdateStatus = {
+  status: "checking" | "up_to_date" | "available" | "error";
+  latestVersion?: string;
+  releaseUrl?: string;
+  errorMessage?: string;
+};
+
+async function fetchReleaseStatus(
+  currentVersion: string,
+  signal?: AbortSignal,
+): Promise<UpdateStatus | null> {
+  try {
+    const res = await fetch(
+      "https://api.github.com/repos/SLedgehammer-dev12/Radiography/releases/latest",
+      { headers: { Accept: "application/vnd.github+json" }, signal },
+    );
+    if (!res.ok) {
+      throw new Error(`GitHub API HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    const tagName: string = data.tag_name || "";
+
+    const parseV = (v: string): [number, number, number] => {
+      const match = v.match(/^v?(\d+)\.(\d+)\.(\d+)/);
+      if (!match) return [0, 0, 0];
+      return [parseInt(match[1], 10), parseInt(match[2], 10), parseInt(match[3], 10)];
+    };
+    const [maj1, min1, pat1] = parseV(tagName);
+    const [maj0, min0, pat0] = parseV(currentVersion);
+
+    const isNewer =
+      maj1 > maj0 ||
+      (maj1 === maj0 && min1 > min0) ||
+      (maj1 === maj0 && min1 === min0 && pat1 > pat0);
+
+    if (isNewer) {
+      return {
+        status: "available",
+        latestVersion: tagName,
+        releaseUrl:
+          data.html_url ||
+          "https://github.com/SLedgehammer-dev12/Radiography/releases",
+      };
+    }
+    return {
+      status: "up_to_date",
+      latestVersion: tagName || `v${currentVersion}`,
+    };
+  } catch (err: unknown) {
+    if (signal?.aborted) return null;
+    return {
+      status: "error",
+      errorMessage: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
 function UpdateModal({ t, onClose, currentVersion = FALLBACK_VERSION }: UpdateModalProps) {
   useEscapeClose(onClose);
-  const [updateState, setUpdateState] = useState<{
-    status: "checking" | "up_to_date" | "available" | "error";
-    latestVersion?: string;
-    releaseUrl?: string;
-    errorMessage?: string;
-  }>({ status: "checking" });
+  const [updateState, setUpdateState] = useState<UpdateStatus>({
+    status: "checking",
+  });
 
-  const handleCheckUpdates = async (signal?: AbortSignal) => {
+  const handleCheckUpdates = async () => {
     setUpdateState({ status: "checking" });
-    try {
-      const res = await fetch(
-        "https://api.github.com/repos/SLedgehammer-dev12/Radiography/releases/latest",
-        { headers: { Accept: "application/vnd.github+json" }, signal },
-      );
-      if (!res.ok) {
-        throw new Error(`GitHub API HTTP ${res.status}`);
-      }
-      const data = await res.json();
-      const tagName: string = data.tag_name || "";
-
-      const parseV = (v: string): [number, number, number] => {
-        const match = v.match(/^v?(\d+)\.(\d+)\.(\d+)/);
-        if (!match) return [0, 0, 0];
-        return [parseInt(match[1], 10), parseInt(match[2], 10), parseInt(match[3], 10)];
-      };
-      const [maj1, min1, pat1] = parseV(tagName);
-      const [maj0, min0, pat0] = parseV(currentVersion);
-
-      const isNewer =
-        maj1 > maj0 ||
-        (maj1 === maj0 && min1 > min0) ||
-        (maj1 === maj0 && min1 === min0 && pat1 > pat0);
-
-      if (isNewer) {
-        setUpdateState({
-          status: "available",
-          latestVersion: tagName,
-          releaseUrl:
-            data.html_url ||
-            "https://github.com/SLedgehammer-dev12/Radiography/releases",
-        });
-      } else {
-        setUpdateState({
-          status: "up_to_date",
-          latestVersion: tagName || `v${currentVersion}`,
-        });
-      }
-    } catch (err: unknown) {
-      if (signal?.aborted) return;
-      setUpdateState({
-        status: "error",
-        errorMessage: err instanceof Error ? err.message : String(err),
-      });
-    }
+    const next = await fetchReleaseStatus(currentVersion);
+    if (next) setUpdateState(next);
   };
 
   useEffect(() => {
     const controller = new AbortController();
-    handleCheckUpdates(controller.signal);
+    void fetchReleaseStatus(currentVersion, controller.signal).then((next) => {
+      if (next) setUpdateState(next);
+    });
     return () => controller.abort();
-  }, []);
+  }, [currentVersion]);
 
   return (
     <div className="modal-backdrop" onClick={onClose}>

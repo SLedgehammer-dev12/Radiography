@@ -1,3 +1,7 @@
+import { createContext } from "react";
+
+export const UnitContext = createContext<{ inch: boolean }>({ inch: false });
+
 export type Tech = "analog" | "digital";
 export type TestingClass = "class_a" | "class_b";
 export type Geometry = "dwsi" | "swsi" | "dwdi_elliptic" | "dwdi_super";

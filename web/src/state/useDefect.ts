@@ -38,7 +38,7 @@ export function useDefect({ form, lang, ready, onError }: UseDefectArgs) {
     }, 150);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, defectActive, form.t, defect, lang]);
+  }, [ready, defectActive, form.t, form.od, defect, lang]);
 
   const runDefect = async () => {
     setDefectActive(true);

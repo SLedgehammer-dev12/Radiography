@@ -104,5 +104,3 @@ self.onmessage = async (event: MessageEvent<Request>) => {
     post({ id: request.id, ok: false, error: String(error) });
   }
 };
-
-export {};

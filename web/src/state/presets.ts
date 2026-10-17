@@ -1,7 +1,7 @@
 import { DEFAULT_FORM, type FormState, type PipeData } from "../types";
 
-const MATERIALS = ["steel", "aluminum", "titanium", "copper_nickel"];
-const SOURCES = [
+export const MATERIALS = ["steel", "aluminum", "titanium", "copper_nickel"];
+export const SOURCES = [
   "x_ray",
   "isotope_ir192",
   "isotope_se75",
@@ -10,9 +10,9 @@ const SOURCES = [
   "isotope_tm170",
 ];
 const CLASSES = ["class_b", "class_a"];
-const GEOMETRIES = ["dwsi", "swsi", "dwdi_elliptic", "dwdi_super"];
+export const GEOMETRIES = ["dwsi", "swsi", "dwdi_elliptic", "dwdi_super"];
 const STANDARDS = ["iso", "asme"];
-const DETECTORS = ["cr_standard", "cr_highres", "dda_si", "dda_se", "dda_gdos"];
+export const DETECTORS = ["cr_standard", "cr_highres", "dda_si", "dda_se", "dda_gdos"];
 const ANALOG_XRAY_CHARTS = ["model", "type_x"];
 const ANALOG_ISOTOPE_CHARTS = ["model", "AA400", "MX125", "T200", "HS800", "M100"];
 const DIGITAL_CR_XRAY_CHARTS = ["model", "digital_xray_chart"];
@@ -47,7 +47,7 @@ export function getActiveChartKeys(
 }
 
 const COLLIMATORS = [0, 1, 2, 4];
-const FILM_SIZES: Record<string, [number, number]> = {
+export const FILM_SIZES: Record<string, [number, number]> = {
   "80x300": [80, 300],
   "100x400": [100, 400],
   "300x400": [300, 400],

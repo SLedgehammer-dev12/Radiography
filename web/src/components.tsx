@@ -1,5 +1,4 @@
 import {
-  createContext,
   useContext,
   useEffect,
   useRef,
@@ -8,7 +7,7 @@ import {
   type ReactNode,
 } from "react";
 
-export const UnitContext = createContext<{ inch: boolean }>({ inch: false });
+import { UnitContext } from "./types";
 
 /**
  * Accessible instant tooltip badge (?) that works on both hover and touch/focus.
@@ -464,8 +463,8 @@ export function LengthSliderField(props: SliderFieldProps) {
     <SliderField
       {...props}
       value={display}
-      min={props.min}
-      max={props.max}
+      min={Number((props.min * factor).toFixed(4))}
+      max={Number((props.max * factor).toFixed(4))}
       sliderMin={
         props.sliderMin === undefined
           ? undefined

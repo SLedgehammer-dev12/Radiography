@@ -15,7 +15,7 @@ export function WarningsPanel({ t, warnings }: WarningsPanelProps) {
           ))}
         </ul>
       ) : (
-        <p className="muted">No active warnings.</p>
+        <p className="muted">{t("no_warnings")}</p>
       )}
     </Group>
   );
