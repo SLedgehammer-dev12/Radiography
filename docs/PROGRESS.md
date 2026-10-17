@@ -55,6 +55,9 @@
   (App.tsx → 2164); `ExposuresProvenance` type added to `types.ts`
 
 ### Features (web)
+- **Keyboard shortcuts** — `Ctrl/Cmd+Enter` exports the PDF, `Ctrl/Cmd+S` saves
+  the current form as a preset (browser save dialog suppressed). PDF button
+  title hints the shortcut. E2E covers both.
 - **Loading feedback** — indeterminate progress bar at the bottom of the sticky
   header while a calculation/PDF export runs; outputs panel shows a
   "Hesaplanıyor… / Calculating…" empty state before the first result.
@@ -78,7 +81,7 @@
 python3 -m pytest -q                    # 915 passed, 6 skipped, 849 subtests
 cd web && npx tsc -b                    # clean
 cd web && npx oxlint src/               # 0 errors (6 pre-existing warnings)
-cd web && npx playwright test           # 29 passed (21 + 3 mobile + 5 feedback)
+cd web && npx playwright test           # 31 passed (21 + 3 mobile + 7 feedback)
 ```
 
 ## Pending / next
@@ -89,9 +92,9 @@ cd web && npx playwright test           # 29 passed (21 + 3 mobile + 5 feedback)
       App.tsx stands at 2164 lines (−31%). Do not resume without a new approach
       (semantic sub-panels or a form context). See `docs/godclass-plan.md` step J.
 - [ ] **Web feature development** — direction: **interaction & feedback**.
-      Done: toast variants + auto-dismiss; sticky header with Reset/PDF;
-      header progress bar; outputs empty state.
-      Possible next: keyboard shortcuts, skeleton rows, error-state polish.
+      Done: toast variants + auto-dismiss; sticky header with Reset/PDF; header
+      progress bar; outputs empty state; keyboard shortcuts.
+      Possible next: skeleton rows, error-state polish, accessibility pass.
 - [ ] Decide whether to record the web-only scope in `AGENTS.md`.
 
 ## Notes & risks

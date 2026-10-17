@@ -69,4 +69,27 @@ test("header exposes an idle indeterminate progress bar", async ({ page }) => {
   );
 });
 
+test("keyboard: Ctrl+S saves a preset", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator(".layout")).toBeVisible({ timeout: 150_000 });
+  const downloadPromise = page.waitForEvent("download");
+  await page.keyboard.press("Control+s");
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toContain("rt_preset");
+});
+
+test("keyboard: Ctrl+Enter exports the PDF", async ({ page }) => {
+  test.setTimeout(300_000);
+  await page.goto("/");
+  await expect(page.locator(".layout")).toBeVisible({ timeout: 150_000 });
+  await expect(page.getByTestId("output-calc_time")).not.toContainText("-", {
+    timeout: 60_000,
+  });
+  const downloadPromise = page.waitForEvent("download", { timeout: 240_000 });
+  await page.keyboard.press("Control+Enter");
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toContain("RT_Inspection_Report");
+});
+
+
 

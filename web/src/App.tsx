@@ -597,6 +597,23 @@ export default function App() {
     }
   };
 
+  // Keyboard shortcuts: Ctrl/Cmd+Enter exports the PDF, Ctrl/Cmd+S saves the
+  // current form as a preset (preventDefault stops the browser save dialog).
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey)) return;
+      if (event.key === "Enter") {
+        event.preventDefault();
+        void exportPdf();
+      } else if (event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        exportPreset();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [exportPdf, exportPreset]);
+
   if (!ready) {
     return (
       <div className="boot-screen">
@@ -644,7 +661,7 @@ export default function App() {
               className="topbar-action primary"
               onClick={exportPdf}
               disabled={pdfBusy || !result}
-              title={t("export_pdf")}
+              title={`${t("export_pdf")} (Ctrl+Enter)`}
             >
               📄 {pdfBusy ? "…" : t("export_pdf")}
             </button>
