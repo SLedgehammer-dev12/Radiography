@@ -87,9 +87,28 @@ test("keyboard: Ctrl+Enter exports the PDF", async ({ page }) => {
   });
   const downloadPromise = page.waitForEvent("download", { timeout: 240_000 });
   await page.keyboard.press("Control+Enter");
+  await expect(page.locator(".app-progress.active")).toHaveAttribute(
+    "aria-hidden",
+    "false",
+  );
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toContain("RT_Inspection_Report");
+  await expect(page.locator(".app-progress")).toHaveAttribute(
+    "aria-hidden",
+    "true",
+  );
 });
 
+test("modals expose role=dialog and close on Escape", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator(".layout")).toBeVisible({ timeout: 150_000 });
+  await page.getByRole("button", { name: /Yardım|Help/i }).click();
+  await page.getByRole("button", { name: /Hakkında|About/i }).click();
 
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toHaveAttribute("aria-modal", "true");
 
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+});

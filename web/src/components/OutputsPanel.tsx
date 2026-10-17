@@ -27,6 +27,7 @@ const OUTPUT_KEYS = [
 interface OutputsPanelProps {
   t: (key: string, ...args: unknown[]) => string;
   result: EngineResult | null;
+  error?: string | null;
   strings: Record<string, string>;
   digital: boolean;
   hiddenOutputs: Set<string>;
@@ -35,6 +36,7 @@ interface OutputsPanelProps {
 export function OutputsPanel({
   t,
   result,
+  error,
   strings,
   digital,
   hiddenOutputs,
@@ -80,7 +82,9 @@ export function OutputsPanel({
           />
         ))
       ) : (
-        <p className="muted">Hesaplanıyor… / Calculating…</p>
+        <p className="muted">
+          {error ? "—" : "Hesaplanıyor… / Calculating…"}
+        </p>
       )}
     </Group>
   );

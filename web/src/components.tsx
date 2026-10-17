@@ -16,6 +16,14 @@ export const UnitContext = createContext<{ inch: boolean }>({ inch: false });
  */
 export function InfoTip({ text, title }: { text?: string; title?: string }) {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [open]);
   if (!text) return null;
   return (
     <>
@@ -30,6 +38,13 @@ export function InfoTip({ text, title }: { text?: string; title?: string }) {
           event.preventDefault();
           event.stopPropagation();
           setOpen(true);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            event.stopPropagation();
+            setOpen(true);
+          }
         }}
       />
       {open && (

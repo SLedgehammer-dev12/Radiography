@@ -6,6 +6,16 @@ import type { Lvl3Settings } from "../types";
 
 export const FALLBACK_VERSION = "2.0.3";
 
+function useEscapeClose(onClose: () => void) {
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+}
+
 interface DecayDialogProps {
   t: (key: string, ...args: unknown[]) => string;
   source: string;
@@ -14,6 +24,7 @@ interface DecayDialogProps {
 }
 
 function DecayDialog({ t, source, onApply, onClose }: DecayDialogProps) {
+  useEscapeClose(onClose);
   const [initial, setInitial] = useState(40);
   const [calibDate, setCalibDate] = useState("");
   const [current, setCurrent] = useState<number | null>(null);
@@ -43,7 +54,12 @@ function DecayDialog({ t, source, onApply, onClose }: DecayDialogProps) {
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(event) => event.stopPropagation()}>
+      <div
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        onClick={(event) => event.stopPropagation()}
+      >
         <h2>{t("decay_dialog")}</h2>
         <NumberField
           label={t("decay_initial")}
@@ -91,6 +107,7 @@ interface Lvl3DialogProps {
 }
 
 function Lvl3Dialog({ lvl3, t, onChange, onClose }: Lvl3DialogProps) {
+  useEscapeClose(onClose);
   const options: [keyof Lvl3Settings, string][] = [
     ["sfd_comp", "lvl3_sfd_compensation"],
     ["voltage_override", "lvl3_voltage_override"],
@@ -101,7 +118,12 @@ function Lvl3Dialog({ lvl3, t, onChange, onClose }: Lvl3DialogProps) {
   ];
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(event) => event.stopPropagation()}>
+      <div
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        onClick={(event) => event.stopPropagation()}
+      >
         <h2>{t("level3_section")}</h2>
         {options.map(([key, labelKey]) => (
           <label className="field field-inline" key={key}>
@@ -145,9 +167,15 @@ interface AboutModalProps {
 }
 
 function AboutModal({ t, onClose, currentVersion = FALLBACK_VERSION }: AboutModalProps) {
+  useEscapeClose(onClose);
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal about-modal" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="modal about-modal"
+        role="dialog"
+        aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="about-header">
           <div className="about-title-block">
             <h2>
@@ -217,6 +245,7 @@ interface UpdateModalProps {
 }
 
 function UpdateModal({ t, onClose, currentVersion = FALLBACK_VERSION }: UpdateModalProps) {
+  useEscapeClose(onClose);
   const [updateState, setUpdateState] = useState<{
     status: "checking" | "up_to_date" | "available" | "error";
     latestVersion?: string;
@@ -281,7 +310,12 @@ function UpdateModal({ t, onClose, currentVersion = FALLBACK_VERSION }: UpdateMo
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal update-modal" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="modal update-modal"
+        role="dialog"
+        aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="about-header">
           <div className="about-title-block">
             <h2>

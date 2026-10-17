@@ -532,6 +532,7 @@ export default function App() {
   };
 
   const exportPdf = async () => {
+    if (pdfBusy) return;
     if (!result) {
       notify("Hesaplama hazır değil / Calculation not ready", "error");
       return;
@@ -541,16 +542,6 @@ export default function App() {
     try {
       await pyClient.request("pdf:prepare");
       const calculated = result.calculated as Record<string, unknown>;
-      const lvl3Active = (
-        [
-          "sfd_comp",
-          "voltage_override",
-          "isotope_flex",
-          "source_flex",
-          "central_proj_reduction",
-          "dw_reduction",
-        ] as (keyof Lvl3Settings)[]
-      ).some((key) => Boolean(lvl3[key]));
       const defectPayload = defectResult
         ? {
             active: true,
@@ -579,7 +570,7 @@ export default function App() {
         display: result.display,
         warnings: result.warnings,
         defect: defectPayload,
-        lvl3_active: lvl3Active,
+        lvl3_active: isLvl3Active,
         lvl3,
         sfd_comp_val: calculated.sfd_comp_target ?? null,
         lang,
@@ -599,28 +590,31 @@ export default function App() {
 
   // Keyboard shortcuts: Ctrl/Cmd+Enter exports the PDF, Ctrl/Cmd+S saves the
   // current form as a preset (preventDefault stops the browser save dialog).
+  const shortcutRef = useRef({ exportPdf, exportPreset, ready });
+  shortcutRef.current = { exportPdf, exportPreset, ready };
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if (!(event.ctrlKey || event.metaKey)) return;
+      if (!(event.ctrlKey || event.metaKey) || event.repeat) return;
+      if (!shortcutRef.current.ready || document.querySelector(".modal-backdrop")) return;
       if (event.key === "Enter") {
         event.preventDefault();
-        void exportPdf();
+        void shortcutRef.current.exportPdf();
       } else if (event.key.toLowerCase() === "s") {
         event.preventDefault();
-        exportPreset();
+        shortcutRef.current.exportPreset();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [exportPdf, exportPreset]);
+  }, []);
 
   if (!ready) {
     return (
       <div className="boot-screen">
         <h1>Radiography</h1>
         <p>{t("app_title")}</p>
-        <div className="spinner" />
-        <p className="boot-note">
+        {!bootError && <div className="spinner" />}
+        <p className="boot-note" role={bootError ? "alert" : undefined}>
           {bootError
             ? `Hata / Error: ${bootError}`
             : "Python çekirdeği (Pyodide) yükleniyor… / Loading the Python core…"}
@@ -629,6 +623,7 @@ export default function App() {
     );
   }
 
+  const working = busy || pdfBusy;
   const baseEUnit = xray ? "mA·min/m²" : "Ci·min/m²";
   const activityFactor = activityUnit === "GBq" ? 37 : 1;
   const bedSuggested = result?.values?.bed_auto_suggested as number | undefined;
@@ -645,8 +640,8 @@ export default function App() {
             <h1 className="title">{t("app_title")}</h1>
           </div>
           <div className="topbar-actions">
-            <span className={busy ? "status busy" : "status"}>
-              {busy ? "…" : error ? "!" : "OK"}
+            <span className={working ? "status busy" : "status"}>
+              {working ? "…" : error ? "!" : "OK"}
             </span>
             <button
               type="button"
@@ -707,7 +702,7 @@ export default function App() {
                     exportPdf();
                     setOpenMenu(null);
                   }}
-                  disabled={pdfBusy}
+                  disabled={pdfBusy || !result}
                 >
                   <span className="item-icon">📄</span>
                   <span>{pdfBusy ? "…" : t("export_pdf")}</span>
@@ -1118,10 +1113,10 @@ export default function App() {
           />
         </div>
         <div
-          className={`app-progress${busy ? " active" : ""}`}
+          className={`app-progress${working ? " active" : ""}`}
           role="progressbar"
           aria-label="Hesaplanıyor / Calculating"
-          aria-hidden={!busy}
+          aria-hidden={!working}
         />
         </div>
 
@@ -2171,6 +2166,7 @@ export default function App() {
             <OutputsPanel
               t={t}
               result={result}
+              error={error}
               strings={strings}
               digital={digital}
               hiddenOutputs={hiddenOutputs}

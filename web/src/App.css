@@ -1617,10 +1617,16 @@ details.group:not([open]) > summary.group-title {
     font-size: 16px;
   }
 
-  /* Comfortable tap targets (>= 40px tall). */
+  /* Comfortable tap targets (>= 40px tall), keeping inline pills compact. */
   button,
   .menu-trigger-btn {
     min-height: 40px;
+  }
+  .sync-btn,
+  .sketch-mini-btn,
+  .info-modal-close,
+  .toast-close {
+    min-height: 28px;
   }
   .radio-option {
     padding: 9px 14px;

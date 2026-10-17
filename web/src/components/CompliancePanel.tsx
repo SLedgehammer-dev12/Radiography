@@ -14,24 +14,26 @@ export function CompliancePanel({ t, error, compliance }: CompliancePanelProps) 
         <div className="badge non-compliant" role="alert">
           ⚠ {error}
         </div>
+      ) : !compliance ? (
+        <p className="muted">Hesaplanıyor… / Calculating…</p>
       ) : (
         <>
           <div
             className={
-              compliance?.is_compliant
+              compliance.is_compliant
                 ? "badge compliant"
                 : "badge non-compliant"
             }
           >
-            {compliance?.is_compliant ? t("compliant") : t("non_compliant")}
+            {compliance.is_compliant ? t("compliant") : t("non_compliant")}
           </div>
           <ul className="check-list">
-            {compliance?.checks.map((check) => (
+            {compliance.checks.map((check) => (
               <li key={check.name} className={check.status ? "ok" : "fail"}>
                 {check.status ? "✓" : "✗"} {check.details}
               </li>
             ))}
-            {compliance?.activity_warning && (
+            {compliance.activity_warning && (
               <li className="warn">⚠ {compliance.activity_warning}</li>
             )}
           </ul>
