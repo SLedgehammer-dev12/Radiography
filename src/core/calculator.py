@@ -110,34 +110,49 @@ class RTCalculator:
     # Source: ISO 17636-2 Annex A, ASTM E2698, manufacturer DQE specs.
     # -----------------------------------------------------------------------
     DETECTOR_TYPE_FACTORS = {
-        "cr_standard": 1.0,    # CR standard phosphor plate (Class A/B baseline)
-        "cr_highres":  0.75,   # CR high-resolution plate (slower, finer)
-        "cr_hires":    0.75,   # Web legacy alias for cr_highres
-        "dda_si":      4.0,    # Flat Panel amorphous silicon (a-Si)
-        "dda_se":      3.5,    # Flat Panel amorphous selenium (a-Se)
-        "dda_gdos":    3.0,    # DDA with GdOS (Gadolinium Oxysulfide) scintillator
+        "cr_standard":  1.0,    # CR IPS-2/3 standard plate (Carestream GP / Waygate IPC2 / Fuji ST-VI)
+        "cr_highres":   0.75,   # CR IPS-1 high-res plate (Carestream HR / Agfa MD4.1 / Fuji UR-1)
+        "cr_hires":     0.75,   # Web legacy alias for cr_highres
+        "cr_ips1_uhd":  0.60,   # CR IPS-1 Ultra-HD plate (Waygate IPU / Dürr HD-IP / Carestream HR-50)
+        "cr_fast":      1.35,   # CR IPS-4 fast plate (Carestream XL Blue / Waygate IPS / Fuji HR-V)
+        "dda_si":       4.0,    # DDA a-Si + CsI:Tl (Waygate DXR250C-W / Varex 2520DX / Carestream HPX-DR)
+        "dda_si_hires": 3.2,    # DDA a-Si + CsI:Tl HD fine-pixel (Varex XRpad4 3025 / Carestream HPX-ARC)
+        "dda_se":       3.5,    # DDA a-Se direct conversion (Teledyne ICM / Analogic a-Se)
+        "dda_gdos":     3.0,    # DDA a-Si + Gd2O2S:Tb (Varex XRD 1621 / Waygate DXR250U-W)
+        "dda_gdos_he":  3.4,    # DDA Gd2O2S:Tb high-energy heavy-wall (Varex XRD 1621 xN / Waygate DXR500L)
+        "dda_cmos":     4.4,    # DDA CMOS + CsI:Tl Ultra-HD (Teledyne DALSA Xineos / Varex Dexela)
     }
 
     # Native basic spatial resolution SR_b,ref (µm) per detector family
     # (ISO 17636-2 Annex F / ISO 16371-1 / ASTM E2698)
     DETECTOR_NATIVE_SRB = {
-        "cr_standard": 100.0,
-        "cr_highres":  50.0,
-        "cr_hires":    50.0,
-        "dda_si":      130.0,
-        "dda_se":      85.0,
-        "dda_gdos":    160.0,
+        "cr_standard":  100.0,
+        "cr_highres":   50.0,
+        "cr_hires":     50.0,
+        "cr_ips1_uhd":  40.0,
+        "cr_fast":      130.0,
+        "dda_si":       130.0,
+        "dda_si_hires": 75.0,
+        "dda_se":       85.0,
+        "dda_gdos":     160.0,
+        "dda_gdos_he":  200.0,
+        "dda_cmos":     50.0,
     }
 
     # Energy-dependent relative DQE(kV) curves for X-Ray sources (normalized at 120 kV)
     # Models Ba K-edge (37.4 keV) in CR, low-Z stopping drop in a-Se (Z=34) above 150 kV,
     # and Gd K-edge (50.2 keV, Z=64) high-energy retention in Gd2O2S.
     DETECTOR_XRAY_DQE_CURVES = {
-        "cr_standard": [(60, 1.18), (100, 1.06), (120, 1.00), (160, 0.94), (220, 0.88), (300, 0.82), (400, 0.76)],
-        "cr_highres":  [(60, 0.88), (100, 0.80), (120, 0.75), (160, 0.70), (220, 0.65), (300, 0.60), (400, 0.56)],
-        "dda_si":      [(60, 4.30), (100, 4.10), (120, 4.00), (160, 3.80), (220, 3.50), (300, 3.20), (400, 2.90)],
-        "dda_se":      [(60, 4.60), (100, 3.90), (120, 3.50), (150, 2.90), (200, 2.15), (300, 1.45), (400, 1.10)],
-        "dda_gdos":    [(60, 2.75), (100, 2.92), (120, 3.00), (160, 3.15), (220, 3.20), (300, 2.95), (400, 2.65)],
+        "cr_standard":  [(60, 1.18), (100, 1.06), (120, 1.00), (160, 0.94), (220, 0.88), (300, 0.82), (400, 0.76)],
+        "cr_highres":   [(60, 0.88), (100, 0.80), (120, 0.75), (160, 0.70), (220, 0.65), (300, 0.60), (400, 0.56)],
+        "cr_ips1_uhd":  [(60, 0.72), (100, 0.65), (120, 0.60), (160, 0.56), (220, 0.51), (300, 0.47), (400, 0.43)],
+        "cr_fast":      [(60, 1.55), (100, 1.42), (120, 1.35), (160, 1.28), (220, 1.20), (300, 1.12), (400, 1.04)],
+        "dda_si":       [(60, 4.30), (100, 4.10), (120, 4.00), (160, 3.80), (220, 3.50), (300, 3.20), (400, 2.90)],
+        "dda_si_hires": [(60, 3.55), (100, 3.32), (120, 3.20), (160, 3.00), (220, 2.75), (300, 2.48), (400, 2.20)],
+        "dda_se":       [(60, 4.60), (100, 3.90), (120, 3.50), (150, 2.90), (200, 2.15), (300, 1.45), (400, 1.10)],
+        "dda_gdos":     [(60, 2.75), (100, 2.92), (120, 3.00), (160, 3.15), (220, 3.20), (300, 2.95), (400, 2.65)],
+        "dda_gdos_he":  [(60, 2.90), (100, 3.20), (120, 3.40), (160, 3.65), (220, 3.80), (300, 3.60), (400, 3.35)],
+        "dda_cmos":     [(60, 4.90), (100, 4.60), (120, 4.40), (160, 4.10), (220, 3.65), (300, 3.15), (400, 2.70)],
     }
     DETECTOR_XRAY_DQE_CURVES["cr_hires"] = DETECTOR_XRAY_DQE_CURVES["cr_highres"]
 
@@ -151,9 +166,21 @@ class RTCalculator:
             "isotope_tm170": 0.84, "isotope_yb169": 0.78,
             "isotope_se75": 0.71,  "isotope_ir192": 0.64, "isotope_co60": 0.51,
         },
+        "cr_ips1_uhd": {
+            "isotope_tm170": 0.68, "isotope_yb169": 0.63,
+            "isotope_se75": 0.57,  "isotope_ir192": 0.51, "isotope_co60": 0.40,
+        },
+        "cr_fast": {
+            "isotope_tm170": 1.50, "isotope_yb169": 1.40,
+            "isotope_se75": 1.28,  "isotope_ir192": 1.16, "isotope_co60": 0.92,
+        },
         "dda_si": {
             "isotope_tm170": 4.15, "isotope_yb169": 3.95,
             "isotope_se75": 3.65,  "isotope_ir192": 3.15, "isotope_co60": 2.25,
+        },
+        "dda_si_hires": {
+            "isotope_tm170": 3.40, "isotope_yb169": 3.20,
+            "isotope_se75": 2.90,  "isotope_ir192": 2.50, "isotope_co60": 1.75,
         },
         "dda_se": {
             "isotope_tm170": 4.10, "isotope_yb169": 3.40,
@@ -162,6 +189,14 @@ class RTCalculator:
         "dda_gdos": {
             "isotope_tm170": 2.85, "isotope_yb169": 3.05,
             "isotope_se75": 3.25,  "isotope_ir192": 2.90, "isotope_co60": 2.10,
+        },
+        "dda_gdos_he": {
+            "isotope_tm170": 3.05, "isotope_yb169": 3.35,
+            "isotope_se75": 3.70,  "isotope_ir192": 3.45, "isotope_co60": 2.65,
+        },
+        "dda_cmos": {
+            "isotope_tm170": 4.65, "isotope_yb169": 4.35,
+            "isotope_se75": 3.90,  "isotope_ir192": 3.25, "isotope_co60": 2.15,
         },
     }
     DETECTOR_ISOTOPE_DQE["cr_hires"] = DETECTOR_ISOTOPE_DQE["cr_highres"]
@@ -1933,7 +1968,7 @@ class RTCalculator:
         det_factor_static = self.DETECTOR_TYPE_FACTORS.get(detector_type, 1.0)
         det_factor = self.get_detector_effective_dqe(detector_type, source=source, kv=kv)
         srb_factor, srb_ref = self.get_srb_dose_factor(detector_type, app_srb=app_srb)
-        is_dda = detector_type in ("dda_si", "dda_se", "dda_gdos")
+        is_dda = str(detector_type).startswith("dda_")
 
         if target_snr is not None and float(target_snr) > 0.0:
             snr_target_used = float(target_snr)

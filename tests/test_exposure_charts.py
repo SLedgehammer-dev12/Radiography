@@ -567,6 +567,37 @@ class TestRTCalculatorWithCharts(unittest.TestCase):
                     self.assertLess(res["time_seconds"], prev_time)
                 prev_time = res["time_seconds"]
 
+    def test_expanded_digital_detector_catalog(self):
+        """All 10 CR and DDA detector models must resolve DQE, SR_b,ref, R-factors, and DDA frame integration."""
+        cr_detectors = ["cr_ips1_uhd", "cr_highres", "cr_standard", "cr_fast"]
+        cr_times = {}
+        for det in cr_detectors:
+            srb_ref = self.calc.DETECTOR_NATIVE_SRB[det]
+            res = self.calc.calculate_exposure_time_details(
+                600.0, 15.0, "isotope_ir192", 40.0, 30.0, "digital",
+                detector_type=det, chart_source="cr_ips_chart",
+                chart_db=self.db, app_srb=srb_ref
+            )
+            self.assertEqual(res["provenance"]["method"], "cr_ips_chart")
+            self.assertGreater(res["time_seconds"], 0.0)
+            cr_times[det] = res["time_seconds"]
+        # Slower finer-grain CR plates (IPS-1 UHD -> IPS-1 -> IPS-2/3 -> IPS-4 Fast) require monotonically more dose at native SR_b
+        self.assertGreater(cr_times["cr_ips1_uhd"], cr_times["cr_highres"])
+        self.assertGreater(cr_times["cr_highres"], cr_times["cr_standard"])
+        self.assertGreater(cr_times["cr_standard"], cr_times["cr_fast"])
+
+        dda_detectors = ["dda_si", "dda_si_hires", "dda_se", "dda_gdos", "dda_gdos_he", "dda_cmos"]
+        for det in dda_detectors:
+            srb_ref = self.calc.DETECTOR_NATIVE_SRB[det]
+            res_frame = self.calc.calculate_exposure_time_details(
+                600.0, 15.0, "x_ray", 5.0, 3.0, "digital",
+                detector_type=det, kv=160.0, chart_source="dda_frame_method",
+                chart_db=self.db, app_srb=srb_ref
+            )
+            self.assertEqual(res_frame["provenance"]["method"], "dda_frame_method")
+            self.assertIsNotNone(res_frame["provenance"]["dda_frame"])
+            self.assertGreater(res_frame["time_seconds"], 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()

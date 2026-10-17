@@ -67,6 +67,11 @@ const DETECTOR_TKEYS = [
   "detector_dda_si",
   "detector_dda_se",
   "detector_dda_gdos",
+  "detector_cr_ips1_uhd",
+  "detector_cr_fast",
+  "detector_dda_si_hires",
+  "detector_dda_gdos_he",
+  "detector_dda_cmos",
 ];
 const CHART_OPTION_META: Record<string, { labelKey?: string; label?: string }> = {
   model: { labelKey: "chart_model" },
@@ -1702,7 +1707,19 @@ export default function App() {
                       const validCharts = getActiveChartKeys(form.tech, value, form.source);
                       patch("detector_type", value);
                       if (!validCharts.includes(form.chart_source)) {
-                        patch("chart_source", validCharts[0] ?? "model");
+                        if (
+                          form.chart_source === "cr_ips_chart" &&
+                          validCharts.includes("dda_panel_chart")
+                        ) {
+                          patch("chart_source", "dda_panel_chart");
+                        } else if (
+                          form.chart_source === "dda_panel_chart" &&
+                          validCharts.includes("cr_ips_chart")
+                        ) {
+                          patch("chart_source", "cr_ips_chart");
+                        } else {
+                          patch("chart_source", validCharts[0] ?? "model");
+                        }
                       }
                     }}
                   />

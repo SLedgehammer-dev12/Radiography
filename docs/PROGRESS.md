@@ -52,7 +52,18 @@
     **Fujifilm IX** (`IX25`, `IX50`, `IX80`, `IX100`, `IX150`), and **Foma Fomadux**
     (`R2`, `R4`, `R5`, `R7`, `R8`) with brand-preserving class/chart synchronization in
     `web/src/state/presets.ts` and `web/src/App.tsx`.
-  - Covered by 8 new regression tests in `tests/test_exposure_charts.py` and
+  - Expanded **Digital CR & DDA Detector** catalog from 5 generic categories to **10 industrial
+    detector models** across ISO 16371-1 (`IPS-1`..`IPS-4`) and ASTM E2698/E2736:
+    `cr_ips1_uhd` (40 µm, Waygate IPU / Dürr HD-IP / Carestream HR-50), `cr_highres` (50 µm,
+    Carestream HR / Agfa MD4.1 / Fuji UR-1), `cr_standard` (100 µm, Carestream GP / Waygate IPC2 /
+    Fuji ST-VI), `cr_fast` (130 µm, Carestream XL Blue / Waygate IPS / Fuji HR-V), `dda_si`
+    (130 µm, Waygate DXR250C-W / Varex 2520DX / Carestream HPX-DR), `dda_si_hires` (75 µm,
+    Varex XRpad4 3025 / Carestream HPX-ARC), `dda_se` (85 µm, Teledyne ICM / Analogic a-Se),
+    `dda_gdos` (160 µm, Varex XRD 1621 / Waygate DXR250U-W), `dda_gdos_he` (200 µm,
+    Varex XRD 1621 xN / Waygate DXR500L), and `dda_cmos` (50 µm, Teledyne DALSA Xineos /
+    Varex Dexela), preserving indices `0..4` for desktop preset compatibility and mapping
+    `cr_ips_chart` ↔ `dda_panel_chart` on CR/DDA switch.
+  - Covered by 9 new regression tests in `tests/test_exposure_charts.py` and
     `tests/test_engine.py`.
 - **DDA saturation advisory** — `dda_frame.t_frame_ideal` exposed; `engine.py`
   warns when `< 0.08 s` (reduce mA / increase SFD). Covered by
@@ -124,7 +135,7 @@
 ## Verification (re-run before continuing)
 
 ```bash
-python3 -m pytest -q                    # 923 passed, 6 skipped, 849 subtests
+python3 -m pytest -q                    # 924 passed, 6 skipped, 849 subtests
 cd web && npx tsc -b                    # clean
 cd web && npx oxlint src/               # 0 warnings, 0 errors
 cd web && npx playwright test           # 33 passed (21 + 3 mobile + 9 feedback)

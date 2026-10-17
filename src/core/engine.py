@@ -1730,7 +1730,7 @@ class CalculationEngine:
 
         # Keep DDA frame integration in sync if Level 3 SFD comp increased the required SNR_N target
         if tech == "digital" and exposure_time_prov.get("dda_frame") and sfd_comp_target is not None:
-            det_for_dda = detector_type if detector_type in ("dda_si", "dda_se", "dda_gdos") else "dda_si"
+            det_for_dda = detector_type if str(detector_type).startswith("dda_") else "dda_si"
             exposure_time_prov["dda_frame"] = calc.calculate_dda_frame_integration(
                 raw_time, sfd, w_eff, source, output_val,
                 det_for_dda, sfd_comp_target, kv=input_kv,

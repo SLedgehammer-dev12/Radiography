@@ -1,6 +1,6 @@
 # Radiography — Repository Index
 
-> **Status**: Current (Indexed at commit `4f84a81` | Version `2.0.3` | 2026-10-17)
+> **Status**: Current (Indexed at commit `8cc850a` | Version `2.0.3` | 2026-10-17)
 > **Domain**: Industrial Radiographic Testing (NDT RT) exposure calculator & report generator
 > **Freshness Policy**: Stale after 7 days or 15 new commits.
 
@@ -22,10 +22,10 @@ Radiography/
 ├── src/ui/                  # [Desktop UI] PyQt6 (main_window 2114 lines + 8 panels/)
 ├── src/mobile/              # [Mobile] KivyMD wizard (24 files incl. .kv)
 ├── src/android/             # [Packaging] p4a manifest hook
-├── web/src/                 # [Web] React 19 (App.tsx 1883 lines, components/, state/, lib/, pyodide/)
+├── web/src/                 # [Web] React 19 (App.tsx 1957 lines, components/, state/, lib/, pyodide/)
 ├── web/python/bridge.py     # [Bridge] Pyodide JSON-RPC -> CalculationEngine
 ├── web/scripts/sync-assets.mjs  # [Tool] src/core -> web/public/python sync
-├── tests/                   # [Tests] 37 files, 921 pytest cases (915 passed, 6 skipped)
+├── tests/                   # [Tests] 37 files, 930 pytest cases (924 passed, 6 skipped)
 ├── web/tests/               # [Tests] 6 Playwright E2E files (33 tests)
 ├── tools/                   # [Tools] Annex A digitizer
 └── docs/                    # [Data/Docs] ASME B36 pipe catalog JSON, PROGRESS.md, godclass-plan.md

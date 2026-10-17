@@ -12,7 +12,18 @@ export const SOURCES = [
 const CLASSES = ["class_b", "class_a"];
 export const GEOMETRIES = ["dwsi", "swsi", "dwdi_elliptic", "dwdi_super"];
 const STANDARDS = ["iso", "asme"];
-export const DETECTORS = ["cr_standard", "cr_highres", "dda_si", "dda_se", "dda_gdos"];
+export const DETECTORS = [
+  "cr_standard",
+  "cr_highres",
+  "dda_si",
+  "dda_se",
+  "dda_gdos",
+  "cr_ips1_uhd",
+  "cr_fast",
+  "dda_si_hires",
+  "dda_gdos_he",
+  "dda_cmos",
+];
 const ANALOG_XRAY_CHARTS = ["model", "type_x"];
 export const ANALOG_ISOTOPE_CHARTS = [
   "model",

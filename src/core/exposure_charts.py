@@ -264,7 +264,7 @@ class ExposureChartDatabase:
     # (Reference detector dose in Roentgen for normalized SNR_N = 70 at native SR_b)
     CR_IPS_TABLE = {
         "cr_standard": {  # IPS-2 / IPS-3 Standard BaFBr:Eu plate (SR_b,ref = 100 µm)
-            "ips_class": "IPS-2 / Standart IP",
+            "ips_class": "IPS-2 / Standart IP (Carestream GP / Waygate IPC2 / Fuji ST-VI)",
             "srb_ref_um": 100.0,
             "r_factors": {
                 "isotope_ir192": 0.18,
@@ -275,7 +275,7 @@ class ExposureChartDatabase:
             },
         },
         "cr_highres": {  # IPS-1 High-Resolution HD-IP plate (SR_b,ref = 50 µm)
-            "ips_class": "IPS-1 / HD Yüksek Çözünürlük IP",
+            "ips_class": "IPS-1 / HD Yüksek Çözünürlük IP (Carestream HR / Agfa MD4.1 / Fuji UR-1)",
             "srb_ref_um": 50.0,
             "r_factors": {
                 "isotope_ir192": 0.26,
@@ -285,13 +285,35 @@ class ExposureChartDatabase:
                 "isotope_tm170": 0.06,
             },
         },
+        "cr_ips1_uhd": {  # IPS-1 Ultra-High-Definition IP plate (SR_b,ref = 40 µm)
+            "ips_class": "IPS-1 / Ultra-HD İnce Taneli IP (Waygate IPU / Dürr HD-IP / Carestream HR-50)",
+            "srb_ref_um": 40.0,
+            "r_factors": {
+                "isotope_ir192": 0.32,
+                "isotope_se75": 0.20,
+                "isotope_co60": 0.13,
+                "isotope_yb169": 0.11,
+                "isotope_tm170": 0.075,
+            },
+        },
+        "cr_fast": {  # IPS-4 High-Speed Phosphor IP plate (SR_b,ref = 130 µm)
+            "ips_class": "IPS-4 / Yüksek Hızlı IP (Carestream XL Blue / Waygate IPS / Fuji HR-V)",
+            "srb_ref_um": 130.0,
+            "r_factors": {
+                "isotope_ir192": 0.13,
+                "isotope_se75": 0.08,
+                "isotope_co60": 0.052,
+                "isotope_yb169": 0.045,
+                "isotope_tm170": 0.030,
+            },
+        },
     }
     CR_IPS_TABLE["cr_hires"] = CR_IPS_TABLE["cr_highres"]
 
     # ASTM E2698 / E2736 DDA Flat Panel Detector Chart & Frame Integration Specs
     DDA_PANEL_TABLE = {
         "dda_si": {  # Amorphous Silicon (a-Si) + CsI:Tl Needle Scintillator
-            "panel_class": "a-Si + CsI:Tl Düz Panel",
+            "panel_class": "a-Si + CsI:Tl Düz Panel (Waygate DXR250C-W / Varex 2520DX / Carestream HPX-DR)",
             "srb_ref_um": 130.0,
             "frame_target_dose_ugy": 12.0,
             "single_frame_snr_ref": 45.0,
@@ -304,8 +326,22 @@ class ExposureChartDatabase:
                 "isotope_tm170": 0.012,
             },
         },
+        "dda_si_hires": {  # Fine-Pitch a-Si + CsI:Tl High-Resolution Panel
+            "panel_class": "a-Si + CsI:Tl HD İnce Piksel Panel (Varex XRpad4 3025 / Carestream HPX-ARC)",
+            "srb_ref_um": 75.0,
+            "frame_target_dose_ugy": 15.0,
+            "single_frame_snr_ref": 42.0,
+            "target_gray_pct": 65.0,
+            "r_factors": {
+                "isotope_ir192": 0.058,
+                "isotope_se75": 0.036,
+                "isotope_co60": 0.032,
+                "isotope_yb169": 0.020,
+                "isotope_tm170": 0.015,
+            },
+        },
         "dda_se": {  # Amorphous Selenium (a-Se) Direct Conversion Photoconductor
-            "panel_class": "a-Se Doğrudan Dönüşüm Panel",
+            "panel_class": "a-Se Doğrudan Dönüşüm Panel (Teledyne ICM / Analogic a-Se)",
             "srb_ref_um": 85.0,
             "frame_target_dose_ugy": 18.0,
             "single_frame_snr_ref": 42.0,
@@ -319,7 +355,7 @@ class ExposureChartDatabase:
             },
         },
         "dda_gdos": {  # Amorphous Silicon + Gd2O2S:Tb Scintillator
-            "panel_class": "Gd₂O₂S:Tb Sintilatör DDA Panel",
+            "panel_class": "Gd₂O₂S:Tb Sintilatör DDA Panel (Varex XRD 1621 / Waygate DXR250U-W)",
             "srb_ref_um": 160.0,
             "frame_target_dose_ugy": 16.0,
             "single_frame_snr_ref": 40.0,
@@ -330,6 +366,34 @@ class ExposureChartDatabase:
                 "isotope_co60": 0.028,
                 "isotope_yb169": 0.020,
                 "isotope_tm170": 0.015,
+            },
+        },
+        "dda_gdos_he": {  # Heavy-Wall High-Energy Gd2O2S:Tb Scintillator Panel
+            "panel_class": "Gd₂O₂S:Tb Yüksek Enerji DDA Panel (Varex XRD 1621 xN / Waygate DXR500L)",
+            "srb_ref_um": 200.0,
+            "frame_target_dose_ugy": 14.0,
+            "single_frame_snr_ref": 44.0,
+            "target_gray_pct": 65.0,
+            "r_factors": {
+                "isotope_ir192": 0.046,
+                "isotope_se75": 0.030,
+                "isotope_co60": 0.022,
+                "isotope_yb169": 0.019,
+                "isotope_tm170": 0.014,
+            },
+        },
+        "dda_cmos": {  # CMOS + CsI:Tl Ultra-HD Fine-Pitch Detector
+            "panel_class": "CMOS + CsI:Tl Ultra-HD Panel (Teledyne DALSA Xineos / Varex Dexela)",
+            "srb_ref_um": 50.0,
+            "frame_target_dose_ugy": 10.0,
+            "single_frame_snr_ref": 48.0,
+            "target_gray_pct": 65.0,
+            "r_factors": {
+                "isotope_ir192": 0.042,
+                "isotope_se75": 0.024,
+                "isotope_co60": 0.026,
+                "isotope_yb169": 0.013,
+                "isotope_tm170": 0.009,
             },
         },
     }
