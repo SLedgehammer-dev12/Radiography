@@ -1,6 +1,6 @@
-# God-class bölme planı (kod değişikliği yok, araştırma çıktısı)
+# God-class bölme planı
 
-## src/ui/main_window.py (3298 satır, 67 metod)
+## src/ui/main_window.py (bölme öncesi 3298 satır)
 Zaten mixin tabanlı parçalama var: InputPanelMixin, DefectPanelMixin,
 WarningsPanelMixin, CompliancePanelMixin. Kalan god-class yükü şu bloklarda:
 
@@ -9,14 +9,14 @@ WarningsPanelMixin, CompliancePanelMixin. Kalan god-class yükü şu bloklarda:
   3. get_form_values (1738-1839) — 100 satır form extraction
   4. _render_calculation (2280-2333) — 50 satır output binding
   5. update_calculations (2357-2371) — pipeline orchestrator
-  6. export_pdf_report (2463-2722) — 260 satır PDF akışı
+  6. export_pdf_report — 260 satır PDF akışı
   7. _setup_menu_bar (2723-2789) — 66 satır
 
 Bölme sırası (risk en düşükten en yükseğe):
-  A. export_pdf_report -> ReportExportMixin (saf akış, testler PDF export'u zaten koşuyor)
-  B. retranslate_ui -> TranslationMixin (stateless-ish, sadece widget text)
-  C. get_form_values + _collect_engine_form -> FormStateMixin
-  D. __init__/init_ui son — en riskli, test blast radius'u en geniş
+  A. [x] export_pdf_report -> ReportExportMixin (src/ui/panels/report_panel.py) — 2026-10-16, 3298→3037 satır, 915 test yeşil
+  B. [ ] retranslate_ui -> TranslationMixin (stateless-ish, sadece widget text)
+  C. [ ] get_form_values + _collect_engine_form -> FormStateMixin
+  D. [ ] __init__/init_ui son — en riskli, test blast radius'u en geniş
 
 ## web/src/App.tsx (3146 satır)
 Tek fonksiyonel component, hook'lar inline. Bölmek için:
