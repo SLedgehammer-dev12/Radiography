@@ -82,8 +82,6 @@ export function WeldSetup3D({
   lang = "tr",
 }: WeldSetup3DProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
-  // Camera state
   const [yaw, setYaw] = useState<number>(0.68); // ~39 deg
   const [pitch, setPitch] = useState<number>(0.42); // ~24 deg
   const [zoom, setZoom] = useState<number>(1.05);
@@ -100,6 +98,22 @@ export function WeldSetup3D({
   const [showProjection, setShowProjection] = useState<boolean>(true);
   const [previewUserGeo, setPreviewUserGeo] = useState<boolean>(true);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [containerWidth, setContainerWidth] = useState<number>(520);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || isFullscreen) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const w = Math.round(entry.contentRect.width);
+        if (w > 0) {
+          setContainerWidth((prev) => (Math.abs(prev - w) >= 4 ? w : prev));
+        }
+      }
+    });
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, [isFullscreen]);
 
   useEffect(() => {
     if (!isFullscreen) return;
@@ -192,10 +206,10 @@ export function WeldSetup3D({
     const dpr = window.devicePixelRatio || 1;
     const width = isFullscreen
       ? Math.min(1600, Math.max(900, (window.innerWidth || 1200) - 56))
-      : 520;
+      : containerWidth || 520;
     const height = isFullscreen
       ? Math.min(960, Math.max(600, (window.innerHeight || 800) - 160))
-      : 430;
+      : Math.round((width * 430) / 520);
     if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(height * dpr)) {
       canvas.width = Math.round(width * dpr);
       canvas.height = Math.round(height * dpr);
@@ -1469,6 +1483,7 @@ export function WeldSetup3D({
     showProjection,
     totalStations,
     isFullscreen,
+    containerWidth,
   ]);
 
   const tr = lang === "tr";

@@ -173,6 +173,14 @@ cd web && npx playwright test           # 34 passed (22 + 3 mobile + 9 feedback)
   - Added structured `dwdi_coverage` check in [`ProcedureComplianceChecker`](file:///Users/macbook/Documents/Kodlama/Radiography/src/core/procedure_check.py).
   - Wired into Web [`HeroSummaryPanel.tsx`](file:///Users/macbook/Documents/Kodlama/Radiography/web/src/components/HeroSummaryPanel.tsx) with an accessible `<InfoTip>` modal on the "Gerekli Poz Sayısı" hero card and status badge (`Boyut Yetersiz ⚠` / `ISO ✓`).
   - Covered by unit tests in `tests/test_calculator.py`, `tests/test_engine.py`, and `tests/test_procedure_check.py`. Full test suite: 930 passed, 35 Playwright E2E passed.
+- **Resizable 3-Column Layout & 40% 3D Column Default Width**:
+  - Set default desktop layout to Left (Inputs) 28%, Middle (Outputs) 32%, Right (3D View) 40%, giving the 3D visualization and pipe projection scene prominent visual space.
+  - Added custom hook [`useResizableColumns.ts`](file:///Users/macbook/Documents/Kodlama/Radiography/web/src/state/useResizableColumns.ts) with pointer event dragging (`onPointerDown`), safe boundary clamping (Col 1: 20%–45%, Col 2: 20%–48%, Col 3: 25%–60%), and `localStorage` persistence under `"radiography_col_widths_v1"`.
+  - Added dual accessible separator handles (`.column-resizer` with `role="separator"`, `tabIndex={0}`, keyboard `ArrowLeft`/`ArrowRight`/`Shift`, `Enter`/`Space` reset, and double-click reset).
+  - Added "Kolonları Sıfırla (%28 - %32 - %40)" button to the "Görünüm" (View) dropdown menu in [`App.tsx`](file:///Users/macbook/Documents/Kodlama/Radiography/web/src/App.tsx).
+  - Added `ResizeObserver` in [`WeldSetup3D.tsx`](file:///Users/macbook/Documents/Kodlama/Radiography/web/src/components/WeldSetup3D.tsx) to automatically adapt logical canvas resolution to the expanded column width without pixelation or stretching.
+  - Responsive breakpoints ($\le 1150\text{px}$ and $\le 860\text{px}$) cleanly hide resizers and switch to 2-column and 1-column layouts.
+  - Verified with new Playwright E2E test [`resizable-columns.spec.ts`](file:///Users/macbook/Documents/Kodlama/Radiography/web/tests/e2e/resizable-columns.spec.ts), 0 `oxlint` errors, and clean TypeScript build.
 
 ## Pending / next
 

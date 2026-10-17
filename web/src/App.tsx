@@ -52,6 +52,7 @@ import {
 import { useEngine } from "./state/useEngine";
 import { useDefect } from "./state/useDefect";
 import { usePersistedAppState } from "./state/usePersistedAppState";
+import { useResizableColumns } from "./state/useResizableColumns";
 import {
   DEFAULT_FORM,
   DEFAULT_LVL3,
@@ -122,6 +123,14 @@ export default function App() {
     reportInfo,
     setReportInfo,
   } = usePersistedAppState();
+  const {
+    widths: colWidths,
+    activeSplitter,
+    layoutRef,
+    startResize,
+    resetWidths,
+    handleResizerKeyDown,
+  } = useResizableColumns();
   const [unitInch, setUnitInch] = useState(false);
   const [pipeStd, setPipeStd] = useState<"b36_10" | "b36_19">("b36_10");
   const [activityUnit, setActivityUnit] = useState<"Ci" | "GBq">("Ci");
@@ -902,6 +911,27 @@ export default function App() {
                   <span className="item-icon">🔼</span>
                   <span>{t("collapse_all")}</span>
                 </button>
+                <div className="dropdown-divider" />
+                <button
+                  type="button"
+                  className="dropdown-item"
+                  onClick={() => {
+                    resetWidths();
+                    setOpenMenu(null);
+                  }}
+                  title={
+                    lang === "tr"
+                      ? "Kolon genişliklerini varsayılan oranlara döndürür: %28 Giriş, %32 Sonuç, %40 3D Görsel"
+                      : "Reset column widths to defaults: 28% Inputs, 32% Outputs, 40% 3D View"
+                  }
+                >
+                  <span className="item-icon">📐</span>
+                  <span>
+                    {lang === "tr"
+                      ? "Kolonları Sıfırla (%28 - %32 - %40)"
+                      : "Reset Columns (28% - 32% - 40%)"}
+                  </span>
+                </button>
               </div>
             )}
           </div>
@@ -1028,7 +1058,17 @@ export default function App() {
         />
         </div>
 
-        <main className="layout">
+        <main
+          ref={layoutRef}
+          className="layout"
+          style={
+            {
+              "--col-1": `${colWidths[0]}fr`,
+              "--col-2": `${colWidths[1]}fr`,
+              "--col-3": `${colWidths[2]}fr`,
+            } as React.CSSProperties
+          }
+        >
           <div className="column inputs">
             <div
               className="preset-chips-bar"
@@ -1981,6 +2021,31 @@ export default function App() {
             />
           </div>
 
+          <div
+            className={`column-resizer ${activeSplitter === 0 ? "dragging" : ""}`}
+            role="separator"
+            tabIndex={0}
+            aria-orientation="vertical"
+            aria-label={
+              lang === "tr"
+                ? "Giriş ve Sonuç kolonları arası genişlik ayırıcı"
+                : "Inputs and Outputs columns width separator"
+            }
+            aria-valuenow={Math.round(colWidths[0])}
+            aria-valuemin={20}
+            aria-valuemax={45}
+            onPointerDown={(event) => startResize(0, event)}
+            onDoubleClick={resetWidths}
+            onKeyDown={(event) => handleResizerKeyDown(0, event)}
+            title={
+              lang === "tr"
+                ? "Genişliği ayarlamak için sürükleyin (Sıfırlamak için çift tıklayın)"
+                : "Drag to resize (Double-click to reset)"
+            }
+          >
+            <div className="column-resizer-grip" />
+          </div>
+
           <div className="column outputs">
             <HeroSummaryPanel
               result={result}
@@ -1999,6 +2064,31 @@ export default function App() {
               hiddenOutputs={hiddenOutputs}
             />
             <CompliancePanel t={t} error={error} compliance={compliance} />
+          </div>
+
+          <div
+            className={`column-resizer ${activeSplitter === 1 ? "dragging" : ""}`}
+            role="separator"
+            tabIndex={0}
+            aria-orientation="vertical"
+            aria-label={
+              lang === "tr"
+                ? "Sonuç ve 3D Görünüm kolonları arası genişlik ayırıcı"
+                : "Outputs and 3D View columns width separator"
+            }
+            aria-valuenow={Math.round(colWidths[2])}
+            aria-valuemin={25}
+            aria-valuemax={60}
+            onPointerDown={(event) => startResize(1, event)}
+            onDoubleClick={resetWidths}
+            onKeyDown={(event) => handleResizerKeyDown(1, event)}
+            title={
+              lang === "tr"
+                ? "Genişliği ayarlamak için sürükleyin (Sıfırlamak için çift tıklayın)"
+                : "Drag to resize (Double-click to reset)"
+            }
+          >
+            <div className="column-resizer-grip" />
           </div>
 
           <div className="column warnings">
