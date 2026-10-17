@@ -45,6 +45,8 @@ import { useEngine } from "./state/useEngine";
 import { useDefect } from "./state/useDefect";
 import { usePersistedAppState } from "./state/usePersistedAppState";
 import {
+  DEFAULT_FORM,
+  DEFAULT_LVL3,
   type FormState,
   type ExposuresProvenance,
   type Lvl3Settings,
@@ -490,6 +492,16 @@ export default function App() {
     );
   };
 
+  const resetForm = () => {
+    setForm({ ...DEFAULT_FORM });
+    setLvl3(DEFAULT_LVL3);
+    setReportInfo({});
+    notify(
+      lang === "tr" ? "Form varsayılana sıfırlandı." : "Form reset to defaults.",
+      "success",
+    );
+  };
+
   const exportPreset = () =>
     downloadJson("rt_preset.json", {
       type: "radiography_preset",
@@ -609,6 +621,7 @@ export default function App() {
   return (
     <UnitContext.Provider value={{ inch: unitInch }}>
       <div className="app">
+        <div className="app-header">
         <header className="topbar">
           <div className="brand">
             <div className="brand-mark">RT</div>
@@ -618,6 +631,23 @@ export default function App() {
             <span className={busy ? "status busy" : "status"}>
               {busy ? "…" : error ? "!" : "OK"}
             </span>
+            <button
+              type="button"
+              className="topbar-action"
+              onClick={resetForm}
+              title={lang === "tr" ? "Formu sıfırla" : "Reset form"}
+            >
+              ⟲ {lang === "tr" ? "Sıfırla" : "Reset"}
+            </button>
+            <button
+              type="button"
+              className="topbar-action primary"
+              onClick={exportPdf}
+              disabled={pdfBusy || !result}
+              title={t("export_pdf")}
+            >
+              📄 {pdfBusy ? "…" : t("export_pdf")}
+            </button>
           </div>
         </header>
         {notice && (
@@ -1069,6 +1099,7 @@ export default function App() {
               event.target.value = "";
             }}
           />
+        </div>
         </div>
 
         <main className="layout">

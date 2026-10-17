@@ -30,3 +30,30 @@ test("toast auto-dismisses after a few seconds", async ({ page }) => {
   await expect(page.locator(".toast")).toBeVisible();
   await expect(page.locator(".toast")).toHaveCount(0, { timeout: 8_000 });
 });
+
+test("topbar reset restores the default form", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator(".layout")).toBeVisible({ timeout: 150_000 });
+
+  const source = page
+    .locator(".field", { hasText: "Radyasyon Kaynağı" })
+    .locator("select");
+  await source.selectOption("isotope_ir192");
+  await expect(source).toHaveValue("isotope_ir192");
+
+  await page.getByRole("button", { name: /Sıfırla|Reset/ }).click();
+  await expect(page.locator(".toast")).toContainText(/sıfırlandı|reset/i);
+  await expect(source).toHaveValue("x_ray");
+});
+
+test("sticky header keeps the primary action reachable when scrolled", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.locator(".layout")).toBeVisible({ timeout: 150_000 });
+  await expect(page.locator(".topbar-action.primary")).toBeVisible();
+
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await expect(page.locator(".topbar-action.primary")).toBeInViewport();
+});
+
