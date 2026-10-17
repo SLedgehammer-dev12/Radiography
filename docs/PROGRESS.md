@@ -1,7 +1,7 @@
 # Progress Log
 
 > Working log of completed and pending work. Updated per session.
-> Last updated: 2026-10-17 (HEAD at time of writing: `286dd7b`).
+> Last updated: 2026-10-17 (HEAD at time of writing: `ffb76f2`).
 
 ## Scope decision
 
@@ -119,8 +119,7 @@ cd web && npx playwright test           # 33 passed (21 + 3 mobile + 9 feedback)
 - Web copies `src/core` into `web/public/python/` (gitignored); sync is automatic
   (`npm run sync` in `predev`/`prebuild`). Mobile has **no copy** — `buildozer.spec`
   packages `src/core/*.py` directly, so it cannot drift (desktop/mobile now frozen).
-- Uncommitted and **not part of this work**: `GEMINI.md`, `.opencode/agents/`,
-  `.opencode/skills/`, `.opencode/command/repo-indexer.md`, `.agents/agents/`
-  (owner's own agent/skill config).
+- Agent & skill configuration (`GEMINI.md`, `.agents/agents/`, `.opencode/agents/`,
+  `.opencode/skills/`, `.opencode/command/repo-indexer.md`) committed in `ffb76f2`.
 - `docs/godclass-plan.md` dated some entries 2026-10-16; actual session commits are
   2026-10-17.
