@@ -482,9 +482,10 @@ export function LengthSliderField(props: SliderFieldProps) {
   );
 }
 
-interface SelectOption {
+export interface SelectOption {
   value: string;
   label: string;
+  group?: string;
 }
 
 interface SelectFieldProps {
@@ -506,6 +507,8 @@ export function SelectField({
   disabled,
   action,
 }: SelectFieldProps) {
+  const hasGroups = options.some((opt) => Boolean(opt.group));
+
   return (
     <div className="field" title={tooltip}>
       <div className="field-head">
@@ -522,11 +525,36 @@ export function SelectField({
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
       >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
+        {hasGroups
+          ? Array.from(
+              options.reduce((map, opt) => {
+                const groupKey = opt.group ?? "";
+                if (!map.has(groupKey)) map.set(groupKey, []);
+                map.get(groupKey)!.push(opt);
+                return map;
+              }, new Map<string, SelectOption[]>()),
+            ).map(([groupName, groupOptions]) =>
+              groupName ? (
+                <optgroup key={groupName} label={groupName}>
+                  {groupOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : (
+                groupOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))
+              ),
+            )
+          : options.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
       </select>
     </div>
   );

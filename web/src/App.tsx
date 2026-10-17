@@ -33,6 +33,7 @@ import {
   CHART_TO_FILM_CLASS,
   DEFAULT_BASE_E_BY_SOURCE,
   DETECTORS as DETECTOR_KEYS,
+  FILM_CHART_BRANDS,
   FILM_CLASS_LABELS,
   FILM_SIZES as FILM_PRESETS,
   GEOMETRIES,
@@ -1622,13 +1623,27 @@ export default function App() {
                   form.source,
                 ).map((key) => {
                   if (key === "model" && digital) {
-                    return { value: key, label: t("chart_digital_model") };
+                    return {
+                      value: key,
+                      label: t("chart_digital_model"),
+                      group: lang === "tr" ? "Hesaplama Modeli" : "Calculation Model",
+                    };
                   }
                   const meta = CHART_OPTION_META[key];
-                  return {
-                    value: key,
-                    label: meta?.labelKey ? t(meta.labelKey) : (meta?.label ?? key),
-                  };
+                  const label = meta?.labelKey ? t(meta.labelKey) : (meta?.label ?? key);
+                  let group: string | undefined;
+                  if (key in FILM_CHART_BRANDS) {
+                    group = FILM_CHART_BRANDS[key];
+                  } else if (key === "model" || key === "type_x" || key === "dda_frame_method") {
+                    group = lang === "tr" ? "Hesaplama Modeli" : "Calculation Model";
+                  } else if (
+                    key === "cr_ips_chart" ||
+                    key === "dda_panel_chart" ||
+                    key === "digital_xray_chart"
+                  ) {
+                    group = lang === "tr" ? "Standart / Abak Yöntemi" : "Standard / Chart Method";
+                  }
+                  return { value: key, label, group };
                 })}
                 onChange={(value) => {
                   patch("chart_source", value);
@@ -1702,6 +1717,13 @@ export default function App() {
                     options={DETECTOR_KEYS.map((value, index) => ({
                       value,
                       label: t(DETECTOR_TKEYS[index]),
+                      group: value.startsWith("cr_")
+                        ? (lang === "tr"
+                            ? "CR — Fosfor Görüntüleme Plakaları (ISO 16371-1)"
+                            : "CR — Phosphor Imaging Plates (ISO 16371-1)")
+                        : (lang === "tr"
+                            ? "DDA — Düz Panel Dedektörler (ASTM E2698 / E2736)"
+                            : "DDA — Flat Panel Detectors (ASTM E2698 / E2736)"),
                     }))}
                     onChange={(value) => {
                       const validCharts = getActiveChartKeys(form.tech, value, form.source);

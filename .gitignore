@@ -56,6 +56,8 @@ web/public/data/
 web/public/assets/
 web/test-results/
 web/playwright-report/
+test-results/
+playwright-report/
 web/launcher/.build/
 
 # Annex A digitization overlays (validation artifacts)

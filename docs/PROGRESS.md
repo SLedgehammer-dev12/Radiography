@@ -138,8 +138,18 @@
 python3 -m pytest -q                    # 924 passed, 6 skipped, 849 subtests
 cd web && npx tsc -b                    # clean
 cd web && npx oxlint src/               # 0 warnings, 0 errors
-cd web && npx playwright test           # 33 passed (21 + 3 mobile + 9 feedback)
+cd web && npx playwright test           # 34 passed (22 + 3 mobile + 9 feedback)
 ```
+
+### UX & Catalog Polish (web)
+- **Native `<optgroup>` categorization** — `SelectField` accepts an optional `group`
+  property on options and cleanly renders native `<optgroup label={group}>` blocks
+  without custom DOM wrappers or breaking keyboard accessibility.
+- **Detector & film brand groupings** — Digital detectors grouped into **CR (ISO 16371-1)**
+  and **DDA (ASTM E2698)**; 22 analog isotope film charts grouped into **Carestream**,
+  **Agfa Structurix**, **Fujifilm IX**, **Foma Fomadux**, and **Calculation Model**;
+  selecting any film model (e.g. `D7`, `R8`) automatically syncs `film_class_used`.
+  Covered by new Playwright E2E in `web/tests/e2e/analog-ui.spec.ts`.
 
 ## Pending / next
 
