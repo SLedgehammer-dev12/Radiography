@@ -161,6 +161,11 @@ cd web && npx playwright test           # 34 passed (22 + 3 mobile + 9 feedback)
   - Wires an accessible `<InfoTip>` directly on the $f_{\min}$ hero card opening an interactive dialog containing the dynamic values line, step-by-step arithmetic substitutions ($C \times d \times b^{2/3}$ and $d \times b / U_{g,\text{limit}}$), active Level 3 exceptions (%20 DW / %50 central reduction), and governing standard resolution.
   - Displays dual ISO & ASME metrics simultaneously in `.hero-sub` (`ISO: ... mm | ASME: ... mm • b = ... mm`) with the governing standard active badge (`ISO ✓` or `ASME ✓`).
   - Passes all 925 Python tests and 35 Playwright E2E tests.
+- **DWSI Figure 14 ($f_{\min} > OD$) Validation per ISO 17636-1 / ISO 17636-2 Clause 7.6**:
+  - Enforced normative check: In DWSI "Odak Yüzeyde / Source on Surface" (`fig14`, `fig14a`, `fig14b`), the source-to-object distance is bounded by the outer pipe diameter ($f \approx OD - t$). When dynamically calculated $f_{\min} > OD$, the source cannot physically or normatively be placed on the surface without violating geometric unsharpness ($U_g$) limits.
+  - **Engine warnings**: Emits localized warning in [`engine.py`](file:///Users/macbook/Documents/Kodlama/Radiography/src/core/engine.py) advising that the figure is invalid and directing the operator to switch to Figure 13 / 13a / 13b (source outside the pipe at $f \ge f_{\min}$).
+  - **Procedure check**: Registers structured `dwsi_figure` check in [`procedure_check.py`](file:///Users/macbook/Documents/Kodlama/Radiography/src/core/procedure_check.py) failing procedure compliance when $f_{\min} > OD$ and passing when $f_{\min} \le OD$.
+  - Covered by unit tests in [`tests/test_procedure_check.py`](file:///Users/macbook/Documents/Kodlama/Radiography/tests/test_procedure_check.py) and [`tests/test_engine.py`](file:///Users/macbook/Documents/Kodlama/Radiography/tests/test_engine.py). Commit `60d8527`.
 
 ## Pending / next
 
