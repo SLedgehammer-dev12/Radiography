@@ -16,7 +16,7 @@ Bölme sırası (risk en düşükten en yükseğe):
   A. [x] export_pdf_report -> ReportExportMixin (src/ui/panels/report_panel.py) — 2026-10-16, 3298→3037 satır, 915 test yeşil
   B. [x] retranslate_ui -> TranslationMixin (src/ui/panels/translation_panel.py) — 2026-10-16, 3037→2836 satır, 915 test yeşil
   C. [x] get_form_values + _collect_engine_form -> FormStateMixin (src/ui/panels/form_state_panel.py) — 2026-10-16, 2836→2647 satır, 915 test yeşil
-  D. [ ] __init__/init_ui son — en riskli, test blast radius'u en geniş
+  D. [x] __init__/init_ui -> UIBuildMixin (src/ui/panels/ui_build_panel.py) — 2026-10-16, 2647→2114 satır, 915 test yeşil (init_ui taşındı; __init__ MainWindow'da kaldı)
 
 ## web/src/App.tsx (3146 satır)
 Tek fonksiyonel component, hook'lar inline. Bölmek için:
