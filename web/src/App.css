@@ -1492,3 +1492,71 @@ details.group:not([open]) > summary.group-title {
   border: 1px solid var(--panel-border);
   color: var(--text-muted);
 }
+
+/* ---------------------------------------------------------------------------
+   Mobile / touch UX
+   The custom fixed scrollbar is a desktop-only nicety; touch devices get
+   larger tap targets and 16px form controls (below 16px iOS Safari zooms the
+   whole page when a control is focused).
+   --------------------------------------------------------------------------- */
+
+@media (pointer: coarse) {
+  .page-scrollbar {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .layout {
+    padding: 10px 10px 40px;
+    gap: 12px;
+  }
+
+  .field-input,
+  .menu-select,
+  .duration-input,
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  /* Comfortable tap targets (>= 40px tall). */
+  button,
+  .menu-trigger-btn {
+    min-height: 40px;
+  }
+  .radio-option {
+    padding: 9px 14px;
+    min-height: 40px;
+  }
+  .info-tip {
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
+  }
+
+  /* Let the sketch tabs wrap to two rows instead of ellipsising. */
+  .tabs {
+    flex-wrap: wrap;
+    border-radius: var(--radius);
+  }
+  .tab {
+    flex: 1 1 40%;
+    padding: 10px 8px;
+    white-space: normal;
+  }
+
+  .modal-backdrop {
+    padding: 12px;
+  }
+
+  .group-title {
+    font-size: 15px;
+    padding: 12px 14px;
+  }
+  .group-body {
+    padding: 12px;
+  }
+}
+

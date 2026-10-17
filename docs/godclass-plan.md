@@ -53,7 +53,9 @@ tab/panel alt bileşenlerine bölünüyor:
              -> components/ReportInfoPanel.tsx — 2383→2358
          [x] SketchTabsPanel (right-column tabs + 3D/2D/ISO/Annex A sketches)
              -> components/SketchTabsPanel.tsx, ExposuresProvenance tipi types.ts'e — 2358→2164
-         [ ] Inputs Group (1076, ~810 satır) — en geniş yüzey (form+patch+helpers), son adım
+         [ ] Inputs Group — STOPPED by decision (2026-10-17): 38 external deps,
+             extracting would create a 38-prop component with no cohesion gain.
+             Panel decomposition ends here (App.tsx 3149→2164, −31%).
 
 ## Kural
 Her bölme adımı tek commit, test suite yeşil kalır, davranış değişmez.

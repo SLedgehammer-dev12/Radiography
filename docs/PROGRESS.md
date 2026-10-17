@@ -54,23 +54,33 @@
 - (J, in progress) Right-column sketch tabs → `web/src/components/SketchTabsPanel.tsx`
   (App.tsx → 2164); `ExposuresProvenance` type added to `types.ts`
 
+### Features (web)
+- **Mobile / responsive UX** — `web/src/App.css` gains a touch/mobile block:
+  hides the desktop-only custom scrollbar on coarse pointers; 16px form controls
+  on phones (stops iOS focus auto-zoom); ≥40px tap targets for buttons, tabs,
+  radios; sketch tabs wrap instead of ellipsising; tighter mobile padding.
+  New E2E: `web/tests/e2e/mobile.spec.ts` (390×844, touch) — no horizontal
+  overflow, 16px inputs, tap-to-open info modal.
+
 ## Verification (re-run before continuing)
 
 ```bash
 python3 -m pytest -q                    # 915 passed, 6 skipped, 849 subtests
 cd web && npx tsc -b                    # clean
 cd web && npx oxlint src/               # 0 errors (6 pre-existing warnings)
-cd web && npx playwright test           # 21 passed
+cd web && npx playwright test           # 24 passed (21 + 3 mobile)
 ```
 
 ## Pending / next
 
-- [ ] **J: remaining web panels** — remaining: Inputs Group (~810 lines, widest
-      prop surface). Done so far: Compliance, Warnings, Report info, Sketch tabs.
-      (see `docs/godclass-plan.md` step J)
-- [ ] **Web feature development** — direction not yet chosen. Options offered:
-      (a) continue panel decomposition, (b) a specific new web feature,
-      (c) responsive/mobile-web UX, (d) web performance (Pyodide boot / lazy load).
+- [ ] **J: remaining web panels** — **STOPPED by decision (2026-10-17).** The
+      remaining Inputs Group has 38 external deps; a component would need 38 props
+      with no cohesion gain. Done: Compliance, Warnings, Report info, Sketch tabs.
+      App.tsx stands at 2164 lines (−31%). Do not resume without a new approach
+      (semantic sub-panels or a form context). See `docs/godclass-plan.md` step J.
+- [ ] **Web feature development** — direction chosen: **mobile/responsive web UX**
+      (first pass done, see Features above). Possible next: landscape/tablet
+      tuning, sticky action bar, collapsible form groups on phones.
 - [ ] Decide whether to record the web-only scope in `AGENTS.md`.
 
 ## Notes & risks
