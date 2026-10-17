@@ -55,6 +55,9 @@
   (App.tsx → 2164); `ExposuresProvenance` type added to `types.ts`
 
 ### Features (web)
+- **Loading feedback** — indeterminate progress bar at the bottom of the sticky
+  header while a calculation/PDF export runs; outputs panel shows a
+  "Hesaplanıyor… / Calculating…" empty state before the first result.
 - **Sticky action bar** — topbar + menu bar wrapped in a sticky header; topbar now
   carries always-visible primary actions: **Reset** (form → defaults) and
   **Export PDF**. New E2E in `web/tests/e2e/feedback.spec.ts` (reset + sticky).
@@ -75,7 +78,7 @@
 python3 -m pytest -q                    # 915 passed, 6 skipped, 849 subtests
 cd web && npx tsc -b                    # clean
 cd web && npx oxlint src/               # 0 errors (6 pre-existing warnings)
-cd web && npx playwright test           # 28 passed (21 + 3 mobile + 4 feedback)
+cd web && npx playwright test           # 29 passed (21 + 3 mobile + 5 feedback)
 ```
 
 ## Pending / next
@@ -86,8 +89,9 @@ cd web && npx playwright test           # 28 passed (21 + 3 mobile + 4 feedback)
       App.tsx stands at 2164 lines (−31%). Do not resume without a new approach
       (semantic sub-panels or a form context). See `docs/godclass-plan.md` step J.
 - [ ] **Web feature development** — direction: **interaction & feedback**.
-      Done: toast variants + auto-dismiss; sticky header with Reset/PDF actions.
-      Possible next: loading/skeleton states, empty/error states, keyboard shortcuts.
+      Done: toast variants + auto-dismiss; sticky header with Reset/PDF;
+      header progress bar; outputs empty state.
+      Possible next: keyboard shortcuts, skeleton rows, error-state polish.
 - [ ] Decide whether to record the web-only scope in `AGENTS.md`.
 
 ## Notes & risks

@@ -57,3 +57,16 @@ test("sticky header keeps the primary action reachable when scrolled", async ({
   await expect(page.locator(".topbar-action.primary")).toBeInViewport();
 });
 
+test("header exposes an idle indeterminate progress bar", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator(".layout")).toBeVisible({ timeout: 150_000 });
+  await expect(page.getByTestId("output-w_nom")).toContainText("mm", {
+    timeout: 60_000,
+  });
+  await expect(page.locator(".app-progress")).toHaveAttribute(
+    "aria-hidden",
+    "true",
+  );
+});
+
+

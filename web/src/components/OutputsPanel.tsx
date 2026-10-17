@@ -55,29 +55,33 @@ export function OutputsPanel({
 
   return (
     <Group title={t("outputs")}>
-      {OUTPUT_KEYS.filter((key) => !hiddenOutputs.has(key)).map((key) => (
-        <OutputRow
-          key={key}
-          testId={`output-${key}`}
-          label={outputLabel(key)}
-          value={result?.display[key] ?? "-"}
-          tooltip={(() => {
-            const dynamicProv = result?.values?.[`${key}_provenance_text`] as
-              | string
-              | undefined;
-            if (dynamicProv) {
-              const base = strings[`tt_${key}`] ?? "";
-              return `${base}\n\n${dynamicProv}`.trim();
-            }
-            if (key === "exposures_panel") {
-              return (
-                strings[digital ? "tt_exposures_panel" : "tt_exposures_film"] ?? ""
-              );
-            }
-            return strings[`tt_${key}`];
-          })()}
-        />
-      ))}
+      {result ? (
+        OUTPUT_KEYS.filter((key) => !hiddenOutputs.has(key)).map((key) => (
+          <OutputRow
+            key={key}
+            testId={`output-${key}`}
+            label={outputLabel(key)}
+            value={result?.display[key] ?? "-"}
+            tooltip={(() => {
+              const dynamicProv = result?.values?.[`${key}_provenance_text`] as
+                | string
+                | undefined;
+              if (dynamicProv) {
+                const base = strings[`tt_${key}`] ?? "";
+                return `${base}\n\n${dynamicProv}`.trim();
+              }
+              if (key === "exposures_panel") {
+                return (
+                  strings[digital ? "tt_exposures_panel" : "tt_exposures_film"] ?? ""
+                );
+              }
+              return strings[`tt_${key}`];
+            })()}
+          />
+        ))
+      ) : (
+        <p className="muted">Hesaplanıyor… / Calculating…</p>
+      )}
     </Group>
   );
 }

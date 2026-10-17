@@ -1100,6 +1100,12 @@ export default function App() {
             }}
           />
         </div>
+        <div
+          className={`app-progress${busy ? " active" : ""}`}
+          role="progressbar"
+          aria-label="Hesaplanıyor / Calculating"
+          aria-hidden={!busy}
+        />
         </div>
 
         <main className="layout">
