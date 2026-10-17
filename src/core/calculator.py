@@ -1331,6 +1331,125 @@ class RTCalculator:
             "needs_three": needs_three,
         }
 
+    def calculate_dwdi_coverage(self, od, t, sfd, bgap=5.0, cap=0.0,
+                                receptor_w=100.0, receptor_h=240.0,
+                                is_digital=False, is_super=False,
+                                tilt_deg=12.0):
+        """
+        Calculates the required minimum film/panel dimensions for DWDI exposures
+        (ISO 17636-1:2022 Clause 7.1.6/7.1.7 and ISO 17636-2:2022).
+        
+        In DWDI, the entire pipe cross-section (both walls) is projected onto the detector.
+        To prevent image cutoff and allow standard IQI & identification placement:
+          - Magnification: M = SFD / f, where b = OD + bgap, f = max(SFD - b, 1.0)
+          - Projected pipe diameter: W_proj = OD * M
+          - Minimum width across pipe: W_min = W_proj + margin (margin = 10.0 mm for IQI/numbers)
+          - Projected weld height: H_proj = (S_ellipse + 2 * W_ae) * M for elliptical,
+            or H_proj = W_ae * M for superimposed.
+        
+        Checks if max(receptor_w, receptor_h) >= W_min and min(receptor_w, receptor_h) >= H_proj.
+        """
+        try:
+            od = float(od)
+            t = float(t)
+            sfd = float(sfd)
+            bgap = max(0.0, float(bgap or 0.0))
+            cap = max(0.0, float(cap or 0.0))
+            rw = float(receptor_w or 0.0)
+            rh = float(receptor_h or 0.0)
+        except (TypeError, ValueError):
+            return {
+                "is_sufficient": True,
+                "w_proj": 0.0,
+                "w_min_req": 0.0,
+                "h_proj": 0.0,
+                "magnification": 1.0,
+                "f_dist": 0.0,
+                "b_dist": 0.0,
+                "available_w": 0.0,
+                "available_h": 0.0,
+                "available_across": 0.0,
+                "margin_mm": 10.0,
+            }
+
+        if od <= 0.0 or sfd <= 0.0:
+            return {
+                "is_sufficient": True,
+                "w_proj": 0.0,
+                "w_min_req": 0.0,
+                "h_proj": 0.0,
+                "magnification": 1.0,
+                "f_dist": 0.0,
+                "b_dist": 0.0,
+                "available_w": rw,
+                "available_h": rh,
+                "available_across": max(rw, rh),
+                "margin_mm": 10.0,
+            }
+
+        b = od + bgap
+        f = max(sfd - b, 1.0)
+        m = sfd / f
+
+        # Projected outer diameter of the pipe
+        w_proj = round(od * m, 1)
+
+        # Margin for wire IQI extending 10mm beyond weld + lead ID markers
+        margin = 10.0
+        w_min_req = round(w_proj + margin, 1)
+
+        # Evaluated Area Width (weld cap + HAZ)
+        wae = self.estimate_wae_width(cap, t)
+        if is_super:
+            h_proj = round(wae * m, 1)
+        else:
+            # Elliptical technique: center separation s + evaluated area width wae
+            tilt_rad = math.radians(tilt_deg)
+            s_ellipse = od * math.tan(tilt_rad)
+            h_proj = round((s_ellipse + wae) * m, 1)
+
+        # Available receptor dimensions:
+        # Standard film can be placed in portrait or landscape (rotated).
+        # Digital panel is typically fixed across pipe unless specified.
+        dim_larger = max(rw, rh)
+        dim_smaller = min(rw, rh)
+        can_rotate = not is_digital
+
+        normal_ok = (rw >= w_min_req and (rh <= 0.0 or rh >= h_proj))
+        rotated_ok = (can_rotate and rh >= w_min_req and (rw <= 0.0 or rw >= h_proj))
+
+        if normal_ok:
+            is_sufficient = True
+            orientation_ok = "normal"
+            best_across = rw
+        elif rotated_ok:
+            is_sufficient = True
+            orientation_ok = "rotated"
+            best_across = rh
+        elif rw > 0.0 or rh > 0.0:
+            is_sufficient = False
+            orientation_ok = "none"
+            best_across = dim_larger if can_rotate else rw
+        else:
+            is_sufficient = True
+            orientation_ok = "default"
+            best_across = 0.0
+
+        return {
+            "is_sufficient": is_sufficient,
+            "orientation_ok": orientation_ok,
+            "w_proj": w_proj,
+            "w_min_req": w_min_req,
+            "h_proj": h_proj,
+            "magnification": round(m, 3),
+            "f_dist": round(f, 1),
+            "b_dist": round(b, 1),
+            "available_w": rw,
+            "available_h": rh,
+            "available_across": best_across,
+            "margin_mm": margin,
+        }
+
     # -----------------------------------------------------------------------
     # Flat-panel (DDA) coverage-based minimum exposures (ISO 17636-2 Annex A)
     # -----------------------------------------------------------------------

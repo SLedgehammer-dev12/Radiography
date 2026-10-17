@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 
+from src.core.calculator import RTCalculator
+
 class ProcedureComplianceChecker:
     def __init__(self):
-        pass
+        self.calc = RTCalculator()
 
     def check_compliance(self, inputs, calculated, applied, lvl3_settings, lang="tr"):
         """
@@ -37,6 +39,8 @@ class ProcedureComplianceChecker:
                 "dwsi_placement_fail": "IQI KONUMLANDIRMA HATASI! DWSI geometrisinde IQI kaynak tarafına yerleştirilemez (film tarafında olmalıdır).",
                 "dwsi_fig14_fail": "GEOMETRİ/ŞEKİL UYGUN DEĞİL! DWSI Odak Yüzeyde (Şekil 14) tekniğinde gereken asgari odak mesafesi (f_min = {:.1f} mm) > Boru Dış Çapı ({:.1f} mm). Kaynak boru yüzeyine konulamaz; ISO 17636 uyarınca Şekil 13 (kaynak boru dışında) seçilmelidir.",
                 "dwsi_fig14_pass": "DWSI Geometri Şekli Uygun: Odak Yüzeyde (Şekil 14) f_min ({:.1f} mm) <= Boru Dış Çapı ({:.1f} mm).",
+                "dwdi_cov_fail": "DWDI BOYUT YETERSİZ! Girilen film/panel boyutu ({:.1f} mm) < Gerekli asgari izdüşüm genişliği ({:.1f} mm). Görüntü kenarlardan kesilecektir!",
+                "dwdi_cov_pass": "DWDI Boyut Uygun: Girilen film/panel boyutu ({:.1f} mm) >= Gerekli izdüşüm genişliği ({:.1f} mm).",
                 
                 "duplex_pass": "Duplex IQI Uygun: Çözülen D {} >= Gereken D {}.",
                 "duplex_fail": "DUBLEX IQI ÇÖZÜNÜRLÜĞÜ YETERSİZ! Çözülen D {} < Gereken D {}.",
@@ -81,6 +85,8 @@ class ProcedureComplianceChecker:
                 "dwsi_placement_fail": "IQI PLACEMENT ERROR! In DWSI geometry, the IQI cannot be placed on the source side (must be on film side).",
                 "dwsi_fig14_fail": "GEOMETRY/FIGURE NON-COMPLIANT! In DWSI source-on-surface (Figure 14), required minimum distance (f_min = {:.1f} mm) > Pipe OD ({:.1f} mm). Source cannot be placed on surface; select Figure 13 (source outside pipe) per ISO 17636.",
                 "dwsi_fig14_pass": "DWSI Geometry Figure Compliant: Source-on-surface (Figure 14) f_min ({:.1f} mm) <= Pipe OD ({:.1f} mm).",
+                "dwdi_cov_fail": "DWDI SIZE INSUFFICIENT! Entered film/panel size ({:.1f} mm) < Required minimum projected width ({:.1f} mm). Image cutoff will occur!",
+                "dwdi_cov_pass": "DWDI Size Compliant: Entered film/panel size ({:.1f} mm) >= Required projected width ({:.1f} mm).",
                 
                 "duplex_pass": "Duplex IQI Compliant: Resolved D {} >= Required D {}.",
                 "duplex_fail": "DUPLEX RESOLUTION INSUFFICIENT! Resolved D {} < Required D {}.",
@@ -163,6 +169,41 @@ class ProcedureComplianceChecker:
                 checks.append({"name": "dwsi_figure", "status": False, "details": l_msgs["dwsi_fig14_fail"].format(f_min, od)})
             elif od > 0.0:
                 checks.append({"name": "dwsi_figure", "status": True, "details": l_msgs["dwsi_fig14_pass"].format(f_min, od)})
+
+        # DWDI Film/Panel physical projection coverage check:
+        if geometry in ("dwdi_elliptic", "dwdi_super"):
+            cov = calculated.get("dwdi_coverage")
+            if cov is None:
+                od = float(inputs.get("od") or inputs.get("outer_diameter") or 0.0)
+                t = float(inputs.get("t") or inputs.get("wall_thickness") or 0.0)
+                sfd = float(applied.get("applied_sfd") or inputs.get("sfd") or calculated.get("sfd_min") or 0.0)
+                rw = float(inputs.get("film_w") or inputs.get("film_width") or inputs.get("panel_width") or inputs.get("detector_width") or 0.0)
+                rh = float(inputs.get("film_h") or inputs.get("film_height") or inputs.get("panel_height") or inputs.get("detector_height") or 0.0)
+                if od > 0.0 and sfd > 0.0 and (rw > 0.0 or rh > 0.0):
+                    cov = self.calc.calculate_dwdi_coverage(
+                        od, t, sfd,
+                        bgap=float(inputs.get("bgap") or 0.0),
+                        cap=float(inputs.get("cap") or 0.0),
+                        receptor_w=rw, receptor_h=rh,
+                        is_digital=(tech == "digital"),
+                        is_super=(geometry == "dwdi_super"),
+                    )
+            if cov and cov.get("available_across", 0.0) > 0.0:
+                w_req = cov.get("w_min_req", 0.0)
+                avail = cov.get("available_across", 0.0)
+                if not cov.get("is_sufficient", True):
+                    is_compliant = False
+                    checks.append({
+                        "name": "dwdi_coverage",
+                        "status": False,
+                        "details": l_msgs["dwdi_cov_fail"].format(avail, w_req)
+                    })
+                else:
+                    checks.append({
+                        "name": "dwdi_coverage",
+                        "status": True,
+                        "details": l_msgs["dwdi_cov_pass"].format(avail, w_req)
+                    })
 
         applied_wire = applied.get("applied_wire", 0)
         req_wire = calculated.get("required_wire_no", 0)

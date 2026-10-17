@@ -453,5 +453,48 @@ class TestProcedureComplianceChecker(unittest.TestCase):
         self.assertTrue(res3["is_compliant"])
         self.assertEqual([c for c in res3["checks"] if c["name"] == "dwsi_figure"], [])
 
+    def test_dwdi_coverage_compliance(self):
+        inputs = {
+            "tech": "analog", "source": "x_ray", "class": "class_b",
+            "geometry": "dwdi_elliptic", "std_figure": "fig11",
+            "od": 60.3, "t": 3.91, "sfd": 400.0,
+            "film_w": 60.0, "film_h": 70.0,
+            "iqi_type": "wire", "film_side": True,
+        }
+        calculated = {
+            "u_max": 150.0, "sfd_min": 350.0, "required_wire_no": 12,
+            "required_exposures": 2, "required_density": 2.3,
+        }
+        applied = {
+            "applied_kv": 140.0, "applied_sfd": 400.0, "applied_wire": 13,
+            "applied_quality": 2.5, "applied_time": 60.0,
+            "applied_film_class": "C4", "applied_overlap": 10.0, "applied_exposures": 2,
+        }
+
+        # Case 1: Insufficient film size (60x70 mm) -> Non-compliant
+        res = self.checker.check_compliance(inputs, calculated, applied, {}, "tr")
+        self.assertFalse(res["is_compliant"])
+        cov_checks = [c for c in res["checks"] if c["name"] == "dwdi_coverage"]
+        self.assertEqual(len(cov_checks), 1)
+        self.assertFalse(cov_checks[0]["status"])
+        self.assertIn("YETERSİZ", cov_checks[0]["details"])
+
+        # Case 2: Sufficient film size (100x240 mm) -> Compliant
+        inputs["film_w"] = 100.0
+        inputs["film_h"] = 240.0
+        res2 = self.checker.check_compliance(inputs, calculated, applied, {}, "tr")
+        self.assertTrue(res2["is_compliant"])
+        cov_checks2 = [c for c in res2["checks"] if c["name"] == "dwdi_coverage"]
+        self.assertTrue(cov_checks2[0]["status"])
+
+        # Case 3: English locale
+        inputs["film_w"] = 60.0
+        inputs["film_h"] = 70.0
+        res_en = self.checker.check_compliance(inputs, calculated, applied, {}, "en")
+        cov_checks_en = [c for c in res_en["checks"] if c["name"] == "dwdi_coverage"]
+        self.assertFalse(cov_checks_en[0]["status"])
+        self.assertIn("INSUFFICIENT", cov_checks_en[0]["details"])
+
 if __name__ == "__main__":
     unittest.main()
+

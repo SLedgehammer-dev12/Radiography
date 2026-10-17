@@ -66,7 +66,18 @@ export function formatExposuresProvenance(
   }
   if (prov.method === "panoramic") return t("exp_prov_panoramic");
   if (prov.method === "dwdi_rule") {
-    return t("exp_prov_dwdi", prov.ratio, prov.n);
+    let text = t("exp_prov_dwdi", prov.ratio, prov.n);
+    if (prov.dwdi_coverage && prov.dwdi_coverage.available_across > 0) {
+      const cov = prov.dwdi_coverage;
+      const isTr = t("language") === "tr" || !t("language");
+      const tag = cov.is_sufficient
+        ? (isTr ? "Kurtarıyor ✓" : "Sufficient ✓")
+        : (isTr ? `Kurtarmıyor ⚠ (Min. ${cov.w_min_req.toFixed(1)} mm)` : `Insufficient ⚠ (Min. ${cov.w_min_req.toFixed(1)} mm)`);
+      const label = isTr ? "Kapsama" : "Coverage";
+      const enteredLabel = isTr ? "Girilen" : "Entered";
+      text += ` | ${label}: Min. ${cov.w_min_req.toFixed(1)} mm / ${enteredLabel}: ${cov.available_across.toFixed(0)} mm (${tag})`;
+    }
+    return text;
   }
   if (prov.method === "out_of_chart") {
     return t("exp_prov_out_of_chart", prov.n);

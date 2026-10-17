@@ -166,6 +166,13 @@ cd web && npx playwright test           # 34 passed (22 + 3 mobile + 9 feedback)
   - **Engine warnings**: Emits localized warning in [`engine.py`](file:///Users/macbook/Documents/Kodlama/Radiography/src/core/engine.py) advising that the figure is invalid and directing the operator to switch to Figure 13 / 13a / 13b (source outside the pipe at $f \ge f_{\min}$).
   - **Procedure check**: Registers structured `dwsi_figure` check in [`procedure_check.py`](file:///Users/macbook/Documents/Kodlama/Radiography/src/core/procedure_check.py) failing procedure compliance when $f_{\min} > OD$ and passing when $f_{\min} \le OD$.
   - Covered by unit tests in [`tests/test_procedure_check.py`](file:///Users/macbook/Documents/Kodlama/Radiography/tests/test_procedure_check.py) and [`tests/test_engine.py`](file:///Users/macbook/Documents/Kodlama/Radiography/tests/test_engine.py). Commit `60d8527`.
+- **DWDI Film & Panel Size Coverage & Minimum Width Notification (ISO 17636-1/2 Clauses 7.1.6 & 7.1.7)**:
+  - In DWDI (Figures 11 & 12: Elliptical and Superimposed), the exposure count ($N = 2$ or $N = 3$) is fixed by normative $t/D_e$ rules, but the film or detector panel must be physically large enough to project the full pipe diameter without cutoff.
+  - Added [`calculate_dwdi_coverage`](file:///Users/macbook/Documents/Kodlama/Radiography/src/core/calculator.py) in `RTCalculator` computing geometric magnification $M = SFD / f$ (where $b = OD + \text{bgap}$, $f = SFD - b$), projected pipe diameter $W_{\text{proj}} = OD \cdot M$, and required minimum film/panel width $W_{\min} = W_{\text{proj}} + 10.0\text{ mm}$ (margin for wire IQI and lead identification markers), along with standard film orientation analysis (normal vs rotated).
+  - Integrated in [`CalculationEngine`](file:///Users/macbook/Documents/Kodlama/Radiography/src/core/engine.py): computes `dwdi_coverage`, formats detailed step-by-step arithmetic (`dwdi_coverage_detail`), updates exposure provenance, and emits localized warning if entered film/panel dimensions do not cover $W_{\min}$.
+  - Added structured `dwdi_coverage` check in [`ProcedureComplianceChecker`](file:///Users/macbook/Documents/Kodlama/Radiography/src/core/procedure_check.py).
+  - Wired into Web [`HeroSummaryPanel.tsx`](file:///Users/macbook/Documents/Kodlama/Radiography/web/src/components/HeroSummaryPanel.tsx) with an accessible `<InfoTip>` modal on the "Gerekli Poz Sayısı" hero card and status badge (`Boyut Yetersiz ⚠` / `ISO ✓`).
+  - Covered by unit tests in `tests/test_calculator.py`, `tests/test_engine.py`, and `tests/test_procedure_check.py`. Full test suite: 930 passed, 35 Playwright E2E passed.
 
 ## Pending / next
 

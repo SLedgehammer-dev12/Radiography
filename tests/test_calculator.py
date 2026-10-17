@@ -1397,6 +1397,50 @@ class TestRTCalculatorEdgeCases(unittest.TestCase):
         res_ok = self.calc.evaluate_exposure_comparison(n_graph=3, n_panel=None, n_applied=5, n_film=5)
         self.assertTrue(res_ok["is_sufficient"])
 
+    def test_calculate_dwdi_coverage(self):
+        # 2" pipe (OD = 60.3 mm), SFD = 400 mm
+        # b = 60.3 mm, f = 339.7 mm -> M = 400 / 339.7 ~= 1.1775
+        # W_proj = 60.3 * 1.1775 ~= 71.0 mm -> W_min = 71.0 + 10.0 = 81.0 mm
+
+        # Case 1: Film 60x240 mm -> normal width (60) is too small, but rotated (240) covers
+        cov = self.calc.calculate_dwdi_coverage(
+            od=60.3, t=3.91, sfd=400.0, bgap=0.0, cap=2.0,
+            receptor_w=60.0, receptor_h=240.0, is_digital=False, is_super=False, tilt_deg=10.0
+        )
+        self.assertIsNotNone(cov)
+        self.assertTrue(cov["is_sufficient"])
+        self.assertEqual(cov["orientation_ok"], "rotated")
+        self.assertGreater(cov["w_min_req"], 80.0)
+        self.assertEqual(cov["available_across"], 240.0)
+
+        # Case 2: Small film 60x70 mm -> neither orientation covers 81 mm
+        cov_small = self.calc.calculate_dwdi_coverage(
+            od=60.3, t=3.91, sfd=400.0, bgap=0.0, cap=2.0,
+            receptor_w=60.0, receptor_h=70.0, is_digital=False, is_super=False
+        )
+        self.assertIsNotNone(cov_small)
+        self.assertFalse(cov_small["is_sufficient"])
+        self.assertEqual(cov_small["orientation_ok"], "none")
+        self.assertEqual(cov_small["available_across"], 70.0)
+
+        # Case 3: Digital panel (locked rotation) with width 70 mm < 81 mm -> fails
+        cov_dig = self.calc.calculate_dwdi_coverage(
+            od=60.3, t=3.91, sfd=400.0, bgap=0.0, cap=2.0,
+            receptor_w=70.0, receptor_h=200.0, is_digital=True, is_super=False
+        )
+        self.assertIsNotNone(cov_dig)
+        self.assertFalse(cov_dig["is_sufficient"])
+        self.assertEqual(cov_dig["orientation_ok"], "none")
+
+        # Case 4: Zero / missing receptor dimensions -> returns default
+        cov_zero = self.calc.calculate_dwdi_coverage(
+            od=60.3, t=3.91, sfd=400.0, bgap=0.0, cap=2.0,
+            receptor_w=0.0, receptor_h=0.0, is_digital=False, is_super=False
+        )
+        self.assertTrue(cov_zero["is_sufficient"])
+        self.assertEqual(cov_zero["available_across"], 0.0)
+
 if __name__ == "__main__":
     unittest.main()
+
 

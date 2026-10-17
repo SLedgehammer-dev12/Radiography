@@ -138,6 +138,20 @@ export interface EngineResult {
   form: FormState;
 }
 
+export interface DWDICoverage {
+  is_sufficient: boolean;
+  w_proj: number;
+  w_min_req: number;
+  h_proj: number;
+  magnification: number;
+  f_dist: number;
+  b_dist: number;
+  available_w: number;
+  available_h: number;
+  available_across: number;
+  margin_mm: number;
+}
+
 export interface ExposuresProvenance {
   method: string;
   n: number;
@@ -151,6 +165,7 @@ export interface ExposuresProvenance {
   next_op?: "le" | "ge";
   l3_dw?: boolean;
   boundaries?: [number, number][];
+  dwdi_coverage?: DWDICoverage;
 }
 
 export interface ComplianceCheck {

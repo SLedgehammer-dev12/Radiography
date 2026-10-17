@@ -647,10 +647,128 @@ def format_exposures_provenance(prov, trans):
     if method == "panoramic":
         return trans.get("exp_prov_panoramic")
     if method == "dwdi_rule":
-        return trans.get("exp_prov_dwdi", prov.get("ratio"), prov.get("n"))
+        text = trans.get("exp_prov_dwdi", prov.get("ratio"), prov.get("n"))
+        dwdi_cov = prov.get("dwdi_coverage")
+        if dwdi_cov and dwdi_cov.get("available_across", 0.0) > 0.0:
+            w_req = dwdi_cov.get("w_min_req", 0.0)
+            avail = dwdi_cov.get("available_across", 0.0)
+            is_suff = dwdi_cov.get("is_sufficient", True)
+            if getattr(trans, "language", "tr") == "tr":
+                tag = "Kurtarıyor ✓" if is_suff else f"Kurtarmıyor ⚠ (Min. {w_req:.1f} mm)"
+                text += f" | Kapsama: Min. {w_req:.1f} mm / Girilen: {avail:.0f} mm ({tag})"
+            else:
+                tag = "Sufficient ✓" if is_suff else f"Insufficient ⚠ (Min. {w_req:.1f} mm)"
+                text += f" | Coverage: Min {w_req:.1f} mm / Entered: {avail:.0f} mm ({tag})"
+        return text
     if method == "out_of_chart":
         return trans.get("exp_prov_out_of_chart", prov.get("n"))
     return trans.get("exp_prov_fallback", prov.get("n"))
+
+
+def format_dwdi_coverage_detail(cov, trans, od, t, sfd, geometry):
+    """Localized step-by-step arithmetic and coverage breakdown for DWDI exposures."""
+    if not cov:
+        return ""
+    lang = getattr(trans, "language", "tr") if not isinstance(trans, dict) else trans.get("language", "tr")
+    tr = (lang == "tr")
+
+    is_super = (geometry == "dwdi_super")
+    tech_name = ("DWDI Çakışık (Şekil 12)" if is_super else "DWDI Eliptik (Şekil 11)") if tr else (
+        "DWDI Superimposed (Figure 12)" if is_super else "DWDI Elliptical (Figure 11)"
+    )
+
+    ratio = (t / od) if od > 0 else 0.0
+    n_exp = 3 if is_super else (3 if ratio >= 0.12 else 2)
+    m = cov.get("magnification", 1.0)
+    w_proj = cov.get("w_proj", 0.0)
+    w_min = cov.get("w_min_req", 0.0)
+    h_proj = cov.get("h_proj", 0.0)
+    f_dist = cov.get("f_dist", 0.0)
+    b_dist = cov.get("b_dist", 0.0)
+    rw = cov.get("available_w", 0.0)
+    rh = cov.get("available_h", 0.0)
+    avail = cov.get("available_across", 0.0)
+    margin = cov.get("margin_mm", 10.0)
+    is_suff = cov.get("is_sufficient", True)
+
+    lines = []
+    if tr:
+        lines.append("DWDI POZ SAYISI VE FİLM / PANEL BOYUT KAPSAMA DÖKÜMÜ:")
+        lines.append("=" * 60)
+        lines.append("1. Normatif Çekim Geometrisi ve Poz Sayısı (ISO 17636-1/2 Madde 7.1.6/7.1.7):")
+        lines.append(f"   • Düzenek: {tech_name}")
+        lines.append(f"   • Boru Dış Çapı (OD): {od:.1f} mm, Et Kalınlığı (t): {t:.1f} mm")
+        lines.append(f"   • t / De Oranı: {ratio:.4f} (Eşik: 0.12)")
+        if is_super:
+            lines.append("   • Çakışık teknikte dikişin tamamını kapsamak için 3 poz (60° veya 120° arayla) gereklidir.")
+        elif ratio >= 0.12:
+            lines.append("   • t/De >= 0.12 olduğundan eliptik teknikte 3 poz (60° veya 120° arayla) gereklidir.")
+        else:
+            lines.append("   • t/De < 0.12 olduğundan eliptik teknikte 2 poz (90° arayla) yeterlidir.")
+        lines.append(f"   • GEREKEN ASGARİ POZ SAYISI: {n_exp} poz")
+        lines.append("")
+        lines.append("2. Projeksiyon Büyütmesi ve İzdüşüm Hesabı:")
+        lines.append(f"   • Uygulanan Odak Mesafesi (SFD): {sfd:.1f} mm")
+        lines.append(f"   • Nesne-Dedektör Mesafesi (b = OD + bgap): {b_dist:.1f} mm")
+        lines.append(f"   • Odak-Nesne Mesafesi (f = SFD - b): {f_dist:.1f} mm")
+        lines.append(f"   • Geometrik Büyütme (M = SFD / f): ×{m:.3f}")
+        lines.append(f"   • Büyütülmüş Boru Çapı (W_proj = OD × M): {w_proj:.1f} mm")
+        lines.append(f"   • Standart IQI ve İşaretçi Kenar Marjı: +{margin:.1f} mm")
+        lines.append(f"   ★ GEREKLİ ASGARİ FİLM/PANEL GENİŞLİĞİ: {w_min:.1f} mm")
+        if h_proj > 0:
+            lines.append(f"   • Projeksiyon Boyuna Açılma (WAE / Elips): {h_proj:.1f} mm")
+        lines.append("")
+        lines.append("3. Boyut Yeterlilik (Kurtarma) Durumu:")
+        lines.append(f"   • Girilen Film/Panel Boyutu: {rw:.0f} × {rh:.0f} mm (Kullanılabilir: {avail:.0f} mm)")
+        if avail <= 0.0:
+            lines.append("   ℹ Bilgi: Özel film/panel boyutu girilmedi; kontrol için boyut giriniz.")
+        elif is_suff:
+            lines.append(f"   ✓ DURUM: KURTARIYOR! Girilen boyut ({avail:.0f} mm) >= Gerekli min. ({w_min:.1f} mm).")
+            lines.append(f"     Boru ve kaynak görüntüsü kesilmeden {n_exp} poz ile tüm dikiş tamamlanabilir.")
+        else:
+            lines.append(f"   ✗ DURUM: KURTARMIYOR! Girilen boyut ({avail:.0f} mm) < Gerekli min. ({w_min:.1f} mm).")
+            lines.append("     Boru görüntüsü film/panel sınırlarından taşacak ve kenarlardan kesilecektir!")
+            lines.append(f"     Çözüm: En az {w_min:.1f} mm genişliğinde film/panel kullanınız.")
+    else:
+        lines.append("DWDI EXPOSURE COUNT & FILM / PANEL COVERAGE BREAKDOWN:")
+        lines.append("=" * 60)
+        lines.append("1. Normative Technique & Exposures (ISO 17636-1/2 Clauses 7.1.6/7.1.7):")
+        lines.append(f"   • Arrangement: {tech_name}")
+        lines.append(f"   • Pipe OD: {od:.1f} mm, Wall Thickness (t): {t:.1f} mm")
+        lines.append(f"   • t / De Ratio: {ratio:.4f} (Threshold: 0.12)")
+        if is_super:
+            lines.append("   • Superimposed technique requires 3 exposures (at 60°/120°) to cover the circumference.")
+        elif ratio >= 0.12:
+            lines.append("   • t/De >= 0.12 requires 3 elliptical exposures (at 60°/120°).")
+        else:
+            lines.append("   • t/De < 0.12 requires 2 elliptical exposures (at 90° offset).")
+        lines.append(f"   • REQUIRED MINIMUM EXPOSURES: {n_exp} exposures")
+        lines.append("")
+        lines.append("2. Projection Magnification & Shadow Sizing:")
+        lines.append(f"   • Applied Distance (SFD): {sfd:.1f} mm")
+        lines.append(f"   • Object-to-Detector Distance (b = OD + bgap): {b_dist:.1f} mm")
+        lines.append(f"   • Source-to-Object Distance (f = SFD - b): {f_dist:.1f} mm")
+        lines.append(f"   • Geometric Magnification (M = SFD / f): x{m:.3f}")
+        lines.append(f"   • Projected Pipe Diameter (W_proj = OD x M): {w_proj:.1f} mm")
+        lines.append(f"   • IQI & Marker Edge Margin: +{margin:.1f} mm")
+        lines.append(f"   * REQUIRED MINIMUM FILM/PANEL WIDTH: {w_min:.1f} mm")
+        if h_proj > 0:
+            lines.append(f"   • Longitudinal Projection (WAE / Ellipse): {h_proj:.1f} mm")
+        lines.append("")
+        lines.append("3. Size Coverage Sufficiency Status:")
+        lines.append(f"   • Entered Film/Panel Size: {rw:.0f} x {rh:.0f} mm (Available: {avail:.0f} mm)")
+        if avail <= 0.0:
+            lines.append("   ℹ Note: Custom film/panel dimensions not entered.")
+        elif is_suff:
+            lines.append(f"   ✓ STATUS: SUFFICIENT! Entered size ({avail:.0f} mm) >= Required min ({w_min:.1f} mm).")
+            lines.append(f"     Full weld circumference can be completed in {n_exp} exposures without cutoff.")
+        else:
+            lines.append(f"   ✗ STATUS: INSUFFICIENT! Entered size ({avail:.0f} mm) < Required min ({w_min:.1f} mm).")
+            lines.append("     Pipe image will be clipped off the detector/film edge!")
+            lines.append(f"     Remedy: Use a detector/film with at least {w_min:.1f} mm width.")
+
+    return "\n".join(lines)
+
 
 
 def format_exposure_time_provenance(prov, trans):
@@ -1051,6 +1169,10 @@ def normalize_form(form):
         "base_multiplier", "base_multiplier_raw", "film_width", "film_height",
         "app_overlap_warn",
     ]
+    if form and "detector_width" in form and "panel_width" not in form:
+        f["panel_width"] = form["detector_width"]
+    if form and "detector_height" in form and "panel_height" not in form:
+        f["panel_height"] = form["detector_height"]
     for key in float_keys:
         f[key] = _as_float(f.get(key), DEFAULT_FORM[key])
 
@@ -1486,6 +1608,8 @@ class CalculationEngine:
         bgap = geo["bgap"]
         dd = geo["dd"]
         df = geo["df"]
+        receptor_w = geo["receptor_w"]
+        receptor_h = geo["receptor_h"]
         receptor_size = geo["receptor_size"]
         is_digital = geo["is_digital"]
 
@@ -1631,6 +1755,36 @@ class CalculationEngine:
                     warnings.append(f"BİLGİ: Kaset boyutu ({raw_len:.0f} mm, bindirme: {overlap_mm:.0f} mm) poz sayısını belirliyor ({n_film} poz, Annex A tabanı: {exposures} poz).")
                 else:
                     warnings.append(f"NOTE: Film length ({raw_len:.0f} mm, overlap: {overlap_mm:.0f} mm) limits exposure count ({n_film} exposures, Annex A baseline: {exposures}).")
+
+        # DWDI Film/Panel physical projection coverage check (Figures 11 & 12)
+        dwdi_coverage = None
+        dwdi_coverage_detail = ""
+        if geometry in ("dwdi_elliptic", "dwdi_super"):
+            is_super = (geometry == "dwdi_super")
+            dwdi_coverage = calc.calculate_dwdi_coverage(
+                od, t, sfd, bgap=bgap, cap=cap,
+                receptor_w=receptor_w, receptor_h=receptor_h,
+                is_digital=is_digital, is_super=is_super,
+            )
+            exposures_prov["dwdi_coverage"] = dwdi_coverage
+            dwdi_coverage_detail = format_dwdi_coverage_detail(
+                dwdi_coverage, trans, od, t, sfd, geometry
+            )
+            if receptor_size > 0.0 and not dwdi_coverage["is_sufficient"]:
+                avail = dwdi_coverage["available_across"] or max(receptor_w, receptor_h)
+                w_min_req = dwdi_coverage["w_min_req"]
+                if trans.language == "tr":
+                    warnings.append(
+                        f"GEOMETRİ/BOYUT UYARISI: DWDI çekimde girilen film/panel boyutu ({avail:.0f} mm), "
+                        f"borunun büyütülmüş izdüşümünü ({w_min_req:.1f} mm) kurtarmıyor! "
+                        f"Boru ve kaynak görüntüsünün kesilmemesi için en az {w_min_req:.1f} mm genişlik gereklidir."
+                    )
+                else:
+                    warnings.append(
+                        f"GEOMETRY/DIMENSION WARNING: In DWDI, the film/panel size ({avail:.0f} mm) "
+                        f"does not cover the projected pipe image ({w_min_req:.1f} mm)! "
+                        f"A minimum width of {w_min_req:.1f} mm is required to prevent image cutoff."
+                    )
 
         # 6. kV input (X-ray only)
         if source == "x_ray":
@@ -2299,6 +2453,8 @@ class CalculationEngine:
             "total_joint_time_seconds": total_joint_sec,
             "total_joint_time_str": total_joint_str,
             "suggestions": suggestions,
+            "dwdi_coverage": dwdi_coverage,
+            "dwdi_coverage_detail": dwdi_coverage_detail,
         }
         if tech == "digital":
             calculated["required_snr"] = target_snr_val
@@ -2420,6 +2576,8 @@ class CalculationEngine:
             "exposures_film": n_film,
             "film_overlap": overlap_mm,
             "suggestions": suggestions,
+            "dwdi_coverage": dwdi_coverage,
+            "dwdi_coverage_detail": dwdi_coverage_detail,
         }
 
         values["lvl3"] = lvl3

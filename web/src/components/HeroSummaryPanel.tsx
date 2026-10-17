@@ -104,6 +104,10 @@ export function HeroSummaryPanel({
     exposuresProvenance,
     t,
   );
+  const dwdiDetail = (result?.values?.dwdi_coverage_detail as string) || "";
+  const dwdiCoverage = result?.values?.dwdi_coverage as
+    | { is_sufficient: boolean; w_min_req: number; available_across: number }
+    | undefined;
 
   const exposureTimeProvenanceText =
     (result?.values?.exposure_time_provenance_text as string | undefined) ?? "";
@@ -425,7 +429,17 @@ export function HeroSummaryPanel({
         <div className="hero-card">
           <div className="hero-main">
             <div className="hero-label">
-              {t("req_exposures").replace(/:\s*$/, "")}
+              <span>{t("req_exposures").replace(/:\s*$/, "")}</span>
+              {dwdiDetail && (
+                <InfoTip
+                  text={dwdiDetail}
+                  title={
+                    lang === "tr"
+                      ? "DWDI Poz Sayısı ve Boyut Kapsaması"
+                      : "DWDI Exposures & Size Coverage"
+                  }
+                />
+              )}
             </div>
             {exposuresProvenanceText && (
               <div className="hero-sub">{exposuresProvenanceText}</div>
@@ -447,13 +461,22 @@ export function HeroSummaryPanel({
             {result && (
               <span
                 className={`hero-status ${
-                  form.app_exposures === 0 ||
-                  Boolean(result.values.exposures_ok)
+                  (form.app_exposures === 0 ||
+                    Boolean(result.values.exposures_ok)) &&
+                  (!dwdiCoverage ||
+                    dwdiCoverage.available_across === 0 ||
+                    dwdiCoverage.is_sufficient)
                     ? "ok"
                     : "warn"
                 }`}
               >
-                {result.display.exposures_check}
+                {dwdiCoverage &&
+                dwdiCoverage.available_across > 0 &&
+                !dwdiCoverage.is_sufficient
+                  ? lang === "tr"
+                    ? "Boyut Yetersiz ⚠"
+                    : "Size Insufficient ⚠"
+                  : result.display.exposures_check}
               </span>
             )}
           </div>

@@ -573,3 +573,41 @@ def test_dwsi_figure14_warning_when_fmin_exceeds_od(engine):
     }, {}, "en")
     assert any("GEOMETRY/FIGURE WARNING" in w and "fig14b" in w and "Figure 13" in w for w in res_en["warnings"])
 
+
+def test_dwdi_coverage_in_engine(engine):
+    """Verifies that DWDI exposures check validates film/detector size coverage
+    and provides detailed calculation provenance and warnings."""
+    # Case 1: DWDI elliptic with too small film (60x70 mm) on 2" pipe (OD 60.3 mm)
+    res_small = engine.calculate({
+        "tech": "analog", "geometry": "dwdi_elliptic",
+        "od": 60.3, "t": 3.91, "sfd": 400.0,
+        "film_width": 60.0, "film_height": 70.0,
+    }, {}, "tr")
+    cov = res_small["calculated"]["dwdi_coverage"]
+    assert cov is not None
+    assert cov["is_sufficient"] is False
+    assert cov["w_min_req"] > 80.0
+    assert any("GEOMETRİ/BOYUT UYARISI" in w and "DWDI" in w for w in res_small["warnings"])
+    assert res_small["values"]["dwdi_coverage_detail"] != ""
+    assert "W_proj" in res_small["values"]["dwdi_coverage_detail"]
+
+    # Case 2: DWDI elliptic with sufficient film (100x240 mm)
+    res_ok = engine.calculate({
+        "tech": "analog", "geometry": "dwdi_elliptic",
+        "od": 60.3, "t": 3.91, "sfd": 400.0,
+        "film_width": 100.0, "film_height": 240.0,
+    }, {}, "tr")
+    cov_ok = res_ok["calculated"]["dwdi_coverage"]
+    assert cov_ok is not None
+    assert cov_ok["is_sufficient"] is True
+    assert not any("GEOMETRİ/BOYUT UYARISI" in w and "DWDI" in w for w in res_ok["warnings"])
+
+    # Case 3: English DWDI super with digital panel
+    res_en = engine.calculate({
+        "tech": "digital", "geometry": "dwdi_super",
+        "od": 60.3, "t": 3.91, "sfd": 400.0,
+        "detector_width": 60.0, "detector_height": 60.0,
+    }, {}, "en")
+    assert any("GEOMETRY/DIMENSION WARNING" in w and "DWDI" in w for w in res_en["warnings"])
+
+
