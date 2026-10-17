@@ -49,8 +49,9 @@ tab/panel alt bileşenlerine bölünüyor:
   J. [~] Kalan paneller:
          [x] CompliancePanel (procedure_section Group) + WarningsPanel (warnings Group)
              -> components/CompliancePanel.tsx, components/WarningsPanel.tsx — 2419→2383
-         [ ] Report info Group (1941), Inputs Group (1130), right-column sketch tabs (2165)
-             — props yüzeyi geniş, sırayla
+         [x] ReportInfoPanel (report_info_section Group + REPORT_FIELDS)
+             -> components/ReportInfoPanel.tsx — 2383→2358
+         [ ] Inputs Group (1076), right-column sketch tabs (2165) — en geniş yüzey, sırayla
 
 ## Kural
 Her bölme adımı tek commit, test suite yeşil kalır, davranış değişmez.

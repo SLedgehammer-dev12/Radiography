@@ -24,6 +24,7 @@ import { DefectPanel } from "./components/DefectPanel";
 import { OutputsPanel } from "./components/OutputsPanel";
 import { CompliancePanel } from "./components/CompliancePanel";
 import { WarningsPanel } from "./components/WarningsPanel";
+import { ReportInfoPanel } from "./components/ReportInfoPanel";
 import {
   AboutModal,
   DecayDialog,
@@ -86,22 +87,6 @@ const CHART_OPTION_META: Record<string, { labelKey?: string; label?: string }> =
   dda_panel_chart: { labelKey: "chart_dda_panel" },
   digital_xray_chart: { labelKey: "chart_digital_xray" },
 };
-const REPORT_FIELDS: [string, string][] = [
-  ["report_no", "report_no"],
-  ["report_rev", "report_rev"],
-  ["project", "project"],
-  ["welder_id", "welder_id"],
-  ["joint_id", "joint_id"],
-  ["wps_pqr", "wps_pqr"],
-  ["procedure_no", "procedure_no"],
-  ["device_serial", "device_serial"],
-  ["calibration_date", "calibration_date"],
-  ["personnel", "personnel"],
-  ["lvl2_name", "lvl2_name"],
-  ["lvl2_cert", "lvl2_cert"],
-  ["lvl3_name", "lvl3_name"],
-  ["lvl3_cert", "lvl3_cert"],
-];
 const FILM_PRESETS: Record<string, [number, number]> = {
   "80x300": [80, 300],
   "100x400": [100, 400],
@@ -1886,21 +1871,11 @@ export default function App() {
               )}
             </Group>
 
-            <Group title={t("report_info_section")} open={false}>
-              <div className="field-row-2">
-                {REPORT_FIELDS.map(([key, labelKey]) => (
-                  <label className="field" key={key}>
-                    <span className="field-label">{t(labelKey)}</span>
-                    <input
-                      className="field-input"
-                      type="text"
-                      value={reportInfo[key] ?? ""}
-                      onChange={(event) => patchReport(key, event.target.value)}
-                    />
-                  </label>
-                ))}
-              </div>
-            </Group>
+            <ReportInfoPanel
+              t={t}
+              reportInfo={reportInfo}
+              patchReport={patchReport}
+            />
           </div>
 
           <div className="column outputs">
