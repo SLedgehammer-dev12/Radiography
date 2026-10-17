@@ -68,7 +68,7 @@
   }, []);
   ```
 
-- [ ] **CR-ITEM-1.3 [Aşırı Yüksek Doz Hızında Dedektör Doyum (Saturation/Blooming) Bilgilendirmesi]**:
+- [x] **CR-ITEM-1.3 [Aşırı Yüksek Doz Hızında Dedektör Doyum (Saturation/Blooming) Bilgilendirmesi]** (CLOSED, verified 2026-10-17 at `70ab040`: `dda_frame.t_frame_ideal < 0.08` emits `warn_dda_high_dose_rate` in `engine.py`, tested by `test_dda_high_dose_rate_saturation_advisory`):
   - **Severity**: Low
   - **Location**: `src/core/calculator.py:1614-1627`, `src/core/engine.py:1140`
   - **Description**: DDA kare entegrasyonunda $t_{frame\_ideal} < 0.10\text{ s}$ çıktığında, standartlar gereği $t_{frame} = 0.10\text{ s}$ tabanına çekilmekte ve $N_{frames} \ge 16$ uygulanmaktadır. Ancak çok ince et kalınlıklarında (örneğin 1-2 mm alüminyum/çelik) ve yüksek tüp akımında (8-10 mA) tek karede toplanan doz hedef ADC seviyesini aşarak dedektör piksel doygunluğuna (saturation) yaklaşabilir. Sistemin kullanıcıya "Tüp akımını (mA) düşürün veya SFD mesafesini artırın" şeklinde önleyici bir uyarı (`warn_dda_high_dose_rate`) üretmesi sahadaki görüntü kalitesini güvenceye alır.
@@ -87,7 +87,7 @@
   };
   ```
 
-- [ ] **CR-ITEM-1.5 [Desktop `_show_about` RichText Güvenliği ve HTML Kaçış Koruması]**:
+- [x] **CR-ITEM-1.5 [Desktop `_show_about` RichText Güvenliği ve HTML Kaçış Koruması]** (CLOSED, verified 2026-10-17 at `70ab040`: `html.escape()` applied in `_show_about`, tested by `test_show_about_escapes_translation_html`):
   - **Severity**: Low
   - **Location**: `src/ui/main_window.py:2661-2677`
   - **Description**: `_show_about` fonksiyonunda `QMessageBox` içeriği `Qt.TextFormat.RichText` formatında HTML string birleştirme ile oluşturulmaktadır. Mevcut çeviri sözlüğü güvenli olsa da, çeviri stringlerine veya kullanıcı tarafından yüklenebilecek dil paketlerine karşı `html.escape()` kullanılması defansif programlama kuralıdır.

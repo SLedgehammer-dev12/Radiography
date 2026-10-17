@@ -55,6 +55,14 @@
   (App.tsx → 2164); `ExposuresProvenance` type added to `types.ts`
 
 ### Features (web)
+- **Accessibility & error/loading polish (`4f84a81`)** — all modals (`DecayDialog`,
+  `Lvl3Dialog`, `AboutModal`, `UpdateModal`) expose `role="dialog"` +
+  `aria-modal="true"` and close on `Escape`; `InfoTip` supports `Enter`/`Space`
+  activation and `Escape`-to-close; keyboard shortcuts (`Ctrl/Cmd+Enter`,
+  `Ctrl/Cmd+S`) guard against `!ready`, key repeat, `pdfBusy`, and open modals;
+  `.app-progress` and header status reflect both `busy` and `pdfBusy`;
+  `OutputsPanel` and `CompliancePanel` handle initial loading and error states
+  cleanly without sticking on "Calculating…" or flashing a false non-compliant badge.
 - **Keyboard shortcuts** — `Ctrl/Cmd+Enter` exports the PDF, `Ctrl/Cmd+S` saves
   the current form as a preset (browser save dialog suppressed). PDF button
   title hints the shortcut. E2E covers both.
@@ -71,7 +79,8 @@
 - **Mobile / responsive UX** — `web/src/App.css` gains a touch/mobile block:
   hides the desktop-only custom scrollbar on coarse pointers; 16px form controls
   on phones (stops iOS focus auto-zoom); ≥40px tap targets for buttons, tabs,
-  radios; sketch tabs wrap instead of ellipsising; tighter mobile padding.
+  radios (keeping inline `.sync-btn`/`.sketch-mini-btn` pills compact at 28px);
+  sketch tabs wrap instead of ellipsising; tighter mobile padding.
   New E2E: `web/tests/e2e/mobile.spec.ts` (390×844, touch) — no horizontal
   overflow, 16px inputs, tap-to-open info modal.
 
@@ -81,20 +90,21 @@
 python3 -m pytest -q                    # 915 passed, 6 skipped, 849 subtests
 cd web && npx tsc -b                    # clean
 cd web && npx oxlint src/               # 0 errors (6 pre-existing warnings)
-cd web && npx playwright test           # 31 passed (21 + 3 mobile + 7 feedback)
+cd web && npx playwright test           # 32 passed (21 + 3 mobile + 8 feedback)
 ```
 
 ## Pending / next
 
-- [ ] **J: remaining web panels** — **STOPPED by decision (2026-10-17).** The
+- [x] **J: remaining web panels** — **STOPPED by decision (2026-10-17).** The
       remaining Inputs Group has 38 external deps; a component would need 38 props
       with no cohesion gain. Done: Compliance, Warnings, Report info, Sketch tabs.
-      App.tsx stands at 2164 lines (−31%). Do not resume without a new approach
+      App.tsx stands at 2244 lines (−29%). Do not resume without a new approach
       (semantic sub-panels or a form context). See `docs/godclass-plan.md` step J.
-- [ ] **Web feature development** — direction: **interaction & feedback**.
+- [x] **Web feature development (interaction, feedback, error-state & accessibility pass)** —
       Done: toast variants + auto-dismiss; sticky header with Reset/PDF; header
-      progress bar; outputs empty state; keyboard shortcuts.
-      Possible next: skeleton rows, error-state polish, accessibility pass.
+      progress bar (`busy || pdfBusy`); outputs & compliance loading/error state polish;
+      keyboard shortcuts + modal/busy guards; modal `role="dialog"` + `Escape`-to-close +
+      keyboard `InfoTip`.
 - [ ] Decide whether to record the web-only scope in `AGENTS.md`.
 
 ## Notes & risks

@@ -1,12 +1,12 @@
 # Radiography — Repository Index
 
-> **Status**: Current (Indexed at commit `0580273` | Version `2.0.3` | 2026-10-16)
+> **Status**: Current (Indexed at commit `4f84a81` | Version `2.0.3` | 2026-10-17)
 > **Domain**: Industrial Radiographic Testing (NDT RT) exposure calculator & report generator
 > **Freshness Policy**: Stale after 7 days or 15 new commits.
 
 ## 1. Architectural Overview
 
-Single pure-Python calculation core (`src/core/`) shared by three targets: Desktop PyQt6, Web React+Pyodide, Mobile KivyMD. `CalculationEngine.calculate()` orchestrates geometry → exposure → IQI → warnings; `report.py` generates the PDF. No target duplicates physics.
+Single pure-Python calculation core (`src/core/`) shared by three targets: Desktop PyQt6 (frozen), Web React+Pyodide (active front-end), Mobile KivyMD (frozen). `CalculationEngine.calculate()` orchestrates geometry → exposure → IQI → warnings; `report.py` generates the PDF. No target duplicates physics.
 
 ## 2. Directory Taxonomy
 
@@ -19,16 +19,16 @@ Radiography/
 ├── src/core/                # [Core] 15x .py: engine, calculator, exposure_charts,
 │                            #   annex_a, api1104, asme_b31_3, asme_b36, asme_viii,
 │                            #   iso5817, procedure_check, report, translation, updater, version
-├── src/ui/                  # [Desktop UI] PyQt6 (main_window 3297 lines + panels/)
+├── src/ui/                  # [Desktop UI] PyQt6 (main_window 2114 lines + 8 panels/)
 ├── src/mobile/              # [Mobile] KivyMD wizard (24 files incl. .kv)
 ├── src/android/             # [Packaging] p4a manifest hook
-├── web/src/                 # [Web] React 19 (App.tsx 3146 lines, main.tsx, pyodide/)
+├── web/src/                 # [Web] React 19 (App.tsx 2244 lines, components/, state/, lib/, pyodide/)
 ├── web/python/bridge.py     # [Bridge] Pyodide JSON-RPC -> CalculationEngine
 ├── web/scripts/sync-assets.mjs  # [Tool] src/core -> web/public/python sync
-├── tests/                   # [Tests] 37 files, 919 pytest cases
-├── web/tests/               # [Tests] 5 Playwright E2E files
+├── tests/                   # [Tests] 37 files, 921 pytest cases (915 passed, 6 skipped)
+├── web/tests/               # [Tests] 6 Playwright E2E files (32 tests)
 ├── tools/                   # [Tools] Annex A digitizer
-└── docs/                    # [Data] ASME B36 pipe catalog JSON
+└── docs/                    # [Data/Docs] ASME B36 pipe catalog JSON, PROGRESS.md, godclass-plan.md
 ```
 
 ## 3. Entry Points
@@ -46,8 +46,8 @@ Core facade: `src/core/engine.py::CalculationEngine.calculate()` — single pipe
 
 | Module | Fan-Out | Instability | Role |
 | :--- | :---: | :---: | :--- |
-| `src/ui/main_window` | 18 | 0.95 High | Desktop god-class (3297 lines) |
-| `web/src/App.tsx` | 12 | 0.92 High | Web god-class (3146 lines) |
+| `src/ui/main_window` | 18 | 0.95 High | Desktop shell (2114 lines + 8 mixins in `src/ui/panels/`) |
+| `web/src/App.tsx` | 16 | 0.94 High | Web orchestrator (2244 lines + `components/*`, `state/*`) |
 | `src/core/engine` | 9 | 0.82 Med | Central facade |
 | `src/mobile/lib/app_state` | 9 | 0.69 Med | Mobile bridge |
 | `src/core/calculator` | 2 | 0.50 Low | Stable physics |
@@ -56,17 +56,17 @@ Core facade: `src/core/engine.py::CalculationEngine.calculate()` — single pipe
 
 External: Desktop `PyQt6, reportlab, matplotlib, numpy, Pillow, qrcode`; Web `react 19, pyodide 314, vite 8, playwright`; Mobile `kivy 2.3.1, kivymd`.
 
-## 5. Change Hotspots (117 commits, 1 author)
+## 5. Change Hotspots (138 commits, 1 author)
 
-Top churn: `build.yml` 42, `CHANGELOG.md` 32, `main_window.py` 30, `version.py` 28, `buildozer.spec` 28, `pyproject.toml` 27, `calculator.py` 20. 58 commits contain `fix`. Bus factor = 1 (`omer.erbas`, 117/117). Co-change cluster: `calculator.py` <-> `main_window.py`.
+Top churn: `build.yml` 42, `CHANGELOG.md` 32, `main_window.py` 34, `version.py` 28, `buildozer.spec` 28, `pyproject.toml` 27, `calculator.py` 21, `App.tsx` 20. 60 commits contain `fix`. Bus factor = 1 (`omer.erbas`, 138/138). Co-change cluster: `calculator.py` <-> `main_window.py` / `App.tsx`.
 
 ## 6. Risks & Debt
 
-1. **God-classes**: `main_window.py` + `App.tsx` carry UI+state+events; any UI change risks regression. Test shield is thin (1 pytest file vs 3297 lines; smoke E2E vs 3146 lines).
-2. **Sync drift (web only)**: web copies core into `web/public/python/` (gitignored); sync is automated (`sync-assets.mjs` + predev/prebuild, diff clean today). Mobile has no copy — `buildozer.spec` packages `src/core/*.py` directly at build time, so it cannot drift.
-3. **Version fallback literals**: 4 manifests agree on `2.0.3`, but `App.tsx` keeps 4 hardcoded `"2.0.3"` fallbacks (`pyClient.version ?? "2.0.3"`) — benign display-only drift on bump. Low.
-4. **Open Low items**: `_show_about` RichText without `html.escape()` (`main_window.py:2775-2786`); no `warn_dda_high_dose_rate` advisory for thin-section/high-mA saturation.
-5. **Closed since TODO, pending doc update**: AbortController (CR-1.2), semver regex (CR-1.4), µGy/mGy units (CR-1.7), `noopener/noreferrer` — all verified in code.
+1. **Large UI orchestrators**: `main_window.py` (3298 → 2114 lines) and `App.tsx` (3149 → 2244 lines) were decomposed via `src/ui/panels/*` and `web/src/components/*` + `web/src/state/*`. Inputs group in `App.tsx` (38 deps) intentionally kept inline per `docs/godclass-plan.md`.
+2. **Sync drift (web only)**: web copies core into `web/public/python/` (gitignored); sync is automated (`sync-assets.mjs` + predev/prebuild, diff clean). Mobile has no copy — `buildozer.spec` packages `src/core/*.py` directly at build time.
+3. **Version bump (5 spots)**: `src/core/version.py`, `pyproject.toml`, `buildozer.spec`, `web/package.json`, and `FALLBACK_VERSION` in `web/src/components/Modals.tsx:7` (`RELEASE.md`).
+4. **Shortcut debt (`ponytail-debt`)**: 1 marker in production code (`src/core/calculator.py:1584`, `shortcut: t unknown -> conservative N, pass t to upgrade`).
+5. **Closed review items**: CR-1.1..1.7 in `TODO_code-reviewer.md` all verified and closed in code and tests.
 
 ## 7. Context Tiers (for agents)
 
