@@ -51,7 +51,9 @@ tab/panel alt bileşenlerine bölünüyor:
              -> components/CompliancePanel.tsx, components/WarningsPanel.tsx — 2419→2383
          [x] ReportInfoPanel (report_info_section Group + REPORT_FIELDS)
              -> components/ReportInfoPanel.tsx — 2383→2358
-         [ ] Inputs Group (1076), right-column sketch tabs (2165) — en geniş yüzey, sırayla
+         [x] SketchTabsPanel (right-column tabs + 3D/2D/ISO/Annex A sketches)
+             -> components/SketchTabsPanel.tsx, ExposuresProvenance tipi types.ts'e — 2358→2164
+         [ ] Inputs Group (1076, ~810 satır) — en geniş yüzey (form+patch+helpers), son adım
 
 ## Kural
 Her bölme adımı tek commit, test suite yeşil kalır, davranış değişmez.

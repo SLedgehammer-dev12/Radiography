@@ -51,6 +51,8 @@
   `web/src/components/WarningsPanel.tsx` (App.tsx → 2383)
 - (J, in progress) Report info Group → `web/src/components/ReportInfoPanel.tsx`
   (App.tsx → 2358)
+- (J, in progress) Right-column sketch tabs → `web/src/components/SketchTabsPanel.tsx`
+  (App.tsx → 2164); `ExposuresProvenance` type added to `types.ts`
 
 ## Verification (re-run before continuing)
 
@@ -63,10 +65,8 @@ cd web && npx playwright test           # 21 passed
 
 ## Pending / next
 
-- [ ] **J: remaining web panels** — remaining: Inputs Group, right-column sketch
-      tabs (3D/2D/ISO/Annex A). Widest prop surfaces (form + patch + handlers);
-      do one panel per commit, keep E2E green.
-      Done so far: Compliance, Warnings, Report info.
+- [ ] **J: remaining web panels** — remaining: Inputs Group (~810 lines, widest
+      prop surface). Done so far: Compliance, Warnings, Report info, Sketch tabs.
       (see `docs/godclass-plan.md` step J)
 - [ ] **Web feature development** — direction not yet chosen. Options offered:
       (a) continue panel decomposition, (b) a specific new web feature,

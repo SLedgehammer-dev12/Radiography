@@ -134,6 +134,21 @@ export interface EngineResult {
   form: FormState;
 }
 
+export interface ExposuresProvenance {
+  method: string;
+  n: number;
+  figure?: string;
+  t_over_de?: number;
+  ratio_name?: string;
+  ratio?: number;
+  next_n?: number | null;
+  next_ratio?: number | null;
+  next_distance_mm?: number | null;
+  next_op?: "le" | "ge";
+  l3_dw?: boolean;
+  boundaries?: [number, number][];
+}
+
 export interface ComplianceCheck {
   name: string;
   status: boolean;
