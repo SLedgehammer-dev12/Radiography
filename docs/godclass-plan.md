@@ -18,14 +18,19 @@ Bölme sırası (risk en düşükten en yükseğe):
   C. [x] get_form_values + _collect_engine_form -> FormStateMixin (src/ui/panels/form_state_panel.py) — 2026-10-16, 2836→2647 satır, 915 test yeşil
   D. [x] __init__/init_ui -> UIBuildMixin (src/ui/panels/ui_build_panel.py) — 2026-10-16, 2647→2114 satır, 915 test yeşil (init_ui taşındı; __init__ MainWindow'da kaldı)
 
-## web/src/App.tsx (3146 satır)
+## web/src/App.tsx (bölme öncesi 3149 satır)
 Tek fonksiyonel component, hook'lar inline. Bölmek için:
   - useEngine already extracted (state/useEngine.ts) — iyi örnek
   - Adaylar: formToDesktopState/presets (state/presets.ts — zaten ayrı),
-    modal'lar (AboutModal, UpdateModal, Lvl3Dialog, DecayDialog — zaten ayrı fonksiyonlar),
-    defect akışı, PDF export (svgToPngBase64, downloadBase64 — ayrı fonksiyonlar)
+    modal'lar (zaten ayrı fonksiyonlar), defect akışı,
+    PDF export (svgToPngBase64, downloadBase64 — ayrı fonksiyonlar)
   - Kalan god-class yükü: useState'lerin ~40'u tek App içinde + useEffect x10.
   Öneri: useAppForm, useReportInfo, useDefectState custom hook'larına ayırmak.
+
+  E. [x] Modal bileşenleri (DecayDialog, Lvl3Dialog, AboutModal, UpdateModal) +
+         FALLBACK_VERSION -> components/Modals.tsx — 2026-10-16, 3149→2788 satır,
+         tsc + oxlint + vite build yeşil
+  F. [ ] useState gruplarını useAppForm/useReportInfo/useDefectState hook'larına ayır (hook kuralları riskli — E2E şart)
 
 ## Kural
 Her bölme adımı tek commit, test suite yeşil kalır, davranış değişmez.
