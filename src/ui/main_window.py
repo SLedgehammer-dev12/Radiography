@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import html
 import json
 import tempfile
 import logging
@@ -2773,14 +2774,14 @@ class MainWindow(QMainWindow,
         msg = QMessageBox(self)
         msg.setWindowTitle(self.trans.get("about_title"))
         title_text = f"<h3>Radiography v{CURRENT_VERSION}</h3><p>ISO 17636 / API 1104 / ASME Compliant</p>"
-        owner_text = f"<p><b>{self.trans.get('app_owner')}</b></p>"
-        disclaimer_header = f"<p><b>{self.trans.get('engineering_disclaimer_title')}</b></p>"
-        disclaimer_body = f"<p style='font-size: 11px;'>{self.trans.get('disclaimer')}</p>"
-        contact_header = f"<p><b>{self.trans.get('contact_title')}</b></p>"
+        owner_text = f"<p><b>{html.escape(self.trans.get('app_owner'))}</b></p>"
+        disclaimer_header = f"<p><b>{html.escape(self.trans.get('engineering_disclaimer_title'))}</b></p>"
+        disclaimer_body = f"<p style='font-size: 11px;'>{html.escape(self.trans.get('disclaimer'))}</p>"
+        contact_header = f"<p><b>{html.escape(self.trans.get('contact_title'))}</b></p>"
         contact_body = (
             f"<ul>"
-            f"<li><a href='https://github.com/SLedgehammer-dev12/Radiography/issues'>{self.trans.get('report_issue')}</a></li>"
-            f"<li><a href='mailto:omer.erbas@botas.gov.tr'>{self.trans.get('contact_email')}</a></li>"
+            f"<li><a href='https://github.com/SLedgehammer-dev12/Radiography/issues'>{html.escape(self.trans.get('report_issue'))}</a></li>"
+            f"<li><a href='mailto:omer.erbas@botas.gov.tr'>{html.escape(self.trans.get('contact_email'))}</a></li>"
             f"</ul>"
         )
         msg.setText(f"{title_text}{owner_text}{disclaimer_header}{disclaimer_body}{contact_header}{contact_body}")

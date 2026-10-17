@@ -26,12 +26,14 @@ text, update the constants, and add a regression test in `tests/`.
 
 ## Steps
 
-### 1. Update Version
+### 1. Update Version (all 5 spots — a partial bump ships a wrong version badge)
 ```bash
-# Edit src/core/version.py
-__version__ = "1.2.1"
-
-# Keep pyproject.toml in sync (same version string)
+# 1. src/core/version.py  (__version__)
+# 2. pyproject.toml  (version =)
+# 3. buildozer.spec  (version =)
+# 4. web/package.json  ("version":)
+# 5. web/src/App.tsx  (FALLBACK_VERSION const — display-only fallback)
+grep -rn "2.0.3" src/core/version.py pyproject.toml buildozer.spec web/package.json web/src/App.tsx
 ```
 
 ### 2. Update CHANGELOG.md
@@ -41,10 +43,10 @@ __version__ = "1.2.1"
 
 ### 3. Commit and Tag
 ```bash
-git add src/core/version.py pyproject.toml CHANGELOG.md
-git commit -m "Release v1.2.1"
-git tag v1.2.1
-git push origin v1.2.1
+git add src/core/version.py pyproject.toml buildozer.spec web/package.json web/src/App.tsx CHANGELOG.md
+git commit -m "Release v2.0.3"
+git tag v2.0.3
+git push origin v2.0.3
 ```
 
 ### 4. Automation
@@ -102,3 +104,19 @@ Set GitHub Secrets:
 Set GitHub Secrets:
 - `WINDOWS_CERT_BASE64`: Base64-encoded .pfx certificate
 - `WINDOWS_CERT_PASSWORD`: Certificate password
+
+## God-Class Split Plan (see docs/godclass-plan.md)
+
+- `src/ui/main_window.py` (~3300 lines, 67 methods): split order A→D —
+  (A) export_pdf_report → ReportExportMixin, (B) retranslate_ui → TranslationMixin,
+  (C) get_form_values/_collect_engine_form → FormStateMixin, (D) __init__/init_ui last.
+- `web/src/App.tsx` (~3150 lines): extract useAppForm/useReportInfo/useDefectState hooks;
+  modal and helper functions already split out.
+- Rule: one split per commit, test suite stays green, no behavior change.
+
+## Maintainer Notes (bus factor: 1 — read before touching)
+
+- **God-classes**: `src/ui/main_window.py` (~3300 lines) and `web/src/App.tsx` (~3150 lines) hold UI+state+events. Small, isolated changes only; any UI edit risks regression — run `tests/test_main_window.py` and the web smoke suite.
+- **Single physics core**: all platforms share `src/core/` via `CalculationEngine`. Never fork formulas per platform. Web copies core into `web/public/python/` (gitignored) and syncs automatically (`npm run sync` in `predev`/`prebuild`); mobile has no copy — `buildozer.spec` packages `src/core/*.py` directly at build time.
+- **Verify before release**: `python3 -m pytest tests/test_engine.py tests/test_calculator.py tests/test_main_window.py` and `npx tsc -b` in `web/`.
+- **Orientation**: `PROJECT_INDEX.md` (stale after 7 days / 15 commits — regenerate, don't hand-edit).

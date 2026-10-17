@@ -42,7 +42,7 @@
 
 ## Review Findings
 
-- [ ] **CR-ITEM-1.1 [UpdateModal ve AboutModal İçinde Sabit Kodlanmış Sürüm Numarası]**:
+- [x] **CR-ITEM-1.1 [UpdateModal ve AboutModal İçinde Sabit Kodlanmış Sürüm Numarası]** (CLOSED, verified 2026-10-16 at 0580273/v2.0.3: `AboutModal`/`UpdateModal` take `currentVersion` prop with `"2.0.3"` fallback, call sites pass `pyClient.version ?? "2.0.3"`):
   - **Severity**: Medium
   - **Location**: `web/src/App.tsx:2863`, `web/src/App.tsx:2943`
   - **Description**: `AboutModal` ve `UpdateModal` bileşenlerinde `const currentVersion = "1.10.2";` değeri doğrudan bileşen gövdesinde string sabiti olarak tanımlanmıştır. Projenin ana sürümü `src/core/version.py` (`__version__ = "1.10.2"`) ve Pyodide köprüsünde (`pyClient.version`) tanımlıdır. Sürüm yükseltmelerinde `App.tsx` içindeki bu değerin unutulması durumunda, güncelleme kontrolcüsü yanlış karşılaştırma yaparak kullanıcılara hatalı "yeni sürüm mevcut" veya "güncelsiniz" mesajı verecektir.
@@ -55,7 +55,7 @@
   }
   ```
 
-- [ ] **CR-ITEM-1.2 [Unmounted Bileşende Asenkron Fetch State Güncellemesi (Memory Leak Risk)]**:
+- [x] **CR-ITEM-1.2 [Unmounted Bileşende Asenkron Fetch State Güncellemesi (Memory Leak Risk)]** (CLOSED, verified 2026-10-16: `AbortController` + cleanup + `aborted` guard in `App.tsx:3049-3053`):
   - **Severity**: Medium
   - **Location**: `web/src/App.tsx:2945-2993`
   - **Description**: `UpdateModal` açıldığında `useEffect` içinden `handleCheckUpdates()` tetiklenmektedir. Kullanıcı GitHub API'den yanıt gelmeden önce modalı kapatırsa (`onClose` ile unmount), API yanıtı döndüğünde unmount edilmiş bileşende `setUpdateState` çağrılır. Bu durum React bellek sızıntısı uyarısına yol açar.
@@ -74,7 +74,7 @@
   - **Description**: DDA kare entegrasyonunda $t_{frame\_ideal} < 0.10\text{ s}$ çıktığında, standartlar gereği $t_{frame} = 0.10\text{ s}$ tabanına çekilmekte ve $N_{frames} \ge 16$ uygulanmaktadır. Ancak çok ince et kalınlıklarında (örneğin 1-2 mm alüminyum/çelik) ve yüksek tüp akımında (8-10 mA) tek karede toplanan doz hedef ADC seviyesini aşarak dedektör piksel doygunluğuna (saturation) yaklaşabilir. Sistemin kullanıcıya "Tüp akımını (mA) düşürün veya SFD mesafesini artırın" şeklinde önleyici bir uyarı (`warn_dda_high_dose_rate`) üretmesi sahadaki görüntü kalitesini güvenceye alır.
   - **Recommendation**: `t_frame_ideal < 0.08` olduğunda `engine.py` uyarılar listesine tavsiye niteliğinde bir not eklenmelidir.
 
-- [ ] **CR-ITEM-1.4 [GitHub API Sürüm Etiketi Semver Doğrulaması (Defensive Parsing)]**:
+- [x] **CR-ITEM-1.4 [GitHub API Sürüm Etiketi Semver Doğrulaması (Defensive Parsing)]** (CLOSED, verified 2026-10-16: semver regex `^v?(\d+)\.(\d+)\.(\d+)` in `App.tsx:3013-3017`):
   - **Severity**: Low
   - **Location**: `web/src/App.tsx:2956-2968`
   - **Description**: GitHub Releases API'den dönen `data.tag_name` doğrudan `tagName.replace(/^v/i, "").split(".")` ile tamsayıya çevrilmektedir. Eğer sürüm etiketi `v1.10.3-beta` veya beklenmeyen bir metin içerirse `parseInt` NaN üretebilir veya maj/min/patch sırası bozulabilir.
@@ -93,13 +93,13 @@
   - **Description**: `_show_about` fonksiyonunda `QMessageBox` içeriği `Qt.TextFormat.RichText` formatında HTML string birleştirme ile oluşturulmaktadır. Mevcut çeviri sözlüğü güvenli olsa da, çeviri stringlerine veya kullanıcı tarafından yüklenebilecek dil paketlerine karşı `html.escape()` kullanılması defansif programlama kuralıdır.
   - **Recommendation**: HTML içine yerleştirilen metinler `html.escape()` ile sarılmalıdır.
 
-- [ ] **CR-ITEM-1.6 [Web ve Desktop Python Kod Senkronizasyon Otomasyonu (Parity Drift Risk)]**:
+- [x] **CR-ITEM-1.6 [Web ve Desktop Python Kod Senkronizasyon Otomasyonu (Parity Drift Risk)]** (CLOSED, verified 2026-10-16: `web/package.json` `sync`/`predev`/`prebuild` via `sync-assets.mjs`, diff clean; mobile has no copy — `buildozer.spec` packages `src/core/*.py` directly, cannot drift):
   - **Severity**: High
   - **Location**: `src/core/` vs `web/public/python/src/core/`
   - **Description**: `web/public/python/` dizini `.gitignore` kapsamındadır ve tarayıcıda Pyodide tarafından kullanılmaktadır. Çekirdek Python dosyalarında (`calculator.py`, `engine.py`, `translation.py`) yapılan değişiklikler geliştirici tarafından elle `cp` yapılmadığı takdirde web arayüzü eski sürüm Python kodunu çalıştırmaya devam eder.
   - **Recommendation**: `web/package.json` içindeki `predev` ve `prebuild` betiklerine `python3 -c "import shutil; ..."` veya senkronizasyon komutu eklenerek her derlemede otomatik kopyalanması sağlanmalıdır.
 
-- [ ] **CR-ITEM-1.7 [DDA Dedektör Dozunda Dinamik Birim Gösterimi ($\mu\text{Gy}$ vs $\text{mGy}$)]**:
+- [x] **CR-ITEM-1.7 [DDA Dedektör Dozunda Dinamik Birim Gösterimi ($\mu\text{Gy}$ vs $\text{mGy}$)]** (CLOSED, verified 2026-10-16: `>= 1000` → mGy branch in `App.tsx:2267`):
   - **Severity**: Low
   - **Location**: `web/src/App.tsx:2230-2242`
   - **Description**: DDA metrik kartında toplam dedektör dozu her zaman `µGy` olarak gösterilmektedir. Kalın parçalarda veya izotop çekimlerinde doz $1.000\ \mu\text{Gy}$ üzerine çıktığında (örneğin $3.450\ \mu\text{Gy}$), $3.45\text{ mGy}$ şeklinde dinamik birim dönüşümü yapılması okunabilirliği artıracaktır.

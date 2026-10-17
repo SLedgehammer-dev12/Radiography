@@ -1861,6 +1861,7 @@ class RTCalculator:
 
         return {
             "t_frame_sec": t_frame_sec,
+            "t_frame_ideal": round(t_frame_ideal, 3),
             "t_frame_ms": t_frame_ms,
             "fps": fps,
             "n_frames": n_frames,

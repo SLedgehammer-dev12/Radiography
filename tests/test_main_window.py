@@ -648,6 +648,29 @@ class TestMainWindowInit(unittest.TestCase):
         self.win.cmb_source.setCurrentIndex(1)
         self.assertTrue(self.win.out_rows["u_max"].isHidden())
 
+    def test_show_about_escapes_translation_html(self):
+        # Hostile translation strings must not break the RichText about box.
+        from unittest import mock
+        from PyQt6.QtWidgets import QMessageBox
+        from src.core.version import __version__ as ver
+
+        real_get = self.win.trans.get
+
+        def hostile(key, *args):
+            if key == "disclaimer":
+                return "<script>alert(1)</script>"
+            return real_get(key, *args)
+
+        seen = {}
+        with mock.patch.object(QMessageBox, "exec", return_value=None), \
+             mock.patch.object(QMessageBox, "setText",
+                               lambda self, t: seen.setdefault("text", t)), \
+             mock.patch.object(self.win.trans, "get", side_effect=hostile):
+            self.win._show_about()
+        self.assertIn(f"Radiography v{ver}", seen["text"])
+        self.assertNotIn("<script>", seen["text"])
+        self.assertIn("&lt;script&gt;", seen["text"])
+
     def test_analog_applied_exposures_procedure_check(self):
         # Set up analog DWSI
         self.win.rad_analog.setChecked(True)

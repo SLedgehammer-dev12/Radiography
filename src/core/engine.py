@@ -2151,6 +2151,11 @@ class CalculationEngine:
                 dda_tag = f" ({n_fr} frames × {t_fr:.2f} s)"
         else:
             dda_tag = ""
+        if dda_frame_info and dda_frame_info.get("t_frame_ideal", 1.0) < 0.08:
+            if trans.language == "tr":
+                warnings.append("UYARI (DDA): Tek kare dozu yüksek — dedektör doyumuna yaklaşılabilir. Tüp akımını (mA) düşürün veya SFD mesafesini artırın.")
+            else:
+                warnings.append("WARNING (DDA): Single-frame dose is high — detector saturation possible. Reduce tube current (mA) or increase SFD.")
         chart_label = ""
         if chart_source != "model":
             chart_tag_map = {

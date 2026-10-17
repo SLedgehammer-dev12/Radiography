@@ -47,6 +47,9 @@ import {
 } from "./types";
 import "./App.css";
 
+// Single fallback when Pyodide has not reported the core version yet.
+const FALLBACK_VERSION = "2.0.3";
+
 const DEFECT_TYPES = [
   "defect_ip",
   "defect_if",
@@ -641,14 +644,14 @@ export default function App() {
   const exportPreset = () =>
     downloadJson("rt_preset.json", {
       type: "radiography_preset",
-      version: pyClient.version ?? "2.0.3",
+      version: pyClient.version ?? FALLBACK_VERSION,
       state: formToDesktopState(form, reportInfo, pipeData, lang),
     });
 
   const exportProject = () =>
     downloadJson("rt_project.json", {
       type: "radiography_project",
-      version: pyClient.version ?? "2.0.3",
+      version: pyClient.version ?? FALLBACK_VERSION,
       state: formToDesktopState(form, reportInfo, pipeData, lang),
       calculated: result?.calculated ?? {},
       warnings: (result?.warnings ?? []).join("\n"),
@@ -2689,14 +2692,14 @@ export default function App() {
         {showAbout && (
           <AboutModal
             t={t}
-            currentVersion={pyClient.version ?? "2.0.3"}
+            currentVersion={pyClient.version ?? FALLBACK_VERSION}
             onClose={() => setShowAbout(false)}
           />
         )}
         {showUpdates && (
           <UpdateModal
             t={t}
-            currentVersion={pyClient.version ?? "2.0.3"}
+            currentVersion={pyClient.version ?? FALLBACK_VERSION}
             onClose={() => setShowUpdates(false)}
           />
         )}
@@ -2917,7 +2920,7 @@ interface AboutModalProps {
   currentVersion?: string;
 }
 
-function AboutModal({ t, onClose, currentVersion = "2.0.3" }: AboutModalProps) {
+function AboutModal({ t, onClose, currentVersion = FALLBACK_VERSION }: AboutModalProps) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal about-modal" onClick={(e) => e.stopPropagation()}>
@@ -2989,7 +2992,7 @@ interface UpdateModalProps {
   currentVersion?: string;
 }
 
-function UpdateModal({ t, onClose, currentVersion = "2.0.3" }: UpdateModalProps) {
+function UpdateModal({ t, onClose, currentVersion = FALLBACK_VERSION }: UpdateModalProps) {
   const [updateState, setUpdateState] = useState<{
     status: "checking" | "up_to_date" | "available" | "error";
     latestVersion?: string;

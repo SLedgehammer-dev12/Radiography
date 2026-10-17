@@ -490,3 +490,23 @@ def test_dynamic_provenance_and_exceptions_info(engine):
     ug_txt = res_dig["values"]["ug_provenance_text"]
     assert "Formül: Ug = d · b / f" in ug_txt
     assert "Hesaplanan Değer: Ug =" in ug_txt
+
+
+def test_dda_high_dose_rate_saturation_advisory(engine):
+    # Thin section + high tube current -> t_frame_ideal < 0.08 s advises
+    # reducing mA or increasing SFD (single-frame saturation risk).
+    thin = engine.calculate({
+        "tech": "digital", "detector_type": "dda_si", "source": "x_ray",
+        "chart_source": "dda_frame_method", "app_kv": 100.0, "output_val": 30.0,
+        "od": 60.3, "t": 1.0, "sfd": 400.0, "app_srb": 100.0, "material": "aluminum",
+    }, {}, "tr")
+    ideal = thin["values"]["exposure_time_provenance"]["dda_frame"]["t_frame_ideal"]
+    assert ideal < 0.08
+    assert any("doyum" in w for w in thin["warnings"])
+    # Normal case stays silent (no false positive).
+    normal = engine.calculate({
+        "tech": "digital", "detector_type": "dda_si", "source": "x_ray",
+        "chart_source": "dda_frame_method", "app_kv": 160.0, "output_val": 5.0,
+        "od": 114.3, "t": 6.02, "sfd": 600.0, "app_srb": 100.0,
+    }, {}, "en")
+    assert not any("saturation" in w for w in normal["warnings"])
