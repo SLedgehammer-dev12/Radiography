@@ -33,7 +33,9 @@ Tek fonksiyonel component, hook'lar inline. Bölmek için:
   E2.[x] Saf yardımcılar (svgToPngBase64, downloadBase64 -> lib/sketchExport.ts;
          selectedOdKey -> state/presets.ts) — 2026-10-16, 2788→2716 satır,
          21/21 Playwright E2E yeşil
-  F. [ ] useState gruplarını useAppForm/useReportInfo/useDefectState hook'larına ayır (hook kuralları riskli — E2E şart)
+  F. [x] useDefect hook (defect state + reactive re-evaluation + runDefect) ->
+         state/useDefect.ts — 2026-10-16, 2716→2686 satır, 21/21 E2E yeşil
+      [ ] useAppForm/useReportInfo ayrımı (kalan useState grupları) — daha geniş yüzey
 
 ## Kural
 Her bölme adımı tek commit, test suite yeşil kalır, davranış değişmez.

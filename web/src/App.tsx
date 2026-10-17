@@ -44,11 +44,11 @@ import {
   selectedOdKey,
 } from "./state/presets";
 import { useEngine } from "./state/useEngine";
+import { useDefect } from "./state/useDefect";
 import {
   DEFAULT_FORM,
   DEFAULT_LVL3,
   type DefectInput,
-  type DefectResult,
   type FormState,
   type Lvl3Settings,
   type PipeData,
@@ -228,18 +228,6 @@ export default function App() {
     "3d" | "dynamic" | "figure" | "annex_a"
   >("3d");
   const [filmSizeMode, setFilmSizeMode] = useState<string>("100x400");
-  const [defect, setDefect] = useState<DefectInput>({
-    standard: "api1104",
-    type: "defect_porosity",
-    length: 10,
-    width: 1.5,
-    accumulated: 15,
-    level: "C",
-    service: "normal",
-    mode: "UW-51",
-  });
-  const [defectResult, setDefectResult] = useState<DefectResult | null>(null);
-  const [defectActive, setDefectActive] = useState(false);
   const [showDecay, setShowDecay] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -358,18 +346,14 @@ export default function App() {
     if (match) setFilmSizeMode(match[0]);
   }, [form.film_width, form.film_height]);
 
-  // Reactive defect evaluation once defect module is activated by user
-  useEffect(() => {
-    if (!ready || !defectActive) return;
-    const timer = setTimeout(() => {
-      pyClient
-        .request<DefectResult>("defect", { form, defect, lang })
-        .then(setDefectResult)
-        .catch(() => undefined);
-    }, 150);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, defectActive, form.t, defect, lang]);
+  // Defect-evaluation tab state + reactive re-evaluation (see useDefect).
+  const {
+    defect,
+    setDefect,
+    defectResult,
+    setDefectActive,
+    runDefect,
+  } = useDefect({ form, lang, ready, onError: setNotice });
 
   const digital = form.tech === "digital";
   const analog = !digital;
@@ -673,20 +657,6 @@ export default function App() {
   const readFile = async (file: File | undefined) => {
     if (!file) return "";
     return file.text();
-  };
-
-  const runDefect = async () => {
-    setDefectActive(true);
-    try {
-      const evaluated = await pyClient.request<DefectResult>("defect", {
-        form,
-        defect,
-        lang,
-      });
-      setDefectResult(evaluated);
-    } catch (caught) {
-      setNotice(String(caught));
-    }
   };
 
   const exportPdf = async () => {
