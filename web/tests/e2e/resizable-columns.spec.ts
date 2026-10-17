@@ -9,8 +9,6 @@ test.describe("Resizable Columns & 3D Column 40% Width Tests", () => {
     await expect(page.getByTestId("output-w_nom")).not.toContainText("-", { timeout: 60_000 });
 
     const layout = page.locator(".layout");
-    const colInputs = page.locator(".column.inputs");
-    const colOutputs = page.locator(".column.outputs");
     const colWarnings = page.locator(".column.warnings"); // 3D view column
 
     const layoutBox = await layout.boundingBox();

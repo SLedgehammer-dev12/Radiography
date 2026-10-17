@@ -1,7 +1,7 @@
 # Progress Log
 
 > Working log of completed and pending work. Updated per session.
-> Last updated: 2026-10-17 (HEAD at time of writing: `ffb76f2`).
+> Last updated: 2026-10-17 (Release `v2.0.4`).
 
 ## Scope decision
 

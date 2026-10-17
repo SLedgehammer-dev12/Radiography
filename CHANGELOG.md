@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.0.4] - 2026-10-17
+
+### Added
+- **DWDI Film & Panel Physical Coverage Validation (ISO 17636-1/2 Clauses 7.1.6 & 7.1.7)**: Computes geometric magnification $M = SFD / f$, projected outer diameter $W_{\text{proj}} = OD \cdot M$, and required minimum film/panel width $W_{\min} = W_{\text{proj}} + 10.0\text{ mm}$ (margin for wire IQI and lead identification markers), along with elliptical weld separation $H_{\text{proj}} = (s + WAE) \cdot M$. Evaluates both normal and rotated (90°) receptor placements and surfaces alerts across the hero badge, inline field warning, warnings list, and procedure compliance checks.
+- **DWSI Figure 14 ($f_{\min} > OD$) Validation (ISO 17636-1/2 Clause 7.6)**: Enforces normative boundary check for DWSI "source on surface" geometry. When calculated $f_{\min} > OD$, emits a localized advisory and procedure check failure directing the operator to Figure 13.
+- **Dual Dynamic $f_{\min}$ Metric & Interactive Derivation Modal**: Simultaneously calculates and displays both ISO 17636-1/2 ($C \cdot d \cdot b^{2/3}$) and ASME Sec V Art 2 T-274.2 ($d \cdot b / U_{g,\text{limit}}$) $f_{\min}$ values with step-by-step arithmetic substitution modals, active Level 3 exemptions, and governing standard resolution.
+- **Exposure-Time Calculation Engine Audit & Refinements**: Corrected 16× digital X-ray chart baseline scaling; implemented energy-dependent X-ray material attenuation; passed testing class into DDA gamma chart frame integration; expanded industrial NDT film catalog to 22 models across Carestream, Agfa Structurix, Fujifilm IX, and Foma Fomadux; expanded digital detector catalog to 10 industrial CR/DDA models.
+- **Resizable 3-Column Layout & 40% 3D View Default**: Desktop workbench defaults to Left (Inputs) 28%, Middle (Outputs) 32%, Right (3D View) 40% with pointer-drag splitters, keyboard ARIA separator navigation, double-click reset, View menu reset, and `localStorage` persistence.
+- **Web Usability & Mobile Ergonomics**: Added Quick Presets chips bar, sticky header one-click sync button, collapsible inputs sections, copy-to-clipboard for inspection summary and hero values, and mobile/touch optimizations (≥40px tap targets, 16px inputs).
+
+### Fixed
+- **Service Worker Dynamic Asset Caching**: Upgraded offline cache to `radiography-v2.0.4` and transitioned dynamic Python sources and metadata to a network-first strategy, preventing stale offline cache traps during app updates.
+- **CI/CD Web Release Automation**: Streamlined `.github/workflows/build.yml` to build and publish only standalone macOS `.dmg` and Windows `.exe` native launchers for the Web edition.
+
 ## [2.0.3] - 2026-10-16
 
 ### Added

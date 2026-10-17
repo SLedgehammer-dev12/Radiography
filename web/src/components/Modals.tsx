@@ -4,7 +4,7 @@ import { NumberField } from "../components";
 import { pyClient } from "../pyodide/client";
 import type { Lvl3Settings } from "../types";
 
-export const FALLBACK_VERSION = "2.0.3";
+export const FALLBACK_VERSION = "2.0.4";
 
 function useEscapeClose(onClose: () => void) {
   useEffect(() => {

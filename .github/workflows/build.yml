@@ -1,4 +1,4 @@
-name: Build and Release
+name: Build and Release (Web Launchers)
 on:
   push:
     branches:
@@ -78,170 +78,34 @@ jobs:
           EOF
 
   test:
-    name: Test (Ubuntu)
+    name: Test (Python & Web)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Install system deps (Qt)
+      - name: Install system deps (Qt headless)
         run: |
           sudo apt-get update
           sudo apt-get install -y libegl1 libgl1 libxkbcommon-x11-0
       - name: Install Python deps
         run: pip install -r requirements.txt pytest
-      - name: Run tests
+      - name: Run Python core tests
         env:
           QT_QPA_PLATFORM: offscreen
         run: python -m pytest tests/ -v
-
-  build-windows:
-    name: Build Windows .exe
-    needs: [check-version, test]
-    if: needs.check-version.outputs.should_release == 'true'
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-node@v4
         with:
-          python-version: '3.13'
-      - name: Run tests on Windows
-        run: pip install -r requirements.txt pytest && python -m pytest tests/ -v
-        env:
-          QT_QPA_PLATFORM: offscreen
-      - name: Install build deps
-        run: pip install -r requirements.txt pyinstaller
-      - name: Build .exe
-        run: pyinstaller --clean Radiography.spec
-      - name: List dist contents
-        run: dir dist\
-        shell: cmd
-      - name: Rename .exe with version
-        shell: powershell
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Run Web typecheck and lint
+        working-directory: web
         run: |
-          $ver = "${{ needs.check-version.outputs.version }}"
-          Get-ChildItem dist\*.exe | Rename-Item -NewName { "Radiography-$ver-Windows-x64.exe" }
-      - name: Smoke test packaged Windows .exe
-        shell: powershell
-        env:
-          QT_QPA_PLATFORM: offscreen
-        run: |
-          $exe = (Get-ChildItem dist\Radiography-*-Windows-x64.exe | Select-Object -First 1).FullName
-          $proc = Start-Process -FilePath $exe -ArgumentList "--self-test" -Wait -PassThru
-          if ($proc.ExitCode -ne 0) {
-            Get-ChildItem "$env:USERPROFILE\Library\Logs\Radiography","$env:TEMP\Radiography" -Filter *.log -ErrorAction SilentlyContinue | ForEach-Object { Get-Content $_.FullName }
-            throw "Windows .exe --self-test failed with exit code $($proc.ExitCode)"
-          }
-      - name: Upload .exe artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Radiography-Windows-x64
-          path: dist/Radiography-*.exe
-          if-no-files-found: error
-
-  build-macos:
-    name: Build macOS .dmg
-    needs: [check-version, test]
-    if: needs.check-version.outputs.should_release == 'true'
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-      - name: Run tests on macOS
-        run: pip install -r requirements.txt pytest && python -m pytest tests/ -v
-        env:
-          QT_QPA_PLATFORM: offscreen
-      - name: Install build deps
-        run: pip install -r requirements.txt pyinstaller dmgbuild
-      - name: Build .app bundle (universal2)
-        run: pyinstaller --clean Radiography.spec
-      - name: Ad-hoc codesign and smoke test .app bundle
-        env:
-          QT_QPA_PLATFORM: offscreen
-        run: |
-          xattr -cr "dist/Radiography.app" || true
-          codesign --force --deep --sign - "dist/Radiography.app"
-          codesign --verify --deep --strict "dist/Radiography.app"
-          "dist/Radiography.app/Contents/MacOS/Radiography" --self-test
-      - name: Build .dmg
-        run: |
-          VER="${{ needs.check-version.outputs.version }}"
-          DMG_NAME="Radiography-${VER}-macOS.dmg"
-          DMG_VOLUME_NAME="Radiography ${VER}" dmgbuild -s dmg_settings.py "Radiography ${VER}" "dist/${DMG_NAME}"
-          codesign --force --sign - "dist/${DMG_NAME}"
-          echo "DMG_NAME=${DMG_NAME}" >> $GITHUB_ENV
-      - name: Upload .dmg artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Radiography-macOS-Universal
-          path: dist/Radiography-*-macOS.dmg
-          if-no-files-found: error
-
-  build-android:
-    name: Build Android APK
-    needs: [check-version, test]
-    # APK excluded from automated GitHub releases per configuration
-    if: false
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Cache buildozer (Android SDK/NDK)
-        uses: actions/cache@v4
-        with:
-          path: |
-            .buildozer/android-sdk
-            .buildozer/android-ndk
-          key: buildozer-sdk-ndk-${{ hashFiles('buildozer.spec') }}
-          restore-keys: |
-            buildozer-sdk-ndk-
-      - name: Sync buildozer.spec version from src/core/version.py
-        run: |
-          VER="$(python3 -c "import re;print(re.search(r'__version__\\s*=\\s*[\"\\']([^\"\\']+)',open('src/core/version.py').read()).group(1))")"
-          sed -i.bak "s/^version = .*/version = ${VER}/" buildozer.spec
-          grep -n "^version = " buildozer.spec
-      - name: Build APK with Buildozer (Docker)
-        env:
-          NO_RL_ACCEL: "1"
-        run: |
-          ok=0
-          for i in 1 2 3 4; do
-            if docker run --rm \
-              -e NO_RL_ACCEL=1 \
-              -e PIP_RETRIES=10 \
-              -e PIP_TIMEOUT=60 \
-              -e NDKPLATFORM=NOTNONE \
-              -e KIVY_CROSS_PLATFORM=android \
-              -v ${{ github.workspace }}:/app \
-              -w /app \
-              --entrypoint /bin/bash \
-              ghcr.io/kivy/buildozer:latest \
-              -c "apt-get update -qq && apt-get install -y -qq wget libgl1-mesa-dev libglu1-mesa-dev mesa-common-dev && buildozer android debug"; then
-              ok=1
-              break
-            fi
-            echo "Android build attempt $i failed; retrying in 30s..."
-            sleep 30
-          done
-          if [ "$ok" != "1" ]; then
-            echo "::error::Android build failed after 4 attempts"
-            exit 1
-          fi
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Radiography-Android-APK
-          path: bin/*.apk
-          if-no-files-found: error
-      - name: Upload AAB artifact
-        if: hashFiles('bin/*.aab') != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: Radiography-Android-AAB
-          path: bin/*.aab
-          if-no-files-found: warn
+          npm ci
+          npm run lint
+          npx tsc -b
 
   build-web-launcher:
     name: Build Web Launcher (${{ matrix.os }})
@@ -322,38 +186,22 @@ jobs:
 
   create-release:
     name: Create GitHub Release
-    needs: [check-version, build-windows, build-macos, build-web-launcher]
+    needs: [check-version, build-web-launcher]
     if: |
       always() &&
       !cancelled() &&
-      needs.build-windows.result == 'success' &&
-      needs.build-macos.result == 'success' &&
       needs.build-web-launcher.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Download Windows artifact
-        continue-on-error: true
-        uses: actions/download-artifact@v4
-        with:
-          name: Radiography-Windows-x64
-          path: release-artifacts
-      - name: Download macOS artifact
-        continue-on-error: true
-        uses: actions/download-artifact@v4
-        with:
-          name: Radiography-macOS-Universal
-          path: release-artifacts
       - name: Download Web launcher (Windows)
-        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: Radiography-Web-Windows
           path: release-artifacts
       - name: Download Web launcher (macOS)
-        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: Radiography-Web-macOS

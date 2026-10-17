@@ -1,6 +1,6 @@
 # Radiography — Repository Index
 
-> **Status**: Current (Indexed at commit `8cc850a` | Version `2.0.3` | 2026-10-17)
+> **Status**: Current (Indexed at commit `8cc850a` | Version `2.0.4` | 2026-10-17)
 > **Domain**: Industrial Radiographic Testing (NDT RT) exposure calculator & report generator
 > **Freshness Policy**: Stale after 7 days or 15 new commits.
 
@@ -13,8 +13,8 @@ Single pure-Python calculation core (`src/core/`) shared by three targets: Deskt
 ```text
 Radiography/
 ├── main.py                  # [Entry] Desktop bootstrap (crash-logger + QApplication)
-├── pyproject.toml           # [Manifest] Python build, version 2.0.3
-├── buildozer.spec           # [Manifest] Android packaging, version 2.0.3
+├── pyproject.toml           # [Manifest] Python build, version 2.0.4
+├── buildozer.spec           # [Manifest] Android packaging, version 2.0.4
 ├── Radiography.spec         # [Manifest] PyInstaller bundle
 ├── src/core/                # [Core] 15x .py: engine, calculator, exposure_charts,
 │                            #   annex_a, api1104, asme_b31_3, asme_b36, asme_viii,

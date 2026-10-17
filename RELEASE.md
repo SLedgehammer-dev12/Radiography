@@ -32,8 +32,8 @@ text, update the constants, and add a regression test in `tests/`.
 # 2. pyproject.toml  (version =)
 # 3. buildozer.spec  (version =)
 # 4. web/package.json  ("version":)
-# 5. web/src/App.tsx  (FALLBACK_VERSION const — display-only fallback)
-grep -rn "2.0.3" src/core/version.py pyproject.toml buildozer.spec web/package.json web/src/App.tsx
+# 5. web/src/components/Modals.tsx  (FALLBACK_VERSION const — display-only fallback)
+grep -rn "2.0.4" src/core/version.py pyproject.toml buildozer.spec web/package.json web/src/components/Modals.tsx
 ```
 
 ### 2. Update CHANGELOG.md
@@ -43,23 +43,21 @@ grep -rn "2.0.3" src/core/version.py pyproject.toml buildozer.spec web/package.j
 
 ### 3. Commit and Tag
 ```bash
-git add src/core/version.py pyproject.toml buildozer.spec web/package.json web/src/App.tsx CHANGELOG.md
-git commit -m "Release v2.0.3"
-git tag v2.0.3
-git push origin v2.0.3
+git add src/core/version.py pyproject.toml buildozer.spec web/package.json web/src/components/Modals.tsx CHANGELOG.md
+git commit -m "Release v2.0.4"
+git tag v2.0.4
+git push origin v2.0.4
 ```
 
 ### 4. Automation
 Pushing the tag triggers `.github/workflows/build.yml`:
 
 ```
-Test (Ubuntu) → [parallel]
-  ├── Build Windows .exe
-  ├── Build macOS .dmg (universal2)
-  ├── Build Android .apk (does not block the release)
-  └── Build Web launchers (Windows .exe + macOS .dmg)
+Test (Python & Web)
        ↓
-  Create GitHub Release
+Build Web Launchers (Windows .exe + macOS .dmg)
+       ↓
+Create GitHub Release
 ```
 
 A push to `main` only releases when `src/core/version.py` is newer than the
