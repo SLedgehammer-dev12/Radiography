@@ -14,7 +14,7 @@ WarningsPanelMixin, CompliancePanelMixin. Kalan god-class yükü şu bloklarda:
 
 Bölme sırası (risk en düşükten en yükseğe):
   A. [x] export_pdf_report -> ReportExportMixin (src/ui/panels/report_panel.py) — 2026-10-16, 3298→3037 satır, 915 test yeşil
-  B. [ ] retranslate_ui -> TranslationMixin (stateless-ish, sadece widget text)
+  B. [x] retranslate_ui -> TranslationMixin (src/ui/panels/translation_panel.py) — 2026-10-16, 3037→2836 satır, 915 test yeşil
   C. [ ] get_form_values + _collect_engine_form -> FormStateMixin
   D. [ ] __init__/init_ui son — en riskli, test blast radius'u en geniş
 
