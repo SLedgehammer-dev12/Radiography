@@ -1,19 +1,28 @@
 import { InfoTip } from "../components";
 import { formatExposuresProvenance, type Translator } from "../i18n";
-import type { EngineResult, ExposuresProvenance, FormState } from "../types";
+import type {
+  ComplianceResult,
+  EngineResult,
+  ExposuresProvenance,
+  FormState,
+} from "../types";
 
 interface HeroSummaryPanelProps {
   result: EngineResult | null;
+  compliance: ComplianceResult | null;
   form: FormState;
   lang: string;
   t: Translator;
+  onNotify?: (message: string, kind?: "info" | "success" | "error") => void;
 }
 
 export function HeroSummaryPanel({
   result,
+  compliance,
   form,
   lang,
   t,
+  onNotify,
 }: HeroSummaryPanelProps) {
   const digital = form.tech === "digital";
   const isAsme = form.standard === "asme";
@@ -115,8 +124,82 @@ export function HeroSummaryPanel({
       }
     | undefined;
 
+  const copyToClipboard = (text: string, label: string) => {
+    if (!text || text === "-") return;
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).then(
+        () => onNotify?.(`${label}: "${text}"`, "success"),
+        () => undefined,
+      );
+    }
+  };
+
+  const copySummary = () => {
+    if (!result) return;
+    const distLabel = digital ? "SDD" : "SFD";
+    const iqiLabel = isAsme
+      ? (result.display.asme_iqi ?? "-")
+      : (result.display.single_wire_iqi ?? "-");
+    const summary = [
+      `RT Muayene Özeti:`,
+      `• Geometri: ${form.geometry.toUpperCase()} (${form.od} mm OD × ${form.t} mm t)`,
+      `• Kaynak: ${form.source.toUpperCase()} ${
+        form.source === "x_ray"
+          ? `(${form.app_kv} kV, ${form.output_val} mA)`
+          : `(${form.output_val} Ci)`
+      }`,
+      `• Teknik: ${
+        digital
+          ? `Dijital (${form.detector_type})`
+          : `Analog Film (${form.film_class_used})`
+      }`,
+      `• Mesafe (${distLabel}): Min ${result.display.sfd_min ?? "-"} mm | Uygulanan: ${form.sfd} mm`,
+      `• Poz Süresi: Min ${result.display.calc_time ?? "-"} | Uygulanan: ${form.app_time} sn`,
+      `• Poz Sayısı: Min ${result.display.req_exposures ?? "-"} | Uygulanan: ${form.app_exposures}`,
+      `• IQI Şartı: ${iqiLabel}`,
+      `• Uygunluk: ${
+        compliance != null
+          ? compliance.is_compliant
+            ? (lang === "tr" ? "UYGUN (COMPLIANT)" : "COMPLIANT")
+            : (lang === "tr" ? "UYGUN DEĞİL (NON-COMPLIANT)" : "NON-COMPLIANT")
+          : "-"
+      }`,
+    ].join("\n");
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(summary).then(
+        () =>
+          onNotify?.(
+            lang === "tr"
+              ? "Hesaplama özeti panoya kopyalandı."
+              : "Inspection summary copied to clipboard.",
+            "success",
+          ),
+        () => undefined,
+      );
+    }
+  };
+
   return (
     <>
+      <div className="hero-toolbar">
+        <span className="hero-toolbar-title">
+          ⚡ {lang === "tr" ? "Hesaplanan Temel Değerler" : "Key Calculated Metrics"}
+        </span>
+        {result && (
+          <button
+            type="button"
+            className="copy-summary-btn"
+            onClick={copySummary}
+            title={
+              lang === "tr"
+                ? "Tüm muayene parametrelerini panoya kopyala"
+                : "Copy inspection summary to clipboard"
+            }
+          >
+            📋 {lang === "tr" ? "Özeti Kopyala" : "Copy Summary"}
+          </button>
+        )}
+      </div>
       <div className="hero-grid">
         <div className="hero-card">
           <div className="hero-main">
@@ -166,7 +249,17 @@ export function HeroSummaryPanel({
             )}
           </div>
           <div className="hero-right">
-            <div className="hero-value" data-testid="output-calc_time">
+            <div
+              className="hero-value"
+              data-testid="output-calc_time"
+              onClick={() =>
+                copyToClipboard(
+                  result?.display.calc_time ?? "",
+                  lang === "tr" ? "Hesaplanan süre" : "Calculated time",
+                )
+              }
+              title={lang === "tr" ? "Kopyalamak için tıklayın" : "Click to copy"}
+            >
               {result?.display.calc_time ?? "-"}
             </div>
             {result && (
@@ -196,7 +289,18 @@ export function HeroSummaryPanel({
             )}
           </div>
           <div className="hero-right">
-            <div className="hero-value">{result?.display.sfd_min ?? "-"}</div>
+            <div
+              className="hero-value"
+              onClick={() =>
+                copyToClipboard(
+                  result?.display.sfd_min ?? "",
+                  lang === "tr" ? "Minimum mesafe" : "Minimum distance",
+                )
+              }
+              title={lang === "tr" ? "Kopyalamak için tıklayın" : "Click to copy"}
+            >
+              {result?.display.sfd_min ?? "-"}
+            </div>
             {result && (
               <span
                 className={`hero-status ${
@@ -222,7 +326,18 @@ export function HeroSummaryPanel({
             )}
           </div>
           <div className="hero-right">
-            <div className="hero-value">{result?.display.f_min ?? "-"}</div>
+            <div
+              className="hero-value"
+              onClick={() =>
+                copyToClipboard(
+                  result?.display.f_min ?? "",
+                  "f_min",
+                )
+              }
+              title={lang === "tr" ? "Kopyalamak için tıklayın" : "Click to copy"}
+            >
+              {result?.display.f_min ?? "-"}
+            </div>
           </div>
         </div>
         <div className="hero-card">
@@ -243,7 +358,18 @@ export function HeroSummaryPanel({
             )}
           </div>
           <div className="hero-right">
-            <div className="hero-value">{result?.display.ug ?? "-"}</div>
+            <div
+              className="hero-value"
+              onClick={() =>
+                copyToClipboard(
+                  result?.display.ug ?? "",
+                  "Ug",
+                )
+              }
+              title={lang === "tr" ? "Kopyalamak için tıklayın" : "Click to copy"}
+            >
+              {result?.display.ug ?? "-"}
+            </div>
             {result && isAsme && (
               <span
                 className={`hero-status ${
@@ -265,7 +391,16 @@ export function HeroSummaryPanel({
             )}
           </div>
           <div className="hero-right">
-            <div className="hero-value">
+            <div
+              className="hero-value"
+              onClick={() =>
+                copyToClipboard(
+                  String(result?.display.req_exposures ?? ""),
+                  lang === "tr" ? "Gerekli poz sayısı" : "Required exposures",
+                )
+              }
+              title={lang === "tr" ? "Kopyalamak için tıklayın" : "Click to copy"}
+            >
               {result?.display.req_exposures ?? "-"}
             </div>
             {result && (

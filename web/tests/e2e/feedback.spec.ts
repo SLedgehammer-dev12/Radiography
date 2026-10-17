@@ -129,3 +129,33 @@ test("inch mode scales LengthSliderField min and max bounds", async ({
   await page.locator(".dropdown-item", { hasText: /Ölçü Birimi|Unit/i }).click();
   await expect(sfdNumber).toHaveAttribute("min", "0.3937");
 });
+
+test("quick preset chips, topbar sync, and hero copy summary enhance usability", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.locator(".layout")).toBeVisible({ timeout: 150_000 });
+  await expect(page.getByTestId("output-calc_time")).not.toContainText("-", {
+    timeout: 60_000,
+  });
+
+  // 1. Preset chip loads preset with single click
+  const chip = page.locator(".preset-chip", { hasText: /16 inç DWSI Ir-192/i });
+  await expect(chip).toBeVisible();
+  await chip.click();
+  await expect(page.locator(".toast.toast-success")).toContainText(/16 inç DWSI Ir-192/);
+
+  // 2. Topbar Sync button applies all calculated targets
+  const syncBtn = page.getByTestId("topbar-sync");
+  await expect(syncBtn).toBeEnabled();
+  await syncBtn.click();
+  await expect(page.locator(".toast.toast-success")).toContainText(
+    /aktarıldı|synced/i,
+  );
+
+  // 3. Hero summary panel copy button is available
+  const copyBtn = page.locator(".copy-summary-btn");
+  await expect(copyBtn).toBeVisible();
+  await expect(copyBtn).toContainText(/Özeti Kopyala|Copy Summary/i);
+});
+

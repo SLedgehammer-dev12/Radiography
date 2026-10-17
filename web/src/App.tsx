@@ -389,6 +389,50 @@ export default function App() {
     );
   };
 
+  const applyNamedPreset = useCallback(
+    (name: string) => {
+      const preset = NAMED_PRESETS[name];
+      if (!preset) return;
+      setForm((previous) => {
+        const nextSource = preset.source ?? previous.source;
+        const nextTech = preset.tech ?? previous.tech;
+        const nextDetector = preset.detector_type ?? previous.detector_type;
+        const next = {
+          ...previous,
+          ...preset,
+          base_e:
+            preset.base_e ??
+            DEFAULT_BASE_E_BY_SOURCE[nextSource] ??
+            previous.base_e,
+        };
+        const validCharts = getActiveChartKeys(
+          nextTech,
+          nextDetector,
+          nextSource,
+        );
+        if (!validCharts.includes(next.chart_source)) {
+          next.chart_source =
+            nextTech !== "digital"
+              ? nextSource === "x_ray"
+                ? "type_x"
+                : resolveFilmChartForClass(
+                    next.film_class_used,
+                    next.chart_source,
+                  )
+              : validCharts[0] ?? "model";
+        }
+        return next;
+      });
+      notify(
+        lang === "tr"
+          ? `"${name}" şablonu uygulandı.`
+          : `Applied "${name}" preset.`,
+        "success",
+      );
+    },
+    [lang, notify, setForm],
+  );
+
   const exportPreset = () =>
     downloadJson("rt_preset.json", {
       type: "radiography_preset",
@@ -533,6 +577,20 @@ export default function App() {
             <button
               type="button"
               className="topbar-action"
+              data-testid="topbar-sync"
+              onClick={syncAllCalculated}
+              disabled={!result}
+              title={
+                lang === "tr"
+                  ? "Hesaplanan asgari değerleri (SFD, poz sayısı, süre, tel) uygulanan alanlara aktar"
+                  : "Sync calculated targets (SFD, exposures, time, wire) to applied fields"
+              }
+            >
+              ⚡ {lang === "tr" ? "Uygula" : "Sync"}
+            </button>
+            <button
+              type="button"
+              className="topbar-action"
               onClick={resetForm}
               title={lang === "tr" ? "Formu sıfırla" : "Reset form"}
             >
@@ -604,48 +662,8 @@ export default function App() {
                     className="menu-select"
                     value=""
                     onChange={(event) => {
-                      const preset = NAMED_PRESETS[event.target.value];
-                      if (preset) {
-                        setForm((previous) => {
-                          const nextSource = preset.source ?? previous.source;
-                          const nextTech = preset.tech ?? previous.tech;
-                          const nextDetector =
-                            preset.detector_type ?? previous.detector_type;
-                          const next = {
-                            ...previous,
-                            ...preset,
-                            base_e:
-                              preset.base_e ??
-                              DEFAULT_BASE_E_BY_SOURCE[nextSource] ??
-                              previous.base_e,
-                          };
-                          // A preset may change tech/source/detector without
-                          // changing chart_source; re-validate so an incompatible
-                          // chart is never sent to the engine.
-                          const validCharts = getActiveChartKeys(
-                            nextTech,
-                            nextDetector,
-                            nextSource,
-                          );
-                          if (!validCharts.includes(next.chart_source)) {
-                            next.chart_source =
-                              nextTech !== "digital"
-                                ? nextSource === "x_ray"
-                                  ? "type_x"
-                                  : resolveFilmChartForClass(
-                                      next.film_class_used,
-                                      next.chart_source,
-                                    )
-                                : validCharts[0] ?? "model";
-                          }
-                          return next;
-                        });
-                        notify(
-                          lang === "tr"
-                            ? `"${event.target.value}" şablonu uygulandı.`
-                            : `Applied "${event.target.value}" preset.`,
-                          "success",
-                        );
+                      if (event.target.value) {
+                        applyNamedPreset(event.target.value);
                       }
                       event.target.value = "";
                       setOpenMenu(null);
@@ -1012,7 +1030,28 @@ export default function App() {
 
         <main className="layout">
           <div className="column inputs">
-            <Group title={t("inputs_section")}>
+            <div
+              className="preset-chips-bar"
+              role="toolbar"
+              aria-label={lang === "tr" ? "Hızlı Hazır Şablonlar" : "Quick Presets"}
+            >
+              <span className="preset-chips-label">
+                ⚡ {lang === "tr" ? "Hazır Setuplar:" : "Presets:"}
+              </span>
+              {Object.keys(NAMED_PRESETS).map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  className="preset-chip"
+                  onClick={() => applyNamedPreset(name)}
+                  title={`${lang === "tr" ? "Şablonu yükle" : "Load preset"}: ${name}`}
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+
+            <Group title={t("pipe_geometry_section")}>
               <SelectField
                 label={t("material_type")}
                 value={form.material}
@@ -1106,6 +1145,9 @@ export default function App() {
                   />
                 )}
               </div>
+            </Group>
+
+            <Group title={t("rad_tech_section")}>
               <RadioGroup
                 label={t("rt_tech")}
                 value={form.tech}
@@ -1229,6 +1271,9 @@ export default function App() {
                   )}
                 </>
               )}
+            </Group>
+
+            <Group title={t("standards_iqi_section")}>
               <div className="field-row-2">
                 <SelectField
                   label={t("testing_class")}
@@ -1899,9 +1944,11 @@ export default function App() {
           <div className="column outputs">
             <HeroSummaryPanel
               result={result}
+              compliance={compliance}
               form={form}
               lang={lang}
               t={t}
+              onNotify={notify}
             />
             <OutputsPanel
               t={t}

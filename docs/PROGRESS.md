@@ -150,19 +150,19 @@ cd web && npx playwright test           # 34 passed (22 + 3 mobile + 9 feedback)
   **Agfa Structurix**, **Fujifilm IX**, **Foma Fomadux**, and **Calculation Model**;
   selecting any film model (e.g. `D7`, `R8`) automatically syncs `film_class_used`.
   Covered by new Playwright E2E in `web/tests/e2e/analog-ui.spec.ts`.
+- **Web UI/UX Usability Iteration 1 (Kullanım Kolaylığı Geliştirmeleri)**:
+  - **Quick Presets Chips Bar**: 1-click preset chips bar (`.preset-chips-bar`) at the top of the inputs column for instant switching between workshop X-ray and field isotope setups without hunting through dropdown menus.
+  - **Sticky Header "⚡ Uygula / Sync" Button**: Instant synchronization of calculated targets (`sfd_min`, `req_exposures`, `calc_time`, `app_wire`) into applied fields directly from the sticky header.
+  - **Collapsible Input Sub-Sections**: Separated the monolithic 400-line inputs column into 3 semantic collapsible `<Group>` blocks (`1. Boru ve Kaynak Geometrisi`, `2. Radyasyon ve Çekim Tekniği`, `3. Standart ve IQI Şartları`) plus applied parameters, significantly reducing vertical scrolling on laptops and tablets.
+  - **Copy to Clipboard & Inspection Summary**: Added "📋 Özeti Kopyala" (copies full standardized RT field notes to clipboard) and click-to-copy handlers on calculated hero values with success toast notifications.
+  - Verified with 35 Playwright E2E tests, 0 `oxlint` errors, and clean TypeScript build.
 
 ## Pending / next
 
-- [x] **J: remaining web panels** — **STOPPED by decision (2026-10-17).** The
-      remaining Inputs Group has 38 external deps; a component would need 38 props
-      with no cohesion gain. Done: Compliance, Warnings, Report info, Sketch tabs,
-      HeroSummaryPanel. App.tsx stands at 1883 lines (−40%). Do not resume without
-      a new approach (semantic sub-panels or a form context). See `docs/godclass-plan.md` step J.
-- [x] **Web feature development (interaction, feedback, error-state & accessibility pass)** —
-      Done: toast variants + auto-dismiss; sticky header with Reset/PDF; header
-      progress bar (`busy || pdfBusy`); outputs & compliance loading/error state polish;
-      keyboard shortcuts + modal/busy guards; modal `role="dialog"` + `Escape`-to-close +
-      keyboard `InfoTip`; inch-mode `LengthSliderField` bounds fix; `0` oxlint warnings.
+- [ ] **Web UI/UX Usability Iteration 2**:
+      1. **Recent Calculations History**: Lightweight in-memory/localStorage stack of the last 5 calculations so operators can revert or compare recent pipe setups with 1 click.
+      2. **Outdoor High-Contrast Mode**: Field/sunlight mode toggle for bright outdoor radiography environments.
+      3. **Keyboard Quick-Jump**: Accesskey shortcuts for jumping directly between sections (`Alt+1` Geometry, `Alt+2` Radiation, `Alt+3` Applied).
 - [ ] Decide whether to record the web-only scope in `AGENTS.md`.
 
 ## Notes & risks

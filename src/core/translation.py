@@ -62,6 +62,9 @@ class Translation:
 
                 # Inputs
                 "inputs_section": "1. Çekim Parametreleri ve Girdiler",
+                "pipe_geometry_section": "1. Boru ve Kaynak Geometrisi",
+                "rad_tech_section": "2. Radyasyon ve Çekim Tekniği",
+                "standards_iqi_section": "3. Standart ve IQI Şartları",
                 "material_type": "Malzeme Tipi:",
                 "steel": "Çelik",
                 "aluminum": "Alüminyum ve Alaşımları",
@@ -502,6 +505,9 @@ class Translation:
 
                 # Inputs
                 "inputs_section": "1. Shooting Parameters and Inputs",
+                "pipe_geometry_section": "1. Pipe & Weld Geometry",
+                "rad_tech_section": "2. Radiation & Technique Setup",
+                "standards_iqi_section": "3. Standard & IQI Requirements",
                 "material_type": "Material Type:",
                 "steel": "Steel",
                 "aluminum": "Aluminum & Alloys",
