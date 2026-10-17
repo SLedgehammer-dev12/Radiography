@@ -1970,6 +1970,27 @@ class CalculationEngine:
                 else:
                     warnings.append(f"NOTE (Clause 7.6): The DWSI physical floor raised SFD_min to {geo['dwsi_physical_min']:.1f} mm (OD+bgap); f_min itself is determined only by wall thickness.")
 
+        if geometry == "dwsi" and std_figure in ("fig14", "fig14a", "fig14b"):
+            f_min_val = geo.get("f_min", 0.0)
+            if od > 0.0 and f_min_val > od:
+                is_dig = geo.get("is_digital", False)
+                fig13_name = ("Şekil 13a" if std_figure == "fig14a" else "Şekil 13b") if is_dig else "Şekil 13"
+                fig13_name_en = ("Figure 13a" if std_figure == "fig14a" else "Figure 13b") if is_dig else "Figure 13"
+                if trans.language == "tr":
+                    warnings.append(
+                        f"GEOMETRİ/ŞEKİL UYARISI (ISO 17636 Madde 7.6): DWSI Odak Yüzeyde ({std_figure}) tekniğinde "
+                        f"gereken asgari odak mesafesi (f_min = {f_min_val:.1f} mm), boru dış çapından (OD = {od:.1f} mm) büyüktür! "
+                        f"Kaynak boru yüzeyine konulduğunda geometrik bulanıklık (Ug) standardı aşar. "
+                        f"Seçilen şekil ({std_figure}) uygun DEĞİLDİR; kaynak borudan geri çekilerek {fig13_name} kullanılmalıdır."
+                    )
+                else:
+                    warnings.append(
+                        f"GEOMETRY/FIGURE WARNING (ISO 17636 Clause 7.6): In DWSI Source-on-Surface ({std_figure}), "
+                        f"required minimum distance (f_min = {f_min_val:.1f} mm) exceeds pipe outer diameter (OD = {od:.1f} mm)! "
+                        f"Placing source on surface violates geometric unsharpness (Ug) limits. "
+                        f"Selected figure ({std_figure}) is INVALID; move source back and use {fig13_name_en}."
+                    )
+
         if calc.is_double_wall_technique(geometry):
             if geo["lvl3_dw"]:
                 if trans.language == "tr":
@@ -2463,6 +2484,8 @@ class CalculationEngine:
             "snr_location": f["snr_location"],
             "material": f["material"],
             "t": f["t"],
+            "od": f["od"],
+            "std_figure": f.get("std_figure"),
         }
         applied = {
             "applied_kv": f["app_kv"],

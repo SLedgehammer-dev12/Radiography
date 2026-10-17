@@ -545,3 +545,31 @@ def test_analog_chart_film_class_mismatch_warning(engine):
     }, {}, "tr")
     assert not any("M100" in w and "C2" in w for w in res_match["warnings"])
 
+
+def test_dwsi_figure14_warning_when_fmin_exceeds_od(engine):
+    """When DWSI Figure 14/14a/14b (source on surface) is chosen and f_min > OD,
+    a specific warning must inform the user that Figure 14 is invalid per ISO 17636 Clause 7.6
+    and Figure 13 (source moved outside) must be used instead."""
+    # Case 1: fig14 with small OD (e.g. 60.3 mm) and thick wall (f_min will exceed OD)
+    res_warn = engine.calculate({
+        "tech": "analog", "geometry": "dwsi", "std_figure": "fig14",
+        "od": 60.3, "t": 5.54, "d": 3.0, "testing_class": "class_b",
+    }, {}, "tr")
+    f_min = res_warn["calculated"]["f_min"]
+    assert f_min > 60.3
+    assert any("GEOMETRİ/ŞEKİL UYARISI" in w and "fig14" in w and "Şekil 13" in w for w in res_warn["warnings"])
+
+    # Case 2: fig13 with same OD is exempt from this warning
+    res_ok = engine.calculate({
+        "tech": "analog", "geometry": "dwsi", "std_figure": "fig13",
+        "od": 60.3, "t": 5.54, "d": 3.0, "testing_class": "class_b",
+    }, {}, "tr")
+    assert not any("GEOMETRİ/ŞEKİL UYARISI" in w and "fig14" in w for w in res_ok["warnings"])
+
+    # Case 3: English warning for digital fig14b
+    res_en = engine.calculate({
+        "tech": "digital", "geometry": "dwsi", "std_figure": "fig14b",
+        "od": 60.3, "t": 5.54, "d": 3.0, "testing_class": "class_b",
+    }, {}, "en")
+    assert any("GEOMETRY/FIGURE WARNING" in w and "fig14b" in w and "Figure 13" in w for w in res_en["warnings"])
+

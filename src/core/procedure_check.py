@@ -35,6 +35,8 @@ class ProcedureComplianceChecker:
                 "hole_pass": "Step & Hole IQI Uygun: Çözülen H {} <= Gereken H {}.",
                 "hole_fail": "IQI HASSASİYETİ YETERSİZ! Çözülen H {} > Gereken H {}. Delik ayırt edilemiyor.",
                 "dwsi_placement_fail": "IQI KONUMLANDIRMA HATASI! DWSI geometrisinde IQI kaynak tarafına yerleştirilemez (film tarafında olmalıdır).",
+                "dwsi_fig14_fail": "GEOMETRİ/ŞEKİL UYGUN DEĞİL! DWSI Odak Yüzeyde (Şekil 14) tekniğinde gereken asgari odak mesafesi (f_min = {:.1f} mm) > Boru Dış Çapı ({:.1f} mm). Kaynak boru yüzeyine konulamaz; ISO 17636 uyarınca Şekil 13 (kaynak boru dışında) seçilmelidir.",
+                "dwsi_fig14_pass": "DWSI Geometri Şekli Uygun: Odak Yüzeyde (Şekil 14) f_min ({:.1f} mm) <= Boru Dış Çapı ({:.1f} mm).",
                 
                 "duplex_pass": "Duplex IQI Uygun: Çözülen D {} >= Gereken D {}.",
                 "duplex_fail": "DUBLEX IQI ÇÖZÜNÜRLÜĞÜ YETERSİZ! Çözülen D {} < Gereken D {}.",
@@ -77,6 +79,8 @@ class ProcedureComplianceChecker:
                 "hole_pass": "Step & Hole IQI Compliant: Resolved H {} <= Required H {}.",
                 "hole_fail": "IQI SENSITIVITY INSUFFICIENT! Resolved H {} > Required H {}. Hole cannot be discerned.",
                 "dwsi_placement_fail": "IQI PLACEMENT ERROR! In DWSI geometry, the IQI cannot be placed on the source side (must be on film side).",
+                "dwsi_fig14_fail": "GEOMETRY/FIGURE NON-COMPLIANT! In DWSI source-on-surface (Figure 14), required minimum distance (f_min = {:.1f} mm) > Pipe OD ({:.1f} mm). Source cannot be placed on surface; select Figure 13 (source outside pipe) per ISO 17636.",
+                "dwsi_fig14_pass": "DWSI Geometry Figure Compliant: Source-on-surface (Figure 14) f_min ({:.1f} mm) <= Pipe OD ({:.1f} mm).",
                 
                 "duplex_pass": "Duplex IQI Compliant: Resolved D {} >= Required D {}.",
                 "duplex_fail": "DUPLEX RESOLUTION INSUFFICIENT! Resolved D {} < Required D {}.",
@@ -146,6 +150,19 @@ class ProcedureComplianceChecker:
         if geometry == "dwsi" and not film_side:
             is_compliant = False
             checks.append({"name": "iqi_placement", "status": False, "details": l_msgs["dwsi_placement_fail"]})
+
+        # DWSI Figure 14 constraint (ISO 17636-1 / ISO 17636-2 Clause 7.6):
+        # In Figure 14 (source on surface), distance is bounded by pipe diameter.
+        # If f_min > OD, source cannot be on surface; Figure 13 must be used.
+        std_fig = inputs.get("std_figure") or ""
+        if geometry == "dwsi" and std_fig in ("fig14", "fig14a", "fig14b"):
+            od = float(inputs.get("od") or inputs.get("outer_diameter") or 0.0)
+            f_min = float(calculated.get("f_min") or 0.0)
+            if od > 0.0 and f_min > od:
+                is_compliant = False
+                checks.append({"name": "dwsi_figure", "status": False, "details": l_msgs["dwsi_fig14_fail"].format(f_min, od)})
+            elif od > 0.0:
+                checks.append({"name": "dwsi_figure", "status": True, "details": l_msgs["dwsi_fig14_pass"].format(f_min, od)})
 
         applied_wire = applied.get("applied_wire", 0)
         req_wire = calculated.get("required_wire_no", 0)

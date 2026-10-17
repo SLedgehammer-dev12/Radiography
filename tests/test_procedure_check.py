@@ -402,5 +402,56 @@ class TestProcedureComplianceChecker(unittest.TestCase):
         self.assertEqual(len(exp_checks2), 1)
         self.assertTrue(exp_checks2[0]["status"])
 
+    def test_dwsi_figure14_fmin_compliance(self):
+        inputs = {
+            "tech": "analog",
+            "source": "x_ray",
+            "class": "class_b",
+            "geometry": "dwsi",
+            "film_side": True,
+            "std_figure": "fig14",
+            "od": 114.3,
+            "t": 6.02,
+        }
+        calculated = {
+            "u_max": 150.0,
+            "sfd_min": 250.0,
+            "f_min": 240.0,  # 240.0 > 114.3 (OD) -> Fig 14 invalid!
+            "required_wire_no": 12,
+            "required_exposures": 3,
+            "required_density": 2.3,
+        }
+        applied = {
+            "applied_kv": 140.0,
+            "applied_sfd": 250.0,
+            "applied_wire": 13,
+            "applied_quality": 2.5,
+            "applied_time": 60.0,
+            "applied_film_class": "C4",
+            "applied_overlap": 12.0,
+            "applied_exposures": 3,
+        }
+        # Case 1: f_min (240) > od (114.3) -> Non-compliant!
+        res = self.checker.check_compliance(inputs, calculated, applied, {}, "tr")
+        self.assertFalse(res["is_compliant"])
+        fig_checks = [c for c in res["checks"] if c["name"] == "dwsi_figure"]
+        self.assertEqual(len(fig_checks), 1)
+        self.assertFalse(fig_checks[0]["status"])
+        self.assertIn("Şekil 13", fig_checks[0]["details"])
+
+        # Case 2: od large enough (323.9 > 240.0) -> Compliant
+        inputs["od"] = 323.9
+        res2 = self.checker.check_compliance(inputs, calculated, applied, {}, "tr")
+        self.assertTrue(res2["is_compliant"])
+        fig_checks2 = [c for c in res2["checks"] if c["name"] == "dwsi_figure"]
+        self.assertTrue(fig_checks2[0]["status"])
+
+        # Case 3: Figure 13 (source outside pipe) is exempt
+        inputs["od"] = 114.3
+        inputs["std_figure"] = "fig13"
+        res3 = self.checker.check_compliance(inputs, calculated, applied, {}, "tr")
+        self.assertTrue(res3["is_compliant"])
+        self.assertEqual([c for c in res3["checks"] if c["name"] == "dwsi_figure"], [])
+
 if __name__ == "__main__":
     unittest.main()
