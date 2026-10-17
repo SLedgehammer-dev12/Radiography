@@ -250,14 +250,15 @@ def build_dmg(app_path: Path, version: str) -> Path:
             "-volname", f"Radiography Web {version}",
             "-srcfolder", str(staging),
             "-ov", "-format", "UDZO",
+            "-imagekey", "zlib-level=9",
             str(target),
         ],
         check=True,
     )
-    subprocess.run(
-        ["codesign", "--force", "--sign", "-", str(target)],
-        check=True,
-    )
+    # Note: Do NOT ad-hoc sign the outer .dmg with codesign --sign -.
+    # Ad-hoc signed DMGs trigger strict Gatekeeper malware rejection ("Açılmadı.
+    # Apple kötü amaçlı yazılım içermediğini doğrulayamadı").
+    # The inner .app bundle is already codesigned with _codesign_macos_bundle above.
     return target
 
 
