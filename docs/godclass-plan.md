@@ -44,7 +44,9 @@ tab/panel alt bileşenlerine bölünüyor:
 
   H. [x] DefectPanel (defect Group JSX + DEFECT_TYPES/STANDARDS) ->
          components/DefectPanel.tsx — 2026-10-16, 2612→2469 satır, 21/21 E2E yeşil
-  I. [ ] Kalan paneller: Outputs (2181), Procedure/compliance (2202), Warnings (2424),
+  I. [x] OutputsPanel (outputs Group + OUTPUT_KEYS + outputLabel) ->
+         components/OutputsPanel.tsx — 2026-10-16, 2469→2419 satır, 21/21 E2E yeşil
+  J. [ ] Kalan paneller: Procedure/compliance (2202), Warnings (2424),
          Report info (1941), Inputs (1130) — props yüzeyi geniş, sırayla
 
 ## Kural

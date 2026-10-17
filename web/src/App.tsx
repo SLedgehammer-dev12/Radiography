@@ -8,7 +8,6 @@ import {
   LengthField,
   LengthSliderField,
   NumberField,
-  OutputRow,
   PageScrollbar,
   RadioGroup,
   SelectField,
@@ -22,6 +21,7 @@ import {
 } from "./components/SketchView";
 import { WeldSetup3D } from "./components/WeldSetup3D";
 import { DefectPanel } from "./components/DefectPanel";
+import { OutputsPanel } from "./components/OutputsPanel";
 import {
   AboutModal,
   DecayDialog,
@@ -84,28 +84,6 @@ const CHART_OPTION_META: Record<string, { labelKey?: string; label?: string }> =
   dda_panel_chart: { labelKey: "chart_dda_panel" },
   digital_xray_chart: { labelKey: "chart_digital_xray" },
 };
-const OUTPUT_KEYS = [
-  "w_nom",
-  "w_eff",
-  "u_max",
-  "f_min",
-  "f_min_asme",
-  "sfd_min",
-  "ug",
-  "req_exposures",
-  "exposures_panel",
-  "exposures_applied",
-  "exposures_check",
-  "single_wire_iqi",
-  "duplex_iqi",
-  "asme_iqi",
-  "quality_target",
-  "calc_time",
-  "total_joint_time",
-  "detector_quality",
-  "barrier_distance",
-  "filter_recommendation",
-];
 const REPORT_FIELDS: [string, string][] = [
   ["report_no", "report_no"],
   ["report_rev", "report_rev"],
@@ -284,20 +262,6 @@ export default function App() {
     hiddenOutputs.add("asme_iqi");
     hiddenOutputs.add("f_min_asme");
   }
-  const outputLabel = (key: string): string => {
-    if (key === "sfd_min") return t(digital ? "sfd_min" : "sfd_min_analog");
-    if (key === "exposures_panel") {
-      return t(digital ? "exposures_panel" : "exposures_film");
-    }
-    if (key === "quality_target") {
-      return t(digital ? "target_snr" : "optical_density");
-    }
-    if (key === "detector_quality") {
-      return t(digital ? "detector_quality" : "film_class_req");
-    }
-    return t(key);
-  };
-
   // SFD_min / SDD_min provenance: which candidate (f_min+b, receptor
   // coverage or the DWSI physical floor) governs the value.
   const provenance = result?.values?.sfd_min_provenance as
@@ -2160,27 +2124,13 @@ export default function App() {
                 </div>
               </div>
             )}
-            <Group title={t("outputs")}>
-              {OUTPUT_KEYS.filter((key) => !hiddenOutputs.has(key)).map((key) => (
-                <OutputRow
-                  key={key}
-                  testId={`output-${key}`}
-                  label={outputLabel(key)}
-                  value={result?.display[key] ?? "-"}
-                  tooltip={(() => {
-                    const dynamicProv = result?.values?.[`${key}_provenance_text`] as string | undefined;
-                    if (dynamicProv) {
-                      const base = strings[`tt_${key}`] ?? "";
-                      return `${base}\n\n${dynamicProv}`.trim();
-                    }
-                    if (key === "exposures_panel") {
-                      return strings[digital ? "tt_exposures_panel" : "tt_exposures_film"] ?? "";
-                    }
-                    return strings[`tt_${key}`];
-                  })()}
-                />
-              ))}
-            </Group>
+            <OutputsPanel
+              t={t}
+              result={result}
+              strings={strings}
+              digital={digital}
+              hiddenOutputs={hiddenOutputs}
+            />
             <Group title={t("procedure_section")}>
               {error ? (
                 <div className="badge non-compliant" role="alert">
