@@ -135,10 +135,10 @@
 ## Verification (re-run before continuing)
 
 ```bash
-python3 -m pytest -q                    # 924 passed, 6 skipped, 849 subtests
+python3 -m pytest -q                    # 930 passed, 6 skipped, 849 subtests
 cd web && npx tsc -b                    # clean
 cd web && npx oxlint src/               # 0 warnings, 0 errors
-cd web && npx playwright test           # 34 passed (22 + 3 mobile + 9 feedback)
+cd web && npx playwright test           # 44 passed (9 E2E spec files)
 ```
 
 ### UX & Catalog Polish (web)
@@ -181,13 +181,18 @@ cd web && npx playwright test           # 34 passed (22 + 3 mobile + 9 feedback)
   - Added `ResizeObserver` in [`WeldSetup3D.tsx`](file:///Users/macbook/Documents/Kodlama/Radiography/web/src/components/WeldSetup3D.tsx) to automatically adapt logical canvas resolution to the expanded column width without pixelation or stretching.
   - Responsive breakpoints ($\le 1150\text{px}$ and $\le 860\text{px}$) cleanly hide resizers and switch to 2-column and 1-column layouts.
   - Verified with new Playwright E2E test [`resizable-columns.spec.ts`](file:///Users/macbook/Documents/Kodlama/Radiography/web/tests/e2e/resizable-columns.spec.ts), 0 `oxlint` errors, and clean TypeScript build.
+- **Agent Skills & 6-Phase Lifecycle Orchestration (`c0d6c22`)**:
+  - Integrated Addy Osmani's `agent-skills` suite across `.agents/`, `.opencode/`, and `~/.gemini/config/plugins/agent-skills/` alongside existing Ponytail and RT domain skills (`rt-research`, `rt-review`, `code-reviewer`, `security-auditor`, `test-engineer`, `web-performance-auditor`).
+- **Web UI/UX Usability Iteration 2 & 3 (`04a45f8` + follow-up)**:
+  1. **Recent Calculations History**: `useCalculationHistory.ts` + `CalculationHistoryModal` in `Modals.tsx` keeping a 5-entry debounced, deduplicated, schema-validated `localStorage` stack with 1-click restore and clear (`⏱️ Geçmiş (N)` / `Alt+H`).
+  2. **Outdoor High-Contrast Mode**: `[data-theme="outdoor"]` WCAG AAA sunlight mode (`#ffffff` bg, `#000000` text, `2px` black borders, high-contrast 3D canvas gradient) cycling in the header (`🌙 / ☀️ / 🕶️`).
+  3. **Keyboard Quick-Jump (`Alt+1..4`, `Alt+H`)**: Cross-platform `event.code` shortcuts auto-expanding `<details>` groups (`#section-geometry`, `#section-radiation`, `#section-standards`, `#section-applied`), scrolling into view, and focusing the first control.
+  4. **Shareable Setup URL (`🔗 Paylaş / Share`)**: `buildShareUrl` and `parseUrlSetup` in `usePersistedAppState.ts` encoding non-default `FormState` deltas into `?setup=...` with strict `DEFAULT_FORM` key/type allowlisting and automatic URL cleanup on boot.
+  5. **NDT Terminology Fixes**: Fixed API 1104 Clause 9.3.6 `defect_ic` translation ("Internal Concavity (IC)" / "İç Çöküntü / Kök Çöküntüsü (IC)") and ISO 17636-2 Table 2 footnote label in `src/core/translation.py`.
+  6. Covered by 5 E2E tests in [`usability-iteration-2.spec.ts`](file:///Users/macbook/Documents/Kodlama/Radiography/web/tests/e2e/usability-iteration-2.spec.ts).
 
 ## Pending / next
 
-- [ ] **Web UI/UX Usability Iteration 2**:
-      1. **Recent Calculations History**: Lightweight in-memory/localStorage stack of the last 5 calculations so operators can revert or compare recent pipe setups with 1 click.
-      2. **Outdoor High-Contrast Mode**: Field/sunlight mode toggle for bright outdoor radiography environments.
-      3. **Keyboard Quick-Jump**: Accesskey shortcuts for jumping directly between sections (`Alt+1` Geometry, `Alt+2` Radiation, `Alt+3` Applied).
 - [ ] Decide whether to record the web-only scope in `AGENTS.md`.
 
 ## Notes & risks
@@ -195,7 +200,6 @@ cd web && npx playwright test           # 34 passed (22 + 3 mobile + 9 feedback)
 - Web copies `src/core` into `web/public/python/` (gitignored); sync is automatic
   (`npm run sync` in `predev`/`prebuild`). Mobile has **no copy** — `buildozer.spec`
   packages `src/core/*.py` directly, so it cannot drift (desktop/mobile now frozen).
-- Agent & skill configuration (`GEMINI.md`, `.agents/agents/`, `.opencode/agents/`,
-  `.opencode/skills/`, `.opencode/command/repo-indexer.md`) committed in `ffb76f2`.
+- Agent & skill configuration (`AGENTS.md`, `GEMINI.md`, `.agents/`, `.opencode/`) committed in `ffb76f2` and `c0d6c22`.
 - `docs/godclass-plan.md` dated some entries 2026-10-16; actual session commits are
-  2026-10-17.
+  2026-10-17 / 2026-10-18.

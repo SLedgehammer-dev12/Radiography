@@ -1,6 +1,6 @@
 # Radiography — Repository Index
 
-> **Status**: Current (Indexed at commit `8cc850a` | Version `2.0.4` | 2026-10-17)
+> **Status**: Current (Indexed at commit `04a45f8` | Version `2.0.4` | 2026-10-18)
 > **Domain**: Industrial Radiographic Testing (NDT RT) exposure calculator & report generator
 > **Freshness Policy**: Stale after 7 days or 15 new commits.
 
@@ -22,11 +22,12 @@ Radiography/
 ├── src/ui/                  # [Desktop UI] PyQt6 (main_window 2114 lines + 8 panels/)
 ├── src/mobile/              # [Mobile] KivyMD wizard (24 files incl. .kv)
 ├── src/android/             # [Packaging] p4a manifest hook
-├── web/src/                 # [Web] React 19 (App.tsx 1957 lines, components/, state/, lib/, pyodide/)
+├── web/src/                 # [Web] React 19 (App.tsx 2268 lines, components/, state/, lib/, pyodide/)
 ├── web/python/bridge.py     # [Bridge] Pyodide JSON-RPC -> CalculationEngine
 ├── web/scripts/sync-assets.mjs  # [Tool] src/core -> web/public/python sync
-├── tests/                   # [Tests] 37 files, 930 pytest cases (924 passed, 6 skipped)
-├── web/tests/               # [Tests] 6 Playwright E2E files (33 tests)
+├── tests/                   # [Tests] 37 files, 936 pytest cases (930 passed, 6 skipped)
+├── web/tests/               # [Tests] 9 Playwright E2E files (44 tests)
+├── .agents/ & .opencode/    # [Agents] 6 specialist personas + 33 engineering/Ponytail skills
 ├── tools/                   # [Tools] Annex A digitizer
 └── docs/                    # [Data/Docs] ASME B36 pipe catalog JSON, PROGRESS.md, godclass-plan.md
 ```
@@ -47,7 +48,7 @@ Core facade: `src/core/engine.py::CalculationEngine.calculate()` — single pipe
 | Module | Fan-Out | Instability | Role |
 | :--- | :---: | :---: | :--- |
 | `src/ui/main_window` | 18 | 0.95 High | Desktop shell (2114 lines + 8 mixins in `src/ui/panels/`) |
-| `web/src/App.tsx` | 17 | 0.94 High | Web orchestrator (1883 lines + `components/*`, `state/*`) |
+| `web/src/App.tsx` | 18 | 0.94 High | Web orchestrator (2268 lines + `components/*`, `state/*`) |
 | `src/core/engine` | 9 | 0.82 Med | Central facade |
 | `src/mobile/lib/app_state` | 9 | 0.69 Med | Mobile bridge |
 | `src/core/calculator` | 2 | 0.50 Low | Stable physics |
@@ -56,13 +57,13 @@ Core facade: `src/core/engine.py::CalculationEngine.calculate()` — single pipe
 
 External: Desktop `PyQt6, reportlab, matplotlib, numpy, Pillow, qrcode`; Web `react 19, pyodide 314, vite 8, playwright`; Mobile `kivy 2.3.1, kivymd`.
 
-## 5. Change Hotspots (139 commits, 1 author)
+## 5. Change Hotspots (160 commits, 1 author)
 
-Top churn: `build.yml` 42, `CHANGELOG.md` 32, `main_window.py` 34, `version.py` 28, `buildozer.spec` 28, `pyproject.toml` 27, `calculator.py` 21, `App.tsx` 21. 61 commits contain `fix`. Bus factor = 1 (`omer.erbas`, 139/139). Co-change cluster: `calculator.py` <-> `main_window.py` / `App.tsx`.
+Top churn: `build.yml` 44, `App.tsx` 35, `main_window.py` 34, `CHANGELOG.md` 33, `version.py` 29, `buildozer.spec` 29, `pyproject.toml` 28, `calculator.py` 23. 64 commits contain `fix`. Bus factor = 1 (`omer.erbas`, 160/160). Co-change cluster: `calculator.py` <-> `main_window.py` / `App.tsx`.
 
 ## 6. Risks & Debt
 
-1. **Large UI orchestrators**: `main_window.py` (3298 → 2114 lines, −36%) and `App.tsx` (3149 → 1883 lines, −40%) were decomposed via `src/ui/panels/*` and `web/src/components/*` + `web/src/state/*`. Inputs group in `App.tsx` (38 deps) intentionally kept inline per `docs/godclass-plan.md`.
+1. **Large UI orchestrators**: `main_window.py` (3298 → 2114 lines, −36%) and `App.tsx` (3149 → 2268 lines, −28%) were decomposed via `src/ui/panels/*` and `web/src/components/*` + `web/src/state/*`. Inputs group in `App.tsx` (38 deps) intentionally kept inline per `docs/godclass-plan.md`.
 2. **Sync drift (web only)**: web copies core into `web/public/python/` (gitignored); sync is automated (`sync-assets.mjs` + predev/prebuild, diff clean). Mobile has no copy — `buildozer.spec` packages `src/core/*.py` directly at build time.
 3. **Version bump (5 spots)**: `src/core/version.py`, `pyproject.toml`, `buildozer.spec`, `web/package.json`, and `FALLBACK_VERSION` in `web/src/components/Modals.tsx:7` (`RELEASE.md`).
 4. **Shortcut debt (`ponytail-debt`)**: 1 marker in production code (`src/core/calculator.py:1584`, `shortcut: t unknown -> conservative N, pass t to upgrade`).

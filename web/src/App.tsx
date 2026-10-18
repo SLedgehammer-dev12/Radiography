@@ -53,7 +53,7 @@ import {
 } from "./state/presets";
 import { useEngine } from "./state/useEngine";
 import { useDefect } from "./state/useDefect";
-import { usePersistedAppState } from "./state/usePersistedAppState";
+import { buildShareUrl, usePersistedAppState } from "./state/usePersistedAppState";
 import { useResizableColumns } from "./state/useResizableColumns";
 import {
   DEFAULT_FORM,
@@ -533,13 +533,43 @@ export default function App() {
   };
 
   // Keyboard shortcuts: Ctrl/Cmd+Enter exports the PDF, Ctrl/Cmd+S saves the
-  // current form as a preset (preventDefault stops the browser save dialog).
+  // current form as a preset (preventDefault stops the browser save dialog),
+  // Alt+1..4 jumps to and expands input sections, and Alt+H opens history.
   const shortcutRef = useRef({ exportPdf, exportPreset, ready });
   shortcutRef.current = { exportPdf, exportPreset, ready };
   useEffect(() => {
+    const sectionMap: Record<string, string> = {
+      Digit1: "section-geometry",
+      Digit2: "section-radiation",
+      Digit3: "section-standards",
+      Digit4: "section-applied",
+      "1": "section-geometry",
+      "2": "section-radiation",
+      "3": "section-standards",
+      "4": "section-applied",
+    };
     const handler = (event: KeyboardEvent) => {
-      if (!(event.ctrlKey || event.metaKey) || event.repeat) return;
-      if (!shortcutRef.current.ready || document.querySelector(".modal-backdrop")) return;
+      if (event.repeat || !shortcutRef.current.ready || document.querySelector(".modal-backdrop")) return;
+      if (event.altKey && !event.ctrlKey && !event.metaKey) {
+        const targetId = sectionMap[event.code] ?? sectionMap[event.key];
+        if (targetId) {
+          event.preventDefault();
+          const el = document.getElementById(targetId) as HTMLDetailsElement | null;
+          if (!el) return;
+          if (el.tagName === "DETAILS") el.open = true;
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+          el.querySelector<HTMLElement>("select, input, button:not(.info-tip)")?.focus({
+            preventScroll: true,
+          });
+          return;
+        }
+        if (event.code === "KeyH" || event.key.toLowerCase() === "h") {
+          event.preventDefault();
+          setShowHistory(true);
+          return;
+        }
+      }
+      if (!(event.ctrlKey || event.metaKey)) return;
       if (event.key === "Enter") {
         event.preventDefault();
         void shortcutRef.current.exportPdf();
@@ -592,7 +622,7 @@ export default function App() {
               className="topbar-action"
               data-testid="topbar-history"
               onClick={() => setShowHistory(true)}
-              title={lang === "tr" ? "Son Hesaplamalar Geçmişi" : "Recent Calculations History"}
+              title={`${t("recent_calculations")} (Alt+H)`}
             >
               ⏱️ {lang === "tr" ? `Geçmiş (${historyCount})` : `History (${historyCount})`}
             </button>
@@ -612,7 +642,24 @@ export default function App() {
                   : (lang === "tr" ? "Karanlık Temaya Geç" : "Switch to Dark Theme")
               }
             >
-              {theme === "outdoor" ? "🕶️ Saha" : theme === "light" ? "☀️ Aydınlık" : "🌙 Karanlık"}
+              {theme === "outdoor"
+                ? (lang === "tr" ? "🕶️ Saha" : "🕶️ Outdoor")
+                : theme === "light"
+                ? (lang === "tr" ? "☀️ Aydınlık" : "☀️ Light")
+                : (lang === "tr" ? "🌙 Karanlık" : "🌙 Dark")}
+            </button>
+            <button
+              type="button"
+              className="topbar-action"
+              data-testid="topbar-share"
+              onClick={() => {
+                const url = buildShareUrl(form);
+                void navigator.clipboard?.writeText(url)?.catch(() => {});
+                notify(t("share_link_copied"), "success");
+              }}
+              title={t("share_setup_tooltip")}
+            >
+              🔗 {t("share_setup_btn")}
             </button>
             <button
               type="button"
@@ -1125,7 +1172,7 @@ export default function App() {
               ))}
             </div>
 
-            <Group title={t("pipe_geometry_section")}>
+            <Group id="section-geometry" title={t("pipe_geometry_section")}>
               <SelectField
                 label={t("material_type")}
                 value={form.material}
@@ -1221,7 +1268,7 @@ export default function App() {
               </div>
             </Group>
 
-            <Group title={t("rad_tech_section")}>
+            <Group id="section-radiation" title={t("rad_tech_section")}>
               <RadioGroup
                 label={t("rt_tech")}
                 value={form.tech}
@@ -1387,7 +1434,7 @@ export default function App() {
                 )}
             </Group>
 
-            <Group title={t("standards_iqi_section")}>
+            <Group id="section-standards" title={t("standards_iqi_section")}>
               <div className="field-row-2">
                 <SelectField
                   label={t("testing_class")}
@@ -1569,6 +1616,7 @@ export default function App() {
             </Group>
 
             <Group
+              id="section-applied"
               title={t("applied_exposure_section")}
               headerAction={
                 <button

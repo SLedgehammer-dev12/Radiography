@@ -172,4 +172,63 @@ test.describe("Web Usability Iteration 2: Outdoor Theme & Calculation History", 
     await page.getByTestId("history-close-btn").click();
     await expect(historyModal).not.toBeVisible();
   });
+
+  test("Keyboard quick-jump (Alt+1..4, Alt+H) expands collapsed sections and opens history", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator(".layout")).toBeVisible({ timeout: 150_000 });
+    await expect(page.getByTestId("output-w_nom")).not.toContainText("-", { timeout: 60_000 });
+
+    // Collapse section-standards (<details id="section-standards">)
+    await page.evaluate(() => {
+      const el = document.getElementById("section-standards") as HTMLDetailsElement | null;
+      if (el) el.open = false;
+    });
+    const isInitiallyOpen = await page.evaluate(
+      () => (document.getElementById("section-standards") as HTMLDetailsElement | null)?.open,
+    );
+    expect(isInitiallyOpen).toBe(false);
+
+    // Press Alt+3 to jump to and auto-expand section-standards
+    await page.keyboard.press("Alt+Digit3");
+    const isOpenedByShortcut = await page.evaluate(
+      () => (document.getElementById("section-standards") as HTMLDetailsElement | null)?.open,
+    );
+    expect(isOpenedByShortcut).toBe(true);
+
+    // Verify focus moved inside #section-standards
+    const focusInsideStandards = await page.evaluate(() => {
+      const section = document.getElementById("section-standards");
+      return Boolean(section && section.contains(document.activeElement));
+    });
+    expect(focusInsideStandards).toBe(true);
+
+    // Press Alt+H to open the Recent Calculations History modal
+    await page.keyboard.press("Alt+KeyH");
+    const historyModal = page.getByTestId("history-modal");
+    await expect(historyModal).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(historyModal).not.toBeVisible();
+  });
+
+  test("Shareable setup URL (?setup=...) hydrates form parameters and cleans address bar", async ({ page }) => {
+    const customSetup = encodeURIComponent(
+      JSON.stringify({ od: 406.4, t: 10.0, geometry: "swsi" }),
+    );
+    await page.goto(`/?setup=${customSetup}`);
+    await expect(page.locator(".layout")).toBeVisible({ timeout: 150_000 });
+    await expect(page.getByTestId("output-w_nom")).not.toContainText("-", { timeout: 60_000 });
+
+    // SWSI with t = 10.0 mm produces w_nom = 10.0 mm
+    await expect(page.getByTestId("output-w_nom")).toContainText("10");
+
+    // Address bar query string should be cleaned after hydration
+    const searchAfterLoad = await page.evaluate(() => window.location.search);
+    expect(searchAfterLoad).toBe("");
+
+    // Clicking topbar-share shows confirmation toast
+    const shareBtn = page.getByTestId("topbar-share");
+    await expect(shareBtn).toBeVisible();
+    await shareBtn.click();
+    await expect(page.locator(".toast")).toBeVisible({ timeout: 5000 });
+  });
 });

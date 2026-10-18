@@ -20,11 +20,78 @@ interface PersistedState {
   reportInfo?: Record<string, string>;
 }
 
+const NULLABLE_NUMBER_KEYS = new Set<keyof FormState>([
+  "b_object",
+  "f_source",
+  "panel_width",
+  "panel_height",
+  "app_time",
+]);
+
+const NULLABLE_STRING_KEYS = new Set<keyof FormState>(["std_figure", "user_geometry"]);
+
+function parseUrlSetup(): Partial<FormState> | undefined {
+  try {
+    const raw = new URLSearchParams(window.location.search).get("setup");
+    if (!raw || raw.length > 4096) return undefined;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
+    const out: Record<string, unknown> = {};
+    for (const key of Object.keys(DEFAULT_FORM) as (keyof FormState)[]) {
+      if (!Object.prototype.hasOwnProperty.call(parsed, key)) continue;
+      const val = (parsed as Record<string, unknown>)[key];
+      const defVal = DEFAULT_FORM[key];
+      if (val === null && (NULLABLE_NUMBER_KEYS.has(key) || NULLABLE_STRING_KEYS.has(key))) {
+        out[key] = null;
+      } else if (typeof defVal === "number" || NULLABLE_NUMBER_KEYS.has(key)) {
+        if (typeof val === "number" && Number.isFinite(val)) out[key] = val;
+      } else if (typeof defVal === "boolean" && typeof val === "boolean") {
+        out[key] = val;
+      } else if (
+        (typeof defVal === "string" || NULLABLE_STRING_KEYS.has(key)) &&
+        typeof val === "string" &&
+        val.length <= 64
+      ) {
+        out[key] = val;
+      }
+    }
+    window.history.replaceState({}, "", window.location.pathname);
+    return out as Partial<FormState>;
+  } catch {
+    return undefined;
+  }
+}
+
+export function buildShareUrl(form: FormState): string {
+  const delta: Record<string, unknown> = {};
+  for (const key of Object.keys(DEFAULT_FORM) as (keyof FormState)[]) {
+    if (form[key] !== DEFAULT_FORM[key]) {
+      delta[key] = form[key];
+    }
+  }
+  const url = new URL(window.location.origin + window.location.pathname);
+  url.searchParams.set("setup", JSON.stringify(delta));
+  return url.toString();
+}
+
 function loadPersisted(): PersistedState {
+  const urlSetup = parseUrlSetup();
+  let parsed: PersistedState = {};
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as PersistedState;
+    if (raw) {
+      const candidate = JSON.parse(raw);
+      if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) {
+        parsed = candidate as PersistedState;
+      }
+    }
+  } catch {
+    parsed = {};
+  }
+  if (urlSetup) {
+    parsed.form = { ...DEFAULT_FORM, ...urlSetup };
+  }
+  try {
     if (parsed.form) {
       if (parsed.form.detector_type === "cr_hires") {
         parsed.form.detector_type = "cr_highres";
@@ -60,7 +127,7 @@ function loadPersisted(): PersistedState {
     }
     return parsed;
   } catch {
-    return {};
+    return urlSetup ? { form: { ...DEFAULT_FORM, ...urlSetup } } : {};
   }
 }
 
