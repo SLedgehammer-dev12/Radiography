@@ -28,3 +28,58 @@ Take the first option that fully works:
 - A shortcut with a known limit gets a code comment in this form: `shortcut: <the limit>, <when to upgrade>`.
 
 Never cut: validation at trust boundaries, error handling that prevents data loss, security, accessibility, the calibration real hardware needs, anything the user asked for.
+
+---
+
+# Agent Skills & Personas Architecture
+
+This project integrates the production engineering skills and specialist personas from [Addy Osmani's agent-skills](https://github.com/addyosmani/agent-skills), mirrored across **Antigravity** (`.agents/`) and **OpenCode** (`.opencode/`).
+
+## Specialist Personas (Subagents)
+
+| Persona | Domain / Role | Permissions | When to Invoke |
+|---------|---------------|-------------|----------------|
+| `code-reviewer` | Senior Staff Reviewer | `edit: deny`, `bash: deny` | Five-axis code review (correctness, readability, architecture, security, performance) |
+| `security-auditor` | Security Engineer | `edit: deny`, `bash: deny` | Vulnerability detection, OWASP Top 10, input bounds, auth/authz, secrets |
+| `test-engineer` | QA / Test Strategy | `edit: allow`, `bash: allow` | Test suite design, Prove-It bug tests, test coverage gap analysis |
+| `web-performance-auditor` | Web Performance | `edit: deny`, `bash: allow` | Core Web Vitals, UI responsiveness, 3D Canvas & Pyodide rendering bottlenecks |
+| `rt-research` | Radiography Codebase Map | `edit: deny`, `bash: deny` | Mapping calculation engine, geometries, IQI, and bridge surfaces |
+| `rt-review` | RT Calculation & Standard Review | `edit: deny`, `bash: deny` | ASME Sec V / ISO 17636 physics verification, zero-bloat Ponytail review |
+
+## Development Lifecycle & Orchestration
+
+The project follows a 6-phase engineering lifecycle:
+
+```
+  DEFINE          PLAN           BUILD          VERIFY         REVIEW          SHIP
+ ┌──────┐      ┌──────┐      ┌──────┐      ┌──────┐      ┌──────┐      ┌──────┐
+ │ Spec │ ───▶ │ Plan │ ───▶ │ Code │ ───▶ │ Test │ ───▶ │  QA  │ ───▶ │ Launch│
+ │Refine│      │ Tasks│      │ Impl │      │Prove │      │ Gate │      │ Gate │
+ └──────┘      └──────┘      └──────┘      └──────┘      └──────┘      └──────┘
+  /spec          /plan          /build        /test         /review       /ship
+```
+
+### Intent ➔ Skill & Persona Routing
+
+| Intent / Developer Activity | Primary Skill | Supporting Skills / Persona |
+|-----------------------------|---------------|-----------------------------|
+| New feature / major requirement | `spec-driven-development` (`/spec`) | `interview-me`, `api-and-interface-design` |
+| Task planning & decomposition | `planning-and-task-breakdown` (`/plan`) | `context-engineering` |
+| Feature implementation | `incremental-implementation` (`/build`) | Ponytail rules, `frontend-ui-engineering` |
+| Bug reproduction & fixing | `debugging-and-error-recovery` | `test-engineer` (Prove-It pattern) |
+| Test suite creation / coverage | `test-driven-development` (`/test`) | `test-engineer`, `references/testing-patterns.md` |
+| General 5-axis code review | `code-review-and-quality` (`/review`) | `code-reviewer` subagent |
+| RT physics & lean review | `ponytail-review` (`/ponytail-review`) | `rt-review` subagent |
+| Code simplification / refactor | `code-simplification` (`/code-simplify`)| Ponytail rules (`/ponytail`) |
+| Security hardening & audit | `security-and-hardening` | `security-auditor` subagent |
+| Web performance / CWV audit | `performance-optimization` (`/webperf`)| `web-performance-auditor` subagent |
+| Pre-release verification | `shipping-and-launch` (`/ship`) | Parallel Fan-out (`code-reviewer` + `security-auditor` + `test-engineer`) |
+
+## Orchestration Rules
+
+1. **User / Slash Commands are the Orchestrator**: Personas do NOT invoke other personas. Flat hierarchy prevents recursion and token bloat.
+2. **Parallel Fan-out with Merge (`/ship`)**:
+   - Spawns `code-reviewer`, `security-auditor`, and `test-engineer` concurrently in isolated subagent contexts.
+   - If changes touch RT calculation code (`src/core/`, `web/python/bridge.py`), also check with `rt-review`.
+   - The main agent merges the independent reports into a unified **Go / No-Go** decision with an explicit rollback plan.
+3. **Ponytail Rule Primacy**: All code produced through `spec`, `plan`, `build`, or bug fixes must adhere to the Ponytail principle: minimum code that works, standard library first, zero unrequested abstractions, and never cutting ASME/ISO calculation boundaries.
