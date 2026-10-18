@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from "react";
 import { Group } from "../components";
 import { formatExposuresProvenance } from "../i18n";
 import type { EngineResult, ExposuresProvenance, FormState } from "../types";
+import type { AppTheme } from "../state/usePersistedAppState";
 import { AnnexAChartSvg, StandardFigureSvg, WeldSetupSvg } from "./SketchView";
 import { WeldSetup3D } from "./WeldSetup3D";
 
@@ -14,7 +15,7 @@ interface SketchTabsPanelProps {
   result: EngineResult | null;
   form: FormState;
   digital: boolean;
-  theme: "dark" | "light";
+  theme: AppTheme;
   lang: string;
   t: (key: string, ...args: unknown[]) => string;
 }

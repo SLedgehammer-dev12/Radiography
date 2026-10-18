@@ -1836,3 +1836,16 @@ details.group:not([open]) > summary.group-title {
   }
 }
 
+.history-card {
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.history-card:hover {
+  border-color: var(--accent) !important;
+}
+
+[data-theme="outdoor"] .history-card {
+  border: 2px solid #000000 !important;
+  background: #ffffff !important;
+}
+

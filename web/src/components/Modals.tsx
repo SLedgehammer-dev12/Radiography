@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { NumberField } from "../components";
 import { pyClient } from "../pyodide/client";
+import type { CalculationHistoryEntry } from "../state/useCalculationHistory";
 import type { Lvl3Settings } from "../types";
 
 export const FALLBACK_VERSION = "2.0.4";
@@ -19,13 +20,14 @@ function useEscapeClose(onClose: () => void) {
 interface DecayDialogProps {
   t: (key: string, ...args: unknown[]) => string;
   source: string;
+  initialActivity?: number;
   onApply: (activity: number) => void;
   onClose: () => void;
 }
 
-function DecayDialog({ t, source, onApply, onClose }: DecayDialogProps) {
+function DecayDialog({ t, source, initialActivity, onApply, onClose }: DecayDialogProps) {
   useEscapeClose(onClose);
-  const [initial, setInitial] = useState(40);
+  const [initial, setInitial] = useState(initialActivity ?? 40);
   const [calibDate, setCalibDate] = useState("");
   const [current, setCurrent] = useState<number | null>(null);
   const displayCurrent = calibDate ? current : null;
@@ -419,5 +421,126 @@ function UpdateModal({ t, onClose, currentVersion = FALLBACK_VERSION }: UpdateMo
   );
 }
 
+interface CalculationHistoryModalProps {
+  t: (key: string, ...args: unknown[]) => string;
+  lang: string;
+  history: CalculationHistoryEntry[];
+  onRestore: (entry: CalculationHistoryEntry) => void;
+  onClear: () => void;
+  onClose: () => void;
+}
 
-export { AboutModal, DecayDialog, Lvl3Dialog, UpdateModal };
+function CalculationHistoryModal({
+  t,
+  lang,
+  history,
+  onRestore,
+  onClear,
+  onClose,
+}: CalculationHistoryModalProps) {
+  useEscapeClose(onClose);
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        className="modal history-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="history-modal-title"
+        data-testid="history-modal"
+        onClick={(event) => event.stopPropagation()}
+        style={{ maxWidth: 640 }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+          <h2 id="history-modal-title" style={{ margin: 0 }}>
+            ⏱️ {t("recent_calculations") || (lang === "tr" ? "Son Hesaplamalar Geçmişi" : "Recent Calculations")}
+          </h2>
+          {history.length > 0 && (
+            <button
+              type="button"
+              className="about-btn"
+              data-testid="history-clear-btn"
+              onClick={onClear}
+              style={{ padding: "4px 10px", fontSize: "11px", color: "var(--red)" }}
+            >
+              🗑️ {lang === "tr" ? "Geçmişi Temizle" : "Clear History"}
+            </button>
+          )}
+        </div>
+
+        {history.length === 0 ? (
+          <p style={{ color: "var(--text-muted)", padding: "20px 0", textAlign: "center" }}>
+            {t("history_empty") || (lang === "tr" ? "Henüz kayıtlı bir hesaplama geçmişi bulunmuyor." : "No calculation history recorded yet.")}
+          </p>
+        ) : (
+          <div className="history-list" style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "420px", overflowY: "auto" }}>
+            {history.map((entry, index) => {
+              const timeStr = new Date(entry.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+              const s = entry.summary;
+              const geomLabel =
+                s.geometry === "dwdi_elliptic"
+                  ? (lang === "tr" ? "DWDI Eliptik" : "DWDI Elliptical")
+                  : s.geometry === "dwdi_super"
+                  ? (lang === "tr" ? "DWDI Çakışık" : "DWDI Superimposed")
+                  : s.geometry?.toUpperCase?.() ?? "";
+              const metricsLabel =
+                lang === "tr"
+                  ? `${s.source} • SFD: ${s.sfd} mm • Asgari: ${s.exposures} Poz • Süre: ${Math.round(s.exposureTimeSec)} sn`
+                  : `${s.source} • SFD: ${s.sfd} mm • Min: ${s.exposures} Exposures • Duration: ${Math.round(s.exposureTimeSec)} s`;
+              return (
+                <div
+                  key={entry.id || index}
+                  className="history-card"
+                  style={{
+                    background: "var(--panel-2)",
+                    border: "1px solid var(--panel-border)",
+                    borderRadius: "8px",
+                    padding: "12px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: "12px",
+                  }}
+                >
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px", flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "var(--text-muted)" }}>
+                      <span>🕒 {timeStr}</span>
+                      <span className="badge" style={{ fontSize: "11px", padding: "1px 6px" }}>{s.governingStd}</span>
+                      <span style={{ fontWeight: 600, color: "var(--text)" }}>{geomLabel}</span>
+                    </div>
+                    <div style={{ fontSize: "14px", fontWeight: 600 }}>
+                      Ø {s.od} mm × {s.t} mm ({s.material})
+                    </div>
+                    <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                      {metricsLabel}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="primary"
+                    data-testid="history-restore-btn"
+                    style={{ padding: "6px 14px", fontSize: "12px", whiteSpace: "nowrap" }}
+                    onClick={() => {
+                      onRestore(entry);
+                      onClose();
+                    }}
+                  >
+                    ⚡ {lang === "tr" ? "Yükle" : "Restore"}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="modal-actions" style={{ marginTop: "16px" }}>
+          <button className="primary" data-testid="history-close-btn" onClick={onClose}>
+            {t("dialog_ok")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export { AboutModal, CalculationHistoryModal, DecayDialog, Lvl3Dialog, UpdateModal };

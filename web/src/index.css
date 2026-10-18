@@ -63,6 +63,52 @@
   color-scheme: light;
 }
 
+[data-theme="outdoor"] {
+  --bg: #ffffff;
+  --bg-alt: #f0f2f5;
+  --panel: #ffffff;
+  --panel-2: #f8f9fa;
+  --panel-border: #000000;
+  --panel-border-strong: #000000;
+  --text: #000000;
+  --text-muted: #1a1a1a;
+  --accent: #0044cc;
+  --accent-2: #4a00e0;
+  --accent-soft: rgba(0, 68, 204, 0.15);
+  --green: #006600;
+  --green-bg: #c8e6c9;
+  --red: #cc0000;
+  --red-bg: #ffcdd2;
+  --yellow: #995500;
+  --orange: #cc4400;
+  --input-bg: #ffffff;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.3);
+  --sketch-pipe: #004d40;
+  --sketch-weld: #b71c1c;
+  --sketch-beam: #f57f17;
+  --sketch-source: #bf360c;
+  --sketch-det: #1b5e20;
+  --sketch-text: #000000;
+  color-scheme: light;
+}
+
+[data-theme="outdoor"] .group,
+[data-theme="outdoor"] .outputs-panel,
+[data-theme="outdoor"] .hero-card,
+[data-theme="outdoor"] .history-card,
+[data-theme="outdoor"] input,
+[data-theme="outdoor"] select,
+[data-theme="outdoor"] button {
+  border-width: 2px !important;
+  border-color: #000000 !important;
+}
+
+[data-theme="outdoor"] .sketch-3d-wrapper.is-fullscreen {
+  background: #ffffff !important;
+}
+
 * {
   box-sizing: border-box;
 }

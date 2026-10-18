@@ -30,7 +30,7 @@ export interface WeldSetup3DProps {
   duplexStr?: string;
   safetyRadiusM?: number | null;
   supervisedRadiusM?: number | null;
-  theme?: "dark" | "light";
+  theme?: "dark" | "light" | "outdoor";
   lang?: string;
 }
 
@@ -219,7 +219,10 @@ export function WeldSetup3D({
 
     const isDark = theme === "dark";
     const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
-    if (isDark) {
+    if (theme === "outdoor") {
+      bgGrad.addColorStop(0, "#ffffff");
+      bgGrad.addColorStop(1, "#f1f3f7");
+    } else if (isDark) {
       bgGrad.addColorStop(0, "#141821");
       bgGrad.addColorStop(1, "#0d1017");
     } else {

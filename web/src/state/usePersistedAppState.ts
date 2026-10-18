@@ -10,11 +10,13 @@ import { DEFAULT_BASE_E_BY_SOURCE, getActiveChartKeys } from "./presets";
 
 const STORAGE_KEY = "radiography_web_state_v1";
 
+export type AppTheme = "dark" | "light" | "outdoor";
+
 interface PersistedState {
   form?: FormState;
   lvl3?: Lvl3Settings;
   lang?: string;
-  theme?: "dark" | "light";
+  theme?: AppTheme;
   reportInfo?: Record<string, string>;
 }
 
@@ -53,6 +55,9 @@ function loadPersisted(): PersistedState {
         parsed.form.chart_source = validCharts[0] ?? "model";
       }
     }
+    if (parsed.theme && !["dark", "light", "outdoor"].includes(parsed.theme)) {
+      parsed.theme = "dark";
+    }
     return parsed;
   } catch {
     return {};
@@ -68,7 +73,7 @@ export function usePersistedAppState() {
   });
   const [lvl3, setLvl3] = useState<Lvl3Settings>(persisted.lvl3 ?? DEFAULT_LVL3);
   const [lang, setLang] = useState<string>(persisted.lang ?? "tr");
-  const [theme, setTheme] = useState<"dark" | "light">(persisted.theme ?? "dark");
+  const [theme, setTheme] = useState<AppTheme>(persisted.theme ?? "dark");
   const [reportInfo, setReportInfo] = useState<Record<string, string>>(
     persisted.reportInfo ?? {},
   );

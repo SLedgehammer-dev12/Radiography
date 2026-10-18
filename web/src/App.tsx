@@ -21,11 +21,13 @@ import { ReportInfoPanel } from "./components/ReportInfoPanel";
 import { SketchTabsPanel } from "./components/SketchTabsPanel";
 import {
   AboutModal,
+  CalculationHistoryModal,
   DecayDialog,
   FALLBACK_VERSION,
   Lvl3Dialog,
   UpdateModal,
 } from "./components/Modals";
+import { useCalculationHistory } from "./state/useCalculationHistory";
 import { makeTranslator } from "./i18n";
 import { downloadBase64, svgToPngBase64 } from "./lib/sketchExport";
 import { pyClient } from "./pyodide/client";
@@ -150,6 +152,7 @@ export default function App() {
   >("3d");
   const [filmSizeMode, setFilmSizeMode] = useState<string>("100x400");
   const [showDecay, setShowDecay] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [notice, setNotice] = useState<
     { text: string; kind: "info" | "success" | "error" } | null
@@ -201,6 +204,7 @@ export default function App() {
   }, [notice]);
 
   const { result, compliance, error, busy, ready } = useEngine(form, lvl3, lang);
+  const { history, clearHistory, historyCount } = useCalculationHistory(form, result, busy);
   const t = useMemo(() => makeTranslator(strings), [strings]);
 
   useEffect(() => {
@@ -586,6 +590,33 @@ export default function App() {
             <button
               type="button"
               className="topbar-action"
+              data-testid="topbar-history"
+              onClick={() => setShowHistory(true)}
+              title={lang === "tr" ? "Son Hesaplamalar Geçmişi" : "Recent Calculations History"}
+            >
+              ⏱️ {lang === "tr" ? `Geçmiş (${historyCount})` : `History (${historyCount})`}
+            </button>
+            <button
+              type="button"
+              className="topbar-action"
+              data-testid="topbar-theme-toggle"
+              onClick={() => {
+                const nextTheme = theme === "dark" ? "light" : theme === "light" ? "outdoor" : "dark";
+                setTheme(nextTheme);
+              }}
+              title={
+                theme === "dark"
+                  ? (lang === "tr" ? "Aydınlık Temaya Geç" : "Switch to Light Theme")
+                  : theme === "light"
+                  ? (lang === "tr" ? "Saha (Güneş Işığı) Moduna Geç" : "Switch to Outdoor High-Contrast Mode")
+                  : (lang === "tr" ? "Karanlık Temaya Geç" : "Switch to Dark Theme")
+              }
+            >
+              {theme === "outdoor" ? "🕶️ Saha" : theme === "light" ? "☀️ Aydınlık" : "🌙 Karanlık"}
+            </button>
+            <button
+              type="button"
+              className="topbar-action"
               data-testid="topbar-sync"
               onClick={syncAllCalculated}
               disabled={!result}
@@ -803,15 +834,18 @@ export default function App() {
                   type="button"
                   className="dropdown-item"
                   onClick={() => {
-                    setTheme(theme === "dark" ? "light" : "dark");
+                    const nextTheme = theme === "dark" ? "light" : theme === "light" ? "outdoor" : "dark";
+                    setTheme(nextTheme);
                     setOpenMenu(null);
                   }}
                 >
-                  <span className="item-icon">🌓</span>
+                  <span className="item-icon">{theme === "outdoor" ? "🕶️" : theme === "light" ? "☀️" : "🌙"}</span>
                   <span>
                     {theme === "dark"
                       ? (lang === "tr" ? "Tema: Karanlık (Aydınlığa Geç)" : "Theme: Dark (Switch to Light)")
-                      : (lang === "tr" ? "Tema: Aydınlık (Karanlığa Geç)" : "Theme: Light (Switch to Dark)")}
+                      : theme === "light"
+                      ? (lang === "tr" ? "Tema: Aydınlık (Saha Moduna Geç)" : "Theme: Light (Switch to Outdoor)")
+                      : (lang === "tr" ? "Tema: Saha (Karanlığa Geç)" : "Theme: Outdoor (Switch to Dark)")}
                   </span>
                 </button>
                 <button
@@ -2130,6 +2164,7 @@ export default function App() {
           <DecayDialog
             t={t}
             source={form.source}
+            initialActivity={form.output_val ?? 40}
             onApply={(activity) => {
               patch("output_val", activity);
               patch("app_activity", activity);
@@ -2149,6 +2184,32 @@ export default function App() {
             t={t}
             currentVersion={pyClient.version ?? FALLBACK_VERSION}
             onClose={() => setShowUpdates(false)}
+          />
+        )}
+        {showHistory && (
+          <CalculationHistoryModal
+            t={t}
+            lang={lang}
+            history={history}
+            onRestore={(entry) => {
+              if (entry?.form && typeof entry.form === "object") {
+                setForm({ ...DEFAULT_FORM, ...entry.form });
+              }
+              notify(
+                lang === "tr"
+                  ? "Geçmiş hesaplama parametreleri geri yüklendi."
+                  : "Calculation parameters restored from history.",
+                "success",
+              );
+            }}
+            onClear={() => {
+              clearHistory();
+              notify(
+                lang === "tr" ? "Hesaplama geçmişi temizlendi." : "Calculation history cleared.",
+                "info",
+              );
+            }}
+            onClose={() => setShowHistory(false)}
           />
         )}
         <PageScrollbar />
