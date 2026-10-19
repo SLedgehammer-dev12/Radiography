@@ -24,7 +24,14 @@ export const DETECTORS = [
   "dda_gdos_he",
   "dda_cmos",
 ];
-const ANALOG_XRAY_CHARTS = ["model", "type_x"];
+const ANALOG_XRAY_CHARTS = [
+  "model",
+  "type_x",
+  "errosco_200kv_d7",
+  "type_x_steel_350kv",
+  "structurix_d7_70cm",
+  "aluminum_chart",
+];
 export const ANALOG_ISOTOPE_CHARTS = [
   "model",
   // Carestream (Kodak Industrex) — indices 1..5 preserved for desktop preset compat
