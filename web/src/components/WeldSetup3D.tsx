@@ -966,6 +966,34 @@ export function WeldSetup3D({
       ctx.stroke();
       ctx.setLineDash([]);
 
+      // Ug geometrik belirsizlik (penumbra) bandı – merkezi ışın eksenine dik,
+      // dedektör düzlemindeki belirsizlik genişliğini gösterir.
+      if (ug && ug > 0 && detCenterProj.scale > 0) {
+        const dx = detCenterProj.x - srcProj.x;
+        const dy = detCenterProj.y - srcProj.y;
+        const beamLen = Math.hypot(dx, dy) || 1;
+        const nx = -dy / beamLen;
+        const ny = dx / beamLen;
+        const half = (ug * detCenterProj.scale) / 2;
+        ctx.beginPath();
+        ctx.moveTo(detCenterProj.x - nx * half, detCenterProj.y - ny * half);
+        ctx.lineTo(detCenterProj.x + nx * half, detCenterProj.y + ny * half);
+        ctx.strokeStyle = isDark
+          ? "rgba(250, 204, 21, 0.4)"
+          : "rgba(234, 88, 12, 0.45)";
+        ctx.lineWidth = 2.2;
+        ctx.setLineDash([7, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = isDark ? "#fde047" : "#c2410c";
+        ctx.font = "700 8px system-ui, sans-serif";
+        ctx.fillText(
+          `Ug = ${ug.toFixed(2)} mm`,
+          detCenterProj.x + nx * (half + 7),
+          detCenterProj.y + ny * (half + 7),
+        );
+      }
+
       if (activeGeo === "dwsi") {
         // Highlight where the DWSI central ray enters the UPPER pipe base metal (beside the upper weld)
         const upperEntryProj = project(

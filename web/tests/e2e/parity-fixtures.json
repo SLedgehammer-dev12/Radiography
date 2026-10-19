@@ -41,7 +41,7 @@
    "required_exposures": 8,
    "required_wire_no": 14,
    "required_duplex_no": 11,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 95.6396798387305
   }
@@ -88,7 +88,7 @@
    "required_exposures": 8,
    "required_wire_no": 15,
    "required_duplex_no": 12,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 7.415601038988373
   }
@@ -182,7 +182,7 @@
    "required_exposures": 8,
    "required_wire_no": 14,
    "required_duplex_no": 11,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 9.09464356112965
   }
@@ -229,7 +229,7 @@
    "required_exposures": 9,
    "required_wire_no": 17,
    "required_duplex_no": 13,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 11.21369209563516
   }
@@ -276,7 +276,7 @@
    "required_exposures": 9,
    "required_wire_no": 17,
    "required_duplex_no": 13,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 18.308722177691337
   }
@@ -323,9 +323,9 @@
    "required_exposures": 8,
    "required_wire_no": 14,
    "required_duplex_no": 11,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
-   "calc_time_raw": 68.95042685550654
+   "calc_time_raw": 206.0821813925808
   }
  },
  {
@@ -370,7 +370,7 @@
    "required_exposures": 8,
    "required_wire_no": 15,
    "required_duplex_no": 12,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 6.2389508141396615
   }
@@ -417,7 +417,7 @@
    "required_exposures": 9,
    "required_wire_no": 16,
    "required_duplex_no": 12,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 5.7414249814977385
   }
@@ -464,7 +464,7 @@
    "required_exposures": 8,
    "required_wire_no": 14,
    "required_duplex_no": 11,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 7.846898989489964
   }
@@ -511,7 +511,7 @@
    "required_exposures": 9,
    "required_wire_no": 17,
    "required_duplex_no": 13,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 5.385873065365325
   }
@@ -558,7 +558,7 @@
    "required_exposures": 9,
    "required_wire_no": 17,
    "required_duplex_no": 13,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 5.5359016600769815
   }
@@ -605,7 +605,7 @@
    "required_exposures": 8,
    "required_wire_no": 14,
    "required_duplex_no": 11,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 79.88817106113555
   }
@@ -652,7 +652,7 @@
    "required_exposures": 8,
    "required_wire_no": 15,
    "required_duplex_no": 12,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 6.730598228209887
   }
@@ -699,7 +699,7 @@
    "required_exposures": 9,
    "required_wire_no": 16,
    "required_duplex_no": 12,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 6.400713279886011
   }
@@ -746,7 +746,7 @@
    "required_exposures": 8,
    "required_wire_no": 14,
    "required_duplex_no": 11,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 8.372093900697827
   }
@@ -793,7 +793,7 @@
    "required_exposures": 9,
    "required_wire_no": 17,
    "required_duplex_no": 13,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 6.332236090349956
   }
@@ -840,7 +840,7 @@
    "required_exposures": 9,
    "required_wire_no": 17,
    "required_duplex_no": 13,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 7.974862877212681
   }
@@ -887,7 +887,7 @@
    "required_exposures": 8,
    "required_wire_no": 14,
    "required_duplex_no": 11,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 108.12498159343721
   }
@@ -934,7 +934,7 @@
    "required_exposures": 8,
    "required_wire_no": 15,
    "required_duplex_no": 12,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 8.067680589303945
   }
@@ -1028,7 +1028,7 @@
    "required_exposures": 8,
    "required_wire_no": 14,
    "required_duplex_no": 11,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 9.773450928857658
   }
@@ -1075,7 +1075,7 @@
    "required_exposures": 9,
    "required_wire_no": 17,
    "required_duplex_no": 13,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 13.423347481393872
   }
@@ -1122,7 +1122,7 @@
    "required_exposures": 9,
    "required_wire_no": 17,
    "required_duplex_no": 13,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 27.4667880636624
   }
@@ -1169,7 +1169,7 @@
    "required_exposures": 9,
    "required_wire_no": 17,
    "required_duplex_no": 13,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 98.54262095808488
   }
@@ -1216,7 +1216,7 @@
    "required_exposures": 9,
    "required_wire_no": 17,
    "required_duplex_no": 13,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 101.61886069445305
   }
@@ -1263,7 +1263,7 @@
    "required_exposures": 9,
    "required_wire_no": 16,
    "required_duplex_no": 12,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 111.37124326003305
   }
@@ -1310,7 +1310,7 @@
    "required_exposures": 9,
    "required_wire_no": 15,
    "required_duplex_no": 12,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 114.84795862110475
   }
@@ -1357,7 +1357,7 @@
    "required_exposures": 8,
    "required_wire_no": 14,
    "required_duplex_no": 11,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 130.17623089160537
   }
@@ -1404,7 +1404,7 @@
    "required_exposures": 8,
    "required_wire_no": 14,
    "required_duplex_no": 11,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 140.7787001128088
   }
@@ -1451,7 +1451,7 @@
    "required_exposures": 7,
    "required_wire_no": 13,
    "required_duplex_no": 10,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 214.94271240073638
   }
@@ -1498,7 +1498,7 @@
    "required_exposures": 9,
    "required_wire_no": 15,
    "required_duplex_no": 13,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 119.88454500356531
   }
@@ -1545,7 +1545,7 @@
    "required_exposures": 9,
    "required_wire_no": 15,
    "required_duplex_no": 13,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 127.48633146714388
   }
@@ -1592,7 +1592,7 @@
    "required_exposures": 9,
    "required_wire_no": 14,
    "required_duplex_no": 12,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 152.65319339378735
   }
@@ -1639,7 +1639,7 @@
    "required_exposures": 9,
    "required_wire_no": 13,
    "required_duplex_no": 12,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 161.6844005977477
   }
@@ -1686,7 +1686,7 @@
    "required_exposures": 8,
    "required_wire_no": 13,
    "required_duplex_no": 11,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 202.9896049671808
   }
@@ -1733,7 +1733,7 @@
    "required_exposures": 8,
    "required_wire_no": 13,
    "required_duplex_no": 11,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 232.72346673592477
   }
@@ -1780,7 +1780,7 @@
    "required_exposures": 7,
    "required_wire_no": 11,
    "required_duplex_no": 10,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 477.7438406726994
   }
@@ -1827,7 +1827,7 @@
    "required_exposures": 2,
    "required_wire_no": 15,
    "required_duplex_no": 12,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 119.88454500356531
   }
@@ -1874,7 +1874,7 @@
    "required_exposures": 2,
    "required_wire_no": 15,
    "required_duplex_no": 12,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 127.48633146714388
   }
@@ -1921,7 +1921,7 @@
    "required_exposures": 2,
    "required_wire_no": 14,
    "required_duplex_no": 11,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 152.65319339378735
   }
@@ -1968,7 +1968,7 @@
    "required_exposures": 9,
    "required_wire_no": 13,
    "required_duplex_no": 12,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 161.6844005977477
   }
@@ -2015,7 +2015,7 @@
    "required_exposures": 8,
    "required_wire_no": 13,
    "required_duplex_no": 11,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 202.9896049671808
   }
@@ -2062,7 +2062,7 @@
    "required_exposures": 8,
    "required_wire_no": 13,
    "required_duplex_no": 11,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 232.72346673592477
   }
@@ -2109,7 +2109,7 @@
    "required_exposures": 7,
    "required_wire_no": 11,
    "required_duplex_no": 10,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 477.7438406726994
   }
@@ -2156,7 +2156,7 @@
    "required_exposures": 3,
    "required_wire_no": 15,
    "required_duplex_no": 12,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 119.88454500356531
   }
@@ -2203,7 +2203,7 @@
    "required_exposures": 3,
    "required_wire_no": 15,
    "required_duplex_no": 12,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 127.48633146714388
   }
@@ -2250,7 +2250,7 @@
    "required_exposures": 3,
    "required_wire_no": 14,
    "required_duplex_no": 11,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 152.65319339378735
   }
@@ -2297,7 +2297,7 @@
    "required_exposures": 9,
    "required_wire_no": 13,
    "required_duplex_no": 12,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 161.6844005977477
   }
@@ -2344,7 +2344,7 @@
    "required_exposures": 8,
    "required_wire_no": 13,
    "required_duplex_no": 11,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 202.9896049671808
   }
@@ -2391,7 +2391,7 @@
    "required_exposures": 8,
    "required_wire_no": 13,
    "required_duplex_no": 11,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 232.72346673592477
   }
@@ -2438,7 +2438,7 @@
    "required_exposures": 7,
    "required_wire_no": 11,
    "required_duplex_no": 10,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 477.7438406726994
   }
@@ -2485,7 +2485,7 @@
    "required_exposures": 8,
    "required_wire_no": 14,
    "required_duplex_no": 11,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 95.6396798387305
   }
@@ -2532,7 +2532,7 @@
    "required_exposures": 8,
    "required_wire_no": 13,
    "required_duplex_no": 11,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 149.13521997588796
   }
@@ -2579,7 +2579,7 @@
    "required_exposures": 8,
    "required_wire_no": 13,
    "required_duplex_no": 11,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 149.13521997588796
   }
@@ -2626,7 +2626,7 @@
    "required_exposures": 8,
    "required_wire_no": 13,
    "required_duplex_no": 11,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 149.13521997588796
   }
@@ -2673,7 +2673,7 @@
    "required_exposures": 8,
    "required_wire_no": 15,
    "required_duplex_no": 12,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 7.415601038988373
   }
@@ -2720,7 +2720,7 @@
    "required_exposures": 8,
    "required_wire_no": 13,
    "required_duplex_no": 12,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 9.154870470101454
   }
@@ -2767,7 +2767,7 @@
    "required_exposures": 8,
    "required_wire_no": 13,
    "required_duplex_no": 12,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 9.154870470101454
   }
@@ -2814,7 +2814,7 @@
    "required_exposures": 8,
    "required_wire_no": 13,
    "required_duplex_no": 12,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 9.154870470101454
   }
@@ -3049,7 +3049,7 @@
    "required_exposures": 8,
    "required_wire_no": 14,
    "required_duplex_no": 11,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 9.09464356112965
   }
@@ -3096,7 +3096,7 @@
    "required_exposures": 8,
    "required_wire_no": 13,
    "required_duplex_no": 11,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 10.887829660891569
   }
@@ -3143,7 +3143,7 @@
    "required_exposures": 8,
    "required_wire_no": 13,
    "required_duplex_no": 11,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 10.887829660891569
   }
@@ -3190,7 +3190,7 @@
    "required_exposures": 8,
    "required_wire_no": 13,
    "required_duplex_no": 11,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 10.887829660891569
   }
@@ -3237,7 +3237,7 @@
    "required_exposures": 9,
    "required_wire_no": 17,
    "required_duplex_no": 13,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 11.21369209563516
   }
@@ -3284,7 +3284,7 @@
    "required_exposures": 9,
    "required_wire_no": 15,
    "required_duplex_no": 13,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 12.208622038531873
   }
@@ -3331,7 +3331,7 @@
    "required_exposures": 2,
    "required_wire_no": 15,
    "required_duplex_no": 12,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 12.208622038531873
   }
@@ -3378,7 +3378,7 @@
    "required_exposures": 3,
    "required_wire_no": 15,
    "required_duplex_no": 12,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 12.208622038531873
   }
@@ -3425,7 +3425,7 @@
    "required_exposures": 9,
    "required_wire_no": 17,
    "required_duplex_no": 13,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 18.308722177691337
   }
@@ -3472,7 +3472,7 @@
    "required_exposures": 9,
    "required_wire_no": 15,
    "required_duplex_no": 13,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 35.04855740542635
   }
@@ -3519,7 +3519,7 @@
    "required_exposures": 2,
    "required_wire_no": 15,
    "required_duplex_no": 12,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 35.04855740542635
   }
@@ -3566,7 +3566,7 @@
    "required_exposures": 3,
    "required_wire_no": 15,
    "required_duplex_no": 12,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 35.04855740542635
   }
@@ -3613,7 +3613,7 @@
    "required_exposures": 6,
    "required_wire_no": 14,
    "required_duplex_no": 9,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 39.080208141903704
   }
@@ -3660,7 +3660,7 @@
    "required_exposures": 6,
    "required_wire_no": 12,
    "required_duplex_no": 9,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 55.01760853673359
   }
@@ -3707,7 +3707,7 @@
    "required_exposures": 2,
    "required_wire_no": 13,
    "required_duplex_no": 9,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 43.38076556868091
   }
@@ -3754,7 +3754,7 @@
    "required_exposures": 3,
    "required_wire_no": 13,
    "required_duplex_no": 9,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 43.38076556868091
   }
@@ -3801,7 +3801,7 @@
    "required_exposures": 9,
    "required_wire_no": 15,
    "required_duplex_no": 12,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 114.84795862110475
   }
@@ -3848,7 +3848,7 @@
    "required_exposures": 9,
    "required_wire_no": 13,
    "required_duplex_no": 12,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 161.6844005977477
   }
@@ -3895,7 +3895,7 @@
    "required_exposures": 2,
    "required_wire_no": 15,
    "required_duplex_no": 12,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 127.48633146714388
   }
@@ -3942,7 +3942,7 @@
    "required_exposures": 3,
    "required_wire_no": 15,
    "required_duplex_no": 12,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 127.48633146714388
   }
@@ -3989,7 +3989,7 @@
    "required_exposures": 6,
    "required_wire_no": 14,
    "required_duplex_no": 9,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 39.080208141903704
   }
@@ -4036,7 +4036,7 @@
    "required_exposures": 6,
    "required_wire_no": 13,
    "required_duplex_no": 9,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 55.01760853673359
   }
@@ -4083,7 +4083,7 @@
    "required_exposures": 2,
    "required_wire_no": 14,
    "required_duplex_no": 9,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 43.38076556868091
   }
@@ -4130,7 +4130,7 @@
    "required_exposures": 3,
    "required_wire_no": 14,
    "required_duplex_no": 9,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 43.38076556868091
   }
@@ -4177,7 +4177,7 @@
    "required_exposures": 9,
    "required_wire_no": 15,
    "required_duplex_no": 12,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 114.84795862110475
   }
@@ -4224,7 +4224,7 @@
    "required_exposures": 9,
    "required_wire_no": 14,
    "required_duplex_no": 12,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 161.6844005977477
   }
@@ -4271,7 +4271,7 @@
    "required_exposures": 2,
    "required_wire_no": 15,
    "required_duplex_no": 12,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 127.48633146714388
   }
@@ -4318,7 +4318,7 @@
    "required_exposures": 3,
    "required_wire_no": 15,
    "required_duplex_no": 12,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 127.48633146714388
   }
@@ -4365,7 +4365,7 @@
    "required_exposures": 6,
    "required_wire_no": 13,
    "required_duplex_no": 9,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 32.54405772290135
   }
@@ -4412,7 +4412,7 @@
    "required_exposures": 8,
    "required_wire_no": 14,
    "required_duplex_no": 11,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 95.6396798387305
   }
@@ -4459,9 +4459,9 @@
    "required_exposures": 6,
    "required_wire_no": 13,
    "required_duplex_no": 9,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
-   "calc_time_raw": 23.462298027220978
+   "calc_time_raw": 70.1251867238643
   }
  },
  {
@@ -4506,9 +4506,9 @@
    "required_exposures": 8,
    "required_wire_no": 14,
    "required_duplex_no": 11,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
-   "calc_time_raw": 68.95042685550654
+   "calc_time_raw": 206.0821813925808
   }
  },
  {
@@ -4553,7 +4553,7 @@
    "required_exposures": 6,
    "required_wire_no": 13,
    "required_duplex_no": 9,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 27.18416931941418
   }
@@ -4600,7 +4600,7 @@
    "required_exposures": 8,
    "required_wire_no": 14,
    "required_duplex_no": 11,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 79.88817106113555
   }
@@ -4647,7 +4647,7 @@
    "required_exposures": 6,
    "required_wire_no": 13,
    "required_duplex_no": 9,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 4.394510470281083
   }
@@ -4694,7 +4694,7 @@
    "required_exposures": 8,
    "required_wire_no": 14,
    "required_duplex_no": 11,
-   "required_snr": 100,
+   "required_snr": 100.0,
    "required_density": null,
    "calc_time_raw": 8.968388714859353
   }
@@ -4741,7 +4741,7 @@
    "required_exposures": 6,
    "required_wire_no": 18,
    "required_duplex_no": 13,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 3.0507411666756767
   }
@@ -4788,7 +4788,7 @@
    "required_exposures": 7,
    "required_wire_no": 16,
    "required_duplex_no": 10,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 5.558812834925025
   }
@@ -4835,7 +4835,7 @@
    "required_exposures": 7,
    "required_wire_no": 15,
    "required_duplex_no": 10,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 10.128817374368952
   }
@@ -4882,7 +4882,7 @@
    "required_exposures": 7,
    "required_wire_no": 14,
    "required_duplex_no": 9,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 13.672473343120775
   }
@@ -4929,7 +4929,7 @@
    "required_exposures": 6,
    "required_wire_no": 18,
    "required_duplex_no": 13,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 2.577944919562299
   }
@@ -4976,7 +4976,7 @@
    "required_exposures": 6,
    "required_wire_no": 18,
    "required_duplex_no": 13,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 2.730521287359586
   }
@@ -5023,7 +5023,7 @@
    "required_exposures": 9,
    "required_wire_no": 12,
    "required_duplex_no": 8,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 13.660282554241157
   }
@@ -5070,7 +5070,7 @@
    "required_exposures": 9,
    "required_wire_no": 11,
    "required_duplex_no": 8,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 15.325108147330509
   }
@@ -5117,7 +5117,7 @@
    "required_exposures": 7,
    "required_wire_no": 13,
    "required_duplex_no": 9,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 4.371064386961202
   }
@@ -5164,7 +5164,7 @@
    "required_exposures": 8,
    "required_wire_no": 13,
    "required_duplex_no": 9,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 4.618207054186152
   }
@@ -5211,7 +5211,7 @@
    "required_exposures": 36,
    "required_wire_no": 9,
    "required_duplex_no": 7,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 24.04691096888697
   }
@@ -5258,7 +5258,7 @@
    "required_exposures": 36,
    "required_wire_no": 8,
    "required_duplex_no": 7,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 25.406538096114726
   }
@@ -5305,7 +5305,7 @@
    "required_exposures": 11,
    "required_wire_no": 11,
    "required_duplex_no": 8,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 5.723246083876575
   }
@@ -5352,7 +5352,7 @@
    "required_exposures": 12,
    "required_wire_no": 11,
    "required_duplex_no": 8,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 5.927106442772843
   }
@@ -5399,7 +5399,7 @@
    "required_exposures": 33,
    "required_wire_no": 6,
    "required_duplex_no": 6,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 97.46917182609296
   }
@@ -5446,7 +5446,7 @@
    "required_exposures": 33,
    "required_wire_no": 6,
    "required_duplex_no": 6,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 100.94099534347883
   }
@@ -5493,7 +5493,7 @@
    "required_exposures": 36,
    "required_wire_no": 9,
    "required_duplex_no": 7,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 8.779116118323879
   }
@@ -5540,7 +5540,7 @@
    "required_exposures": 36,
    "required_wire_no": 9,
    "required_duplex_no": 7,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 8.974396885100827
   }
@@ -5587,7 +5587,7 @@
    "required_exposures": 31,
    "required_wire_no": 5,
    "required_duplex_no": 5,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 303.194869570883
   }
@@ -5634,7 +5634,7 @@
    "required_exposures": 31,
    "required_wire_no": 5,
    "required_duplex_no": 5,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 309.9390709021604
   }
@@ -5681,7 +5681,7 @@
    "required_exposures": 7,
    "required_wire_no": 15,
    "required_duplex_no": 10,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 27.062656632515814
   }
@@ -5728,7 +5728,7 @@
    "required_exposures": 36,
    "required_wire_no": 8,
    "required_duplex_no": 7,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 238.21051357760248
   }
@@ -5775,7 +5775,7 @@
    "required_exposures": 32,
    "required_wire_no": 6,
    "required_duplex_no": 6,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 7511.232107505817
   }
@@ -5822,9 +5822,9 @@
    "required_exposures": 30,
    "required_wire_no": 4,
    "required_duplex_no": 4,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
-   "calc_time_raw": 864000.0
+   "calc_time_raw": 86400.0
   }
  },
  {
@@ -5869,7 +5869,7 @@
    "required_exposures": 2,
    "required_wire_no": 14,
    "required_duplex_no": 11,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 82.31428635920975
   }
@@ -5916,7 +5916,7 @@
    "required_exposures": 3,
    "required_wire_no": 14,
    "required_duplex_no": 10,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 94.52159070098563
   }
@@ -5963,7 +5963,7 @@
    "required_exposures": 2,
    "required_wire_no": 13,
    "required_duplex_no": 10,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 124.40031114033086
   }
@@ -6010,7 +6010,7 @@
    "required_exposures": 3,
    "required_wire_no": 13,
    "required_duplex_no": 10,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 133.21392323435873
   }
@@ -6057,7 +6057,7 @@
    "required_exposures": 3,
    "required_wire_no": 14,
    "required_duplex_no": 11,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 65.78768622823681
   }
@@ -6104,7 +6104,7 @@
    "required_exposures": 3,
    "required_wire_no": 13,
    "required_duplex_no": 10,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 150.81662297523252
   }
@@ -6151,7 +6151,7 @@
    "required_exposures": 9,
    "required_wire_no": 17,
    "required_duplex_no": 13,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 98.54262095808488
   }
@@ -6198,7 +6198,7 @@
    "required_exposures": 9,
    "required_wire_no": 17,
    "required_duplex_no": 13,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 101.61886069445305
   }
@@ -6245,7 +6245,7 @@
    "required_exposures": 9,
    "required_wire_no": 16,
    "required_duplex_no": 12,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 111.37124326003305
   }
@@ -6292,7 +6292,7 @@
    "required_exposures": 9,
    "required_wire_no": 15,
    "required_duplex_no": 12,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 114.84795862110475
   }
@@ -6339,7 +6339,7 @@
    "required_exposures": 8,
    "required_wire_no": 14,
    "required_duplex_no": 11,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 130.17623089160537
   }
@@ -6386,7 +6386,7 @@
    "required_exposures": 8,
    "required_wire_no": 14,
    "required_duplex_no": 11,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 140.7787001128088
   }
@@ -6433,7 +6433,7 @@
    "required_exposures": 7,
    "required_wire_no": 13,
    "required_duplex_no": 10,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 214.94271240073638
   }
@@ -6480,7 +6480,7 @@
    "required_exposures": 1,
    "required_wire_no": 14,
    "required_duplex_no": 11,
-   "required_snr": 120,
+   "required_snr": 120.0,
    "required_density": null,
    "calc_time_raw": 130.17623089160537
   }
@@ -6527,7 +6527,7 @@
    "required_exposures": 1,
    "required_wire_no": 14,
    "required_duplex_no": 9,
-   "required_snr": 70,
+   "required_snr": 70.0,
    "required_density": null,
    "calc_time_raw": 39.080208141903704
   }

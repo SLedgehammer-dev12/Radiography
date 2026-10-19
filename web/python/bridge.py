@@ -266,6 +266,7 @@ def handle(request_json):
         for key, filename in (
             ("sketch_png_base64", "/tmp/sketch_dynamic.png"),
             ("standard_png_base64", "/tmp/sketch_standard.png"),
+            ("threed_png_base64", "/tmp/sketch_threed.png"),
         ):
             encoded = payload.get(key)
             if not encoded:
@@ -291,6 +292,7 @@ def handle(request_json):
             _trans,
             dynamic_img_path=image_paths[0],
             standard_img_path=image_paths[1],
+            threed_img_path=image_paths[2],
             lvl3=payload.get("lvl3"),
         )
         for filename in image_paths:

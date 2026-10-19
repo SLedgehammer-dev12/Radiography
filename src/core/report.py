@@ -197,7 +197,7 @@ class PDFReportGenerator:
         except Exception:
             return None
 
-    def generate_report(self, filepath, inputs, outputs, warnings_list, defect_eval, lvl3_active, sfd_comp_val, lang_obj, dynamic_img_path=None, standard_img_path=None, lvl3=None):
+    def generate_report(self, filepath, inputs, outputs, warnings_list, defect_eval, lvl3_active, sfd_comp_val, lang_obj, dynamic_img_path=None, standard_img_path=None, threed_img_path=None, lvl3=None):
         """
         Generates the PDF report. Never raises: returns True on success and
         False on any build/formatting error (the caller shows an error dialog).
@@ -211,13 +211,14 @@ class PDFReportGenerator:
                 lvl3_active, sfd_comp_val, lang_obj,
                 dynamic_img_path=dynamic_img_path,
                 standard_img_path=standard_img_path,
+                threed_img_path=threed_img_path,
                 lvl3=lvl3,
             )
         except Exception:
             logger.exception("PDF report generation failed")
             return False
 
-    def _generate_report_impl(self, filepath, inputs, outputs, warnings_list, defect_eval, lvl3_active, sfd_comp_val, lang_obj, dynamic_img_path=None, standard_img_path=None, lvl3=None):
+    def _generate_report_impl(self, filepath, inputs, outputs, warnings_list, defect_eval, lvl3_active, sfd_comp_val, lang_obj, dynamic_img_path=None, standard_img_path=None, threed_img_path=None, lvl3=None):
         """
         Generates a professional PDF report of the RT calculation and defect evaluation.
         """
@@ -747,6 +748,23 @@ class PDFReportGenerator:
                 ('BOTTOMPADDING', (0,0), (-1,-1), 4),
             ]))
             story.append(img_table)
+            story.append(Spacer(1, 15))
+
+        # Section 6b: 3D Shooting Geometry Visualization (if image provided)
+        threed_img_path = threed_img_path if _valid_image(threed_img_path) else None
+        if threed_img_path:
+            story.append(Paragraph("3D Çekim Geometrisi Görselleştirmesi / 3D Shooting Geometry Visualization", section_style))
+            try:
+                threed_img = Image(threed_img_path, width=440, height=320)
+                threed_table = Table([[threed_img]], colWidths=[500])
+                threed_table.setStyle(TableStyle([
+                    ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                    ('TOPPADDING', (0,0), (-1,-1), 4),
+                    ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+                ]))
+                story.append(threed_table)
+            except Exception:
+                story.append(Paragraph("3D visualization unavailable / 3D görselleştirme kullanılamadı", value_style))
             story.append(Spacer(1, 15))
 
         # Section 7: Standards & References Appendix

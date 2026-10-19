@@ -260,6 +260,175 @@ class ExposureChartDatabase:
 
     TYPE_X_KV_VALUES = [80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 350]
 
+    # -----------------------------------------------------------------------
+    # Zhong Yi XXG 200 X-ray device data
+    # Source: NDT Akademi notes — Zhong yi XXG 200, d: 1.5x1.5 mm, FFDe: 600 mm
+    # Formula: B = B_type_x(kV, t) × Cws × (Dy / base_density) × (Cfy / Cfe) × (ffd/ffd_ref)^2
+    # -----------------------------------------------------------------------
+    ZHONG_YI_XXG_200_KV_VALUES = [100, 150, 200]
+
+    # Cws malzeme katsayısı (X-ray tablosundan, kV bazında)
+    ZHONG_YI_XXG_200_MATERIAL_FACTORS = {
+        "magnesium": {100: 0.05, 150: 0.05, 200: 0.08},
+        "aluminum": {100: 0.08, 150: 0.12, 200: 0.18},
+        "steel": {100: 1.0, 150: 1.0, 200: 1.0},
+        "copper": {100: 1.6, 150: 1.6, 200: 1.5},
+        "zinc": {150: 1.4, 200: 1.3},
+        "brass": {150: 1.4, 200: 1.3},
+        "lead": {150: 14.0, 200: 13.0},
+    }
+
+    # Film poz faktörü (GÖrecek poz faktörü, cGy); C4 referans = 1.8
+    ZHONG_YI_XXG_200_FILM_FACTORS = {
+        "C1": 8.0,
+        "C2": 2.1,
+        "C3": 2.45,
+        "C4": 1.8,
+        "C5": 1.0,
+        "C6": None,
+    }
+
+    # -----------------------------------------------------------------------
+    # IS 2595 (2008): Industrial radiographic testing - Code of practice
+    # Table 4 — Approximate Radiographic Equivalence Factors for Various Metals.
+    # Values are relative multipliers for exposure time at the given kV.
+    # Reference basis: aluminium = 1.0 at 50/100 kV; steel = 1.0 at >=150 kV.
+    # Source: IS 2595:2008 Clause 8.4.4, Table 4 (public standard).
+    # -----------------------------------------------------------------------
+    IS_2595_EQUIVALENCE_FACTORS = {
+        "magnesium": {50: 0.05, 100: 0.08, 150: 0.45, 220: 1.0, 400: 1.0},
+        "aluminum": {50: 0.12, 100: 0.18, 150: 0.35, 220: 1.0, 400: 1.0},
+        "steel": {50: 1.0, 100: 1.0, 150: 1.0, 220: 1.0, 400: 1.0},
+        "copper": {50: 1.6, 100: 1.4, 150: 1.4, 220: 1.4, 400: 1.4},
+        "zinc": {50: 1.4, 100: 1.3, 150: 1.3, 220: 1.3, 400: 12.0},
+        "brass": {50: 1.4, 100: 1.3, 150: 1.3, 220: 1.3, 400: 12.0},
+        "lead": {50: 14.0, 100: 12.0},
+    }
+
+    # -----------------------------------------------------------------------
+    # Digitized X-ray exposure charts (anchor points read from catalog/photos).
+    # Each curve is [(thickness_mm, exposure), ...]; exposure is log-linearly
+    # interpolated between anchors. Values are APPROXIMATE — verify against the
+    # original equipment catalog before production use.
+    # -----------------------------------------------------------------------
+    XRAY_CHARTS = {
+        "errosco_200kv_d7": {
+            "label": "Errosco 200 kV - Steel/Structurix D7/8 mA/SFD 300 mm",
+            "material": "steel",
+            "film": "Structurix D7",
+            "density": 2.0,
+            "ffd_mm": 300.0,
+            "current_ma": 8.0,
+            "unit": "mA*s",
+            "note": "Digitized from Errosco 200 kV chart photo; approximate.",
+            "curves": {
+                100: [(1.0, 2000.0), (7.0, 10000.0)],
+                120: [(2.0, 2000.0), (12.0, 10000.0)],
+                140: [(5.0, 2000.0), (18.0, 10000.0)],
+                160: [(9.0, 2000.0), (24.0, 10000.0)],
+                180: [(13.0, 2000.0), (33.0, 10000.0)],
+            },
+        },
+        "type_x_steel_350kv": {
+            "label": "Type X 350 kV - Steel/FFD 700 mm/density 2.0",
+            "material": "steel",
+            "film": "Type X",
+            "density": 2.0,
+            "ffd_mm": 700.0,
+            "current_ma": None,
+            "unit": "mA*min",
+            "note": "Same steel chart the Type X engine already uses.",
+            "use_type_x": True,
+        },
+        "structurix_d7_70cm": {
+            "label": "Structurix D7 - Steel/FFD 700 mm/density 2/0.02 mm Pb",
+            "material": "steel",
+            "film": "Structurix D7",
+            "density": 2.0,
+            "ffd_mm": 700.0,
+            "current_ma": None,
+            "unit": "mA*min",
+            "note": "Digitized from Fig. 7-9 chart photo; approximate.",
+            "curves": {
+                100: [(0.0, 1.0), (6.0, 90.0)],
+                120: [(1.0, 1.0), (11.0, 90.0)],
+                140: [(3.0, 1.0), (17.0, 90.0)],
+                160: [(5.0, 1.0), (21.0, 90.0)],
+                180: [(7.0, 1.0), (27.0, 90.0)],
+                200: [(9.0, 1.0), (33.0, 90.0)],
+                220: [(11.0, 1.0), (40.0, 60.0)],
+                240: [(14.0, 1.0), (40.0, 30.0)],
+                260: [(17.0, 1.0), (40.0, 12.0)],
+            },
+        },
+        "aluminum_chart": {
+            "label": "Aluminum X-ray chart - mA*min vs thickness (inches -> mm)",
+            "material": "aluminum",
+            "film": "Type X",
+            "density": 2.0,
+            "ffd_mm": 700.0,
+            "current_ma": None,
+            "unit": "mA*min",
+            "note": "Digitized from aluminum exposure chart photo; approximate. "
+                    "Reference film/density/FFD assumed Type X-like (C5, D=2.0, 700 mm).",
+            "curves": {
+                60: [(0.0, 2.0), (12.7, 120.0), (25.4, 1500.0)],
+                70: [(0.0, 1.5), (12.7, 60.0), (25.4, 900.0)],
+                80: [(0.0, 1.5), (12.7, 30.0), (25.4, 250.0), (38.1, 900.0)],
+                90: [(0.0, 1.5), (12.7, 18.0), (25.4, 90.0), (50.8, 900.0)],
+                100: [(0.0, 1.2), (12.7, 9.0), (25.4, 23.0), (38.1, 59.0), (50.8, 150.0), (63.5, 420.0)],
+                120: [(0.0, 1.5), (12.7, 10.0), (25.4, 25.0), (50.8, 90.0), (76.2, 300.0)],
+                140: [(0.0, 1.2), (12.7, 5.0), (25.4, 10.0), (50.8, 35.0), (76.2, 100.0)],
+                160: [(0.0, 1.2), (12.7, 3.5), (25.4, 6.0), (50.8, 20.0), (76.2, 55.0)],
+                180: [(0.0, 1.2), (12.7, 3.0), (25.4, 4.5), (50.8, 14.0), (76.2, 40.0)],
+                200: [(0.0, 1.2), (12.7, 2.2), (25.4, 4.5), (38.1, 9.5), (50.8, 19.0), (63.5, 38.0), (76.2, 78.0)],
+                220: [(0.0, 1.2), (12.7, 1.8), (25.4, 2.5), (50.8, 8.0), (76.2, 17.0)],
+                250: [(0.0, 1.1), (12.7, 1.5), (25.4, 1.8), (50.8, 5.0), (76.2, 10.0)],
+                300: [(0.0, 1.0), (12.7, 1.4), (25.4, 2.1), (38.1, 3.2), (50.8, 4.8), (63.5, 7.0), (76.2, 10.0)],
+            },
+        },
+    }
+
+    def get_xray_chart_exposure(self, chart_id, kv, thickness_mm):
+        """Exposure for a digitized chart at (kV, thickness) with log-linear
+        interpolation along thickness. Returns None for unknown chart/input."""
+        chart = self.XRAY_CHARTS.get(chart_id)
+        if not chart:
+            return None
+        try:
+            kv_f = float(kv)
+            t_f = float(thickness_mm)
+        except (TypeError, ValueError):
+            return None
+        if chart.get("use_type_x"):
+            return self.get_type_x_exposure(kv_f, t_f, interpolate=True)
+        curves = chart.get("curves") or {}
+        if not curves:
+            return None
+        kv_eff = min(curves.keys(), key=lambda k: abs(k - kv_f))
+        pts = sorted(curves[kv_eff])
+        if t_f <= pts[0][0]:
+            if len(pts) >= 2 and pts[0][1] > 0 and pts[1][1] > 0 and pts[1][0] != pts[0][0]:
+                slope = math.log(pts[1][1] / pts[0][1]) / (pts[1][0] - pts[0][0])
+                expo = max(-20.0, min(20.0, slope * (t_f - pts[0][0])))
+                return pts[0][1] * math.exp(expo)
+            return pts[0][1]
+        if t_f >= pts[-1][0]:
+            if len(pts) >= 2 and pts[-1][1] > 0 and pts[-2][1] > 0 and pts[-1][0] != pts[-2][0]:
+                slope = math.log(pts[-1][1] / pts[-2][1]) / (pts[-1][0] - pts[-2][0])
+                expo = max(-20.0, min(20.0, slope * (t_f - pts[-1][0])))
+                return pts[-1][1] * math.exp(expo)
+            return pts[-1][1]
+        for (t1, e1), (t2, e2) in zip(pts, pts[1:]):
+            if t1 <= t_f <= t2:
+                if t2 == t1:
+                    return e1
+                frac = (t_f - t1) / (t2 - t1)
+                if e1 > 0 and e2 > 0:
+                    return math.exp(math.log(e1) + frac * (math.log(e2) - math.log(e1)))
+                return e1 + frac * (e2 - e1)
+        return None
+
     # ISO 16371-1 / EN 14784-1 CR Phosphor Imaging Plate R-Factor table
     # (Reference detector dose in Roentgen for normalized SNR_N = 70 at native SR_b)
     CR_IPS_TABLE = {

@@ -339,12 +339,265 @@ class TestRTCalculator(unittest.TestCase):
         self.assertAlmostEqual(t_b / t_a, 3.45, places=2)
 
     def test_exposure_time_overflow(self):
-        # Massive thickness (10000mm) should be capped at 864000 seconds (10 days)
+        # Massive thickness (10000mm) should be capped at 86400 seconds (1 day)
         min_calc, sec_calc, raw_time = self.calc.calculate_exposure_time(
             600.0, 10000.0, "x_ray", 5.0, 3.0, "digital",
             testing_class="class_a", detector_type="cr_standard"
         )
-        self.assertEqual(raw_time, 864000.0)
+        self.assertEqual(raw_time, 86400.0)
+
+    def test_exposure_time_details_model_provenance(self):
+        # Physics model path must return a structured provenance dict.
+        res = self.calc.calculate_exposure_time_details(
+            sfd=600.0, w_eff=10.0, source="x_ray", output_val=5.0, base_factor=3.0,
+            tech="analog", testing_class="class_a", film_class="C5",
+        )
+        prov = res["provenance"]
+        self.assertEqual(prov["method"], "model")
+        self.assertGreater(prov["mu_eff"], 0.0)
+        self.assertGreater(prov["attenuation"], 1.0)
+        self.assertGreater(prov["t_base_min"], 0.0)
+        self.assertGreater(res["time_seconds"], 0.0)
+
+    def test_exposure_time_details_rfactor_provenance(self):
+        # Analog film R-Factor path must expose film key, raw/effective R, HVL/gamma.
+        res = self.calc.calculate_exposure_time_details(
+            sfd=600.0, w_eff=10.0, source="isotope_ir192", output_val=40.0, base_factor=3.0,
+            tech="analog", testing_class="class_a", film_class="C5",
+            chart_source="AA400",
+        )
+        prov = res["provenance"]
+        self.assertEqual(prov["method"], "rfactor")
+        self.assertEqual(prov["film_key"], "AA400")
+        self.assertGreater(prov["r_factor_raw"], 0.0)
+        self.assertGreater(prov["hvl"], 0.0)
+        self.assertGreater(prov["gamma"], 0.0)
+
+    def test_exposure_time_details_type_x_provenance(self):
+        # X-ray Type X chart path must expose kV, chart value and SFD correction.
+        res = self.calc.calculate_exposure_time_details(
+            sfd=600.0, w_eff=10.0, source="x_ray", output_val=5.0, base_factor=3.0,
+            tech="digital", testing_class="class_a", detector_type="cr_standard",
+            chart_source="type_x", kv=120.0,
+        )
+        prov = res["provenance"]
+        self.assertIn(prov["method"], ("type_x", "digital_xray_chart"))
+        self.assertEqual(prov["kv"], 120.0)
+        self.assertGreater(prov["exposure_mamin_chart"], 0.0)
+        self.assertGreater(prov["sfd_correction"], 0.0)
+
+    def test_exposure_time_details_kvp_law_provenance(self):
+        # X-ray kVpⁿ power-law method returns structured provenance with exponent.
+        res = self.calc.calculate_exposure_time_details(
+            sfd=600.0, w_eff=10.0, source="x_ray", output_val=5.0, base_factor=3.0,
+            tech="analog", testing_class="class_a", film_class="C5",
+            chart_source="kvp_law", kv=150.0,
+        )
+        prov = res["provenance"]
+        self.assertEqual(prov["method"], "kvp_law")
+        self.assertEqual(prov["kv"], 150.0)
+        self.assertEqual(prov["kvp_exponent"], 4)   # 150-250 kV band
+        self.assertGreater(prov["kvp_k_factor"], 0.0)
+        self.assertGreater(prov["attenuation"], 1.0)
+        self.assertGreater(prov["mu_eff"], 0.0)
+        self.assertGreater(res["time_seconds"], 0.0)
+
+    def test_exposure_time_details_kvp_law_exponent_bands(self):
+        # kVp exponent steps up with voltage band.
+        self.assertEqual(self.calc._kvp_exponent(80.0), 2)
+        self.assertEqual(self.calc._kvp_exponent(100.0), 3)
+        self.assertEqual(self.calc._kvp_exponent(150.0), 4)
+        self.assertEqual(self.calc._kvp_exponent(300.0), 5)
+
+    def test_exposure_time_details_kvp_law_non_xray_falls_back(self):
+        # kVp law is X-ray only; isotope source falls back to physics model.
+        res = self.calc.calculate_exposure_time_details(
+            sfd=600.0, w_eff=10.0, source="isotope_ir192", output_val=40.0, base_factor=3.0,
+            tech="analog", testing_class="class_a", film_class="C5",
+            chart_source="kvp_law",
+        )
+        prov = res["provenance"]
+        self.assertEqual(prov["method"], "model")
+        self.assertEqual(prov["fallback_reason"], "kvp_law_requires_xray")
+
+    def test_exposure_time_details_dda_frame_provenance(self):
+        # DDA panel chart path must expose DDA frame integration (N × t_frame).
+        res = self.calc.calculate_exposure_time_details(
+            sfd=600.0, w_eff=10.0, source="isotope_ir192", output_val=40.0, base_factor=3.0,
+            tech="digital", testing_class="class_b", detector_type="dda_si",
+            chart_source="dda_panel_chart",
+        )
+        prov = res["provenance"]
+        self.assertEqual(prov["method"], "dda_panel_chart")
+        self.assertIsNotNone(prov.get("dda_frame"))
+        frame = prov["dda_frame"]
+        self.assertGreaterEqual(frame["n_frames"], 32)  # Class B floor
+        self.assertGreater(frame["t_frame_sec"], 0.0)
+        self.assertGreater(frame["total_acq_sec"], 0.0)
+
+    def test_zhong_yi_xxg_200_basic(self):
+        # Zhong Yi XXG 200: steel, 150 kV, 10 mm, C4 film, density 1.5, FFD 600
+        res = self.calc.calculate_zhong_yi_xxg_200_exposure(
+            kV=150, thickness_mm=10.0, material="steel", density=1.5,
+            film_class="C4", ffd=600.0, ffd_ref=600.0, base_density=1.5,
+        )
+        self.assertIsNotNone(res)
+        self.assertGreater(res, 0.0)
+
+    def test_zhong_yi_xxg_200_material_factor(self):
+        # Copper should need more exposure than steel (Cws > 1)
+        res_steel = self.calc.calculate_zhong_yi_xxg_200_exposure(
+            kV=150, thickness_mm=10.0, material="steel", density=1.5,
+            film_class="C4", ffd=600.0,
+        )
+        res_cu = self.calc.calculate_zhong_yi_xxg_200_exposure(
+            kV=150, thickness_mm=10.0, material="copper", density=1.5,
+            film_class="C4", ffd=600.0,
+        )
+        self.assertIsNotNone(res_steel)
+        self.assertIsNotNone(res_cu)
+        self.assertGreater(res_cu, res_steel)
+
+    def test_zhong_yi_xxg_200_film_factor(self):
+        # C5 film (factor 1.0) needs less exposure than C4 (factor 1.8)
+        res_c5 = self.calc.calculate_zhong_yi_xxg_200_exposure(
+            kV=150, thickness_mm=10.0, material="steel", density=1.5,
+            film_class="C5", ffd=600.0,
+        )
+        res_c4 = self.calc.calculate_zhong_yi_xxg_200_exposure(
+            kV=150, thickness_mm=10.0, material="steel", density=1.5,
+            film_class="C4", ffd=600.0,
+        )
+        self.assertIsNotNone(res_c5)
+        self.assertIsNotNone(res_c4)
+        self.assertLess(res_c5, res_c4)
+
+    def test_zhong_yi_xxg_200_density_factor(self):
+        # Higher density needs more exposure
+        res_d2 = self.calc.calculate_zhong_yi_xxg_200_exposure(
+            kV=150, thickness_mm=10.0, material="steel", density=2.0,
+            film_class="C4", ffd=600.0, base_density=1.5,
+        )
+        res_d1_5 = self.calc.calculate_zhong_yi_xxg_200_exposure(
+            kV=150, thickness_mm=10.0, material="steel", density=1.5,
+            film_class="C4", ffd=600.0, base_density=1.5,
+        )
+        self.assertIsNotNone(res_d2)
+        self.assertIsNotNone(res_d1_5)
+        self.assertGreater(res_d2, res_d1_5)
+
+    def test_zhong_yi_xxg_200_distance_correction(self):
+        # Larger FFD needs more exposure (inverse square)
+        res_600 = self.calc.calculate_zhong_yi_xxg_200_exposure(
+            kV=150, thickness_mm=10.0, material="steel", density=1.5,
+            film_class="C4", ffd=600.0, ffd_ref=600.0,
+        )
+        res_800 = self.calc.calculate_zhong_yi_xxg_200_exposure(
+            kV=150, thickness_mm=10.0, material="steel", density=1.5,
+            film_class="C4", ffd=800.0, ffd_ref=600.0,
+        )
+        self.assertIsNotNone(res_600)
+        self.assertIsNotNone(res_800)
+        self.assertGreater(res_800, res_600)
+
+    def test_zhong_yi_xxg_200_invalid_kv_returns_none(self):
+        # kV outside device range should fall back to nearest and still work
+        res = self.calc.calculate_zhong_yi_xxg_200_exposure(
+            kV=50, thickness_mm=10.0, material="steel", density=1.5,
+            film_class="C4", ffd=600.0,
+        )
+        # 50 kV is below 100, nearest is 100; chart may not have data -> None acceptable
+        self.assertTrue(res is None or res > 0.0)
+
+    def test_is_2595_equivalence_factors_present(self):
+        from src.core.exposure_charts import ExposureChartDatabase
+        factors = ExposureChartDatabase.IS_2595_EQUIVALENCE_FACTORS
+        self.assertIn("steel", factors)
+        self.assertIn("copper", factors)
+        self.assertIn("aluminum", factors)
+        # Steel is reference (1.0) at all listed kV
+        for kv, val in factors["steel"].items():
+            self.assertEqual(val, 1.0)
+        # Copper needs more exposure than steel
+        self.assertGreater(factors["copper"][150], factors["steel"][150])
+        # Aluminum needs less exposure than steel
+        self.assertLess(factors["aluminum"][150], factors["steel"][150])
+
+    def test_calculate_xray_exposure_with_factors_is_2595(self):
+        # Generic method with IS 2595 factors for copper at 150 kV
+        from src.core.exposure_charts import ExposureChartDatabase
+        res_cu = self.calc.calculate_xray_exposure_with_factors(
+            kV=150, thickness_mm=10.0, material="copper", density=1.5,
+            film_class="C4", ffd=600.0, ffd_ref=600.0, base_density=1.5,
+            kv_values=ExposureChartDatabase.ZHONG_YI_XXG_200_KV_VALUES,
+            material_factors=ExposureChartDatabase.IS_2595_EQUIVALENCE_FACTORS,
+            film_factors=ExposureChartDatabase.ZHONG_YI_XXG_200_FILM_FACTORS,
+            reference_film_class="C4",
+        )
+        res_st = self.calc.calculate_xray_exposure_with_factors(
+            kV=150, thickness_mm=10.0, material="steel", density=1.5,
+            film_class="C4", ffd=600.0, ffd_ref=600.0, base_density=1.5,
+            kv_values=ExposureChartDatabase.ZHONG_YI_XXG_200_KV_VALUES,
+            material_factors=ExposureChartDatabase.IS_2595_EQUIVALENCE_FACTORS,
+            film_factors=ExposureChartDatabase.ZHONG_YI_XXG_200_FILM_FACTORS,
+            reference_film_class="C4",
+        )
+        self.assertIsNotNone(res_cu)
+        self.assertIsNotNone(res_st)
+        # IS 2595: copper Cws=1.4 vs steel Cws=1.0 at 150 kV -> copper needs more
+        self.assertGreater(res_cu, res_st)
+
+    def test_zhong_yi_still_works_after_refactor(self):
+        # Regression: Zhong Yi wrapper still returns a valid result
+        res = self.calc.calculate_zhong_yi_xxg_200_exposure(
+            kV=150, thickness_mm=10.0, material="steel", density=1.5,
+            film_class="C4", ffd=600.0,
+        )
+        self.assertIsNotNone(res)
+        self.assertGreater(res, 0.0)
+
+    def test_aluminum_chart_lookup_monotonic(self):
+        # Aluminum direct chart: exposure rises with thickness, falls with kV.
+        from src.core.exposure_charts import ExposureChartDatabase
+        db = ExposureChartDatabase()
+        e_low = db.get_xray_chart_exposure("aluminum_chart", 100, 25.4)
+        e_high = db.get_xray_chart_exposure("aluminum_chart", 200, 25.4)
+        self.assertIsNotNone(e_low)
+        self.assertIsNotNone(e_high)
+        self.assertGreater(e_low, e_high)
+
+        e_thin = db.get_xray_chart_exposure("aluminum_chart", 100, 25.4)
+        e_thick = db.get_xray_chart_exposure("aluminum_chart", 100, 50.8)
+        self.assertGreater(e_thick, e_thin)
+
+    def test_aluminum_engine_uses_direct_chart(self):
+        # When material=aluminum, the engine must use the direct aluminum chart
+        # rather than steel_chart × IS-2595 factor.
+        res = self.calc.calculate_exposure_time_details(
+            sfd=700.0, w_eff=25.4, source="x_ray", output_val=5.0, base_factor=3.0,
+            tech="analog", testing_class="class_a", film_class="C5",
+            kv=150.0, material="aluminum", chart_source="model",
+        )
+        prov = res["provenance"]
+        self.assertEqual(prov["method"], "aluminum_chart")
+        self.assertGreater(prov["exposure_mamin_chart"], 0.0)
+        self.assertGreater(res["time_seconds"], 0.0)
+
+    def test_aluminum_engine_digital_uses_direct_chart(self):
+        res = self.calc.calculate_exposure_time_details(
+            sfd=700.0, w_eff=25.4, source="x_ray", output_val=5.0, base_factor=3.0,
+            tech="digital", testing_class="class_a", detector_type="cr_standard",
+            kv=200.0, material="aluminum", chart_source="model",
+        )
+        self.assertEqual(res["provenance"]["method"], "aluminum_chart")
+
+    def test_steel_does_not_use_aluminum_chart(self):
+        res = self.calc.calculate_exposure_time_details(
+            sfd=700.0, w_eff=25.4, source="x_ray", output_val=5.0, base_factor=3.0,
+            tech="analog", testing_class="class_a", film_class="C5",
+            kv=150.0, material="steel", chart_source="model",
+        )
+        self.assertNotEqual(res["provenance"]["method"], "aluminum_chart")
 
     def test_get_mu_from_kv(self):
         # Steel at 80 kV (boundary): 0.090

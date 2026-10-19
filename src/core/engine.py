@@ -1912,7 +1912,7 @@ class CalculationEngine:
                 testing_class=testing_class,
             )
             if chart_source == "dda_frame_method":
-                raw_time = min(864000.0, exposure_time_prov["dda_frame"]["total_acq_sec"])
+                raw_time = min(86400.0, exposure_time_prov["dda_frame"]["total_acq_sec"])
             else:
                 min_acq_floor = max(
                     2.0 if source == "x_ray" else 0.0,

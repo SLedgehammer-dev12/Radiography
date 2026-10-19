@@ -2102,6 +2102,73 @@ class RTCalculator:
         active_method = "model"
         fallback_reason = None
 
+        # ── Aluminum direct chart (bypasses the steel × REF approximation) ────
+        # When aluminum is selected for X-ray, use the digitized aluminum
+        # exposure chart directly instead of steel_chart × IS-2595 factor.
+        if (source == "x_ray" and material == "aluminum"
+                and requested_method in ("model", "aluminum_chart")):
+            if chart_db is None and ExposureChartDatabase is not None:
+                json_path = resource_path("exposure_chart_dataset.json")
+                chart_db = (ExposureChartDatabase(json_path) if os.path.exists(json_path)
+                            else ExposureChartDatabase())
+            kv_eff = float(kv) if (kv is not None and float(kv) > 0) else 120.0
+            raw_al = (chart_db.get_xray_chart_exposure("aluminum_chart", kv_eff, w_eff)
+                      if chart_db is not None else None)
+            if raw_al is not None and raw_al > 0:
+                sfd_ref = 700.0
+                sfd_correction = (sfd / sfd_ref) ** 2
+                if tech == "analog":
+                    exposure_mamin = raw_al
+                    receptor_mod = od_factor * (16.0 / film_speed)
+                else:
+                    exposure_mamin = raw_al
+                    receptor_mod = (snr_factor * srb_factor) / det_factor
+                t_min = ((exposure_mamin * sfd_correction * receptor_mod) / output_safe) * extra_mult
+                if t_min > 0:
+                    active_method = "aluminum_chart"
+                    time_seconds = min(86400.0, t_min * 60.0)
+                    minutes = int(time_seconds // 60)
+                    seconds = int(time_seconds % 60)
+                    prov = {
+                        "method": "aluminum_chart",
+                        "requested_method": requested_method,
+                        "fallback_reason": None,
+                        "tech": tech,
+                        "source": source,
+                        "material": material,
+                        "ref_factor": ref_factor,
+                        "w_eff": w_eff,
+                        "w_eq_steel": w_eq_steel,
+                        "kv": kv_eff,
+                        "sfd": sfd,
+                        "sfd_ref": sfd_ref,
+                        "sfd_correction": sfd_correction,
+                        "output_val": output_safe,
+                        "exposure_mamin_chart": exposure_mamin,
+                        "receptor_mod": receptor_mod,
+                        "film_class": film_class if tech == "analog" else None,
+                        "film_speed": film_speed if tech == "analog" else None,
+                        "target_od": target_od if tech == "analog" else None,
+                        "od_factor": od_factor if tech == "analog" else None,
+                        "detector_type": detector_type if tech == "digital" else None,
+                        "det_factor": det_factor if tech == "digital" else None,
+                        "target_snr": snr_target_used if tech == "digital" else None,
+                        "snr_factor": snr_factor if tech == "digital" else None,
+                        "srb_factor": srb_factor if tech == "digital" else None,
+                        "srb_ref": srb_ref if tech == "digital" else None,
+                        "app_srb": app_srb if tech == "digital" else None,
+                        "dda_frame": None,
+                        "t_minutes_base": t_min,
+                        "time_seconds": time_seconds,
+                    }
+                    return {
+                        "minutes": minutes,
+                        "seconds": seconds,
+                        "time_seconds": time_seconds,
+                        "provenance": prov,
+                    }
+            fallback_reason = "aluminum_chart_unavailable"
+
         # ── Chart-based routing ───────────────────────────────────────────────
         if requested_method != "model":
             if chart_db is None:
@@ -2144,7 +2211,7 @@ class RTCalculator:
                         gamma = chart_db.GAMMA.get(source, 0.48)
                         attenuation = 2.0 ** (w_eq_steel / hvl)
                         t_min = t_min * extra_mult
-                        time_seconds = min(864000.0, t_min * 60.0)
+                        time_seconds = min(86400.0, t_min * 60.0)
                         dda_frame = (
                             self.calculate_dda_frame_integration(
                                 time_seconds, sfd, w_eff, source, output_safe,
@@ -2218,7 +2285,7 @@ class RTCalculator:
                             gamma = chart_db.GAMMA.get(source, 0.48)
                             attenuation = 2.0 ** (w_eq_steel / hvl)
                             t_min = t_min * extra_mult
-                            time_seconds = min(864000.0, t_min * 60.0)
+                            time_seconds = min(86400.0, t_min * 60.0)
                             dda_frame = (
                                 self.calculate_dda_frame_integration(
                                     time_seconds, sfd, w_eff, source, output_safe,
@@ -2295,7 +2362,7 @@ class RTCalculator:
                         t_min = ((exposure_mamin * sfd_correction * receptor_mod) / output_safe) * extra_mult
                         if t_min > 0:
                             active_method = "digital_xray_chart" if tech == "digital" else "type_x"
-                            time_seconds = min(864000.0, t_min * 60.0)
+                            time_seconds = min(86400.0, t_min * 60.0)
                             dda_frame = (
                                 self.calculate_dda_frame_integration(
                                     time_seconds, sfd, w_eff, source, output_safe,
@@ -2354,7 +2421,74 @@ class RTCalculator:
                             }
                     fallback_reason = "type_x_out_of_range"
 
-            # 3) Analog R-Factor (film / SCRATA slide rule) chart path
+            # 3) X-ray kVpⁿ power-law (analytical cross-check / out-of-chart)
+            if eff_chart == "kvp_law":
+                if source != "x_ray":
+                    fallback_reason = "kvp_law_requires_xray"
+                else:
+                    kv_eff = float(kv) if (kv is not None and float(kv) > 0) else 120.0
+                    mu_raw = self.get_mu_from_kv(kv_eff, material)
+                    mu = self._apply_beam_hardening(mu_raw, w_eff, source, kv_eff, material)
+                    exponent = min(700.0, mu * w_eff)
+                    attenuation = math.exp(exponent)
+                    sfd_m = sfd / 1000.0
+                    n = self._kvp_exponent(kv_eff)
+                    kv_ref = 120.0
+                    k_factor = (kv_eff / kv_ref) ** n
+                    t_base = (base_factor * (sfd_m ** 2) * attenuation) / output_safe
+                    if tech == "analog":
+                        t_min = (t_base * k_factor * od_factor / film_speed) * extra_mult
+                    else:
+                        t_min = (t_base * k_factor * (snr_factor * srb_factor) / det_factor) * extra_mult
+                    if t_min > 0:
+                        active_method = "kvp_law"
+                        time_seconds = min(86400.0, t_min * 60.0)
+                        minutes = int(time_seconds // 60)
+                        seconds = int(time_seconds % 60)
+                        prov = {
+                            "method": "kvp_law",
+                            "requested_method": requested_method,
+                            "fallback_reason": None,
+                            "tech": tech,
+                            "source": source,
+                            "material": material,
+                            "ref_factor": ref_factor,
+                            "w_eff": w_eff,
+                            "w_eq_steel": w_eq_steel,
+                            "kv": kv_eff,
+                            "mu_raw": mu_raw,
+                            "mu_eff": mu,
+                            "beam_hardening_pct": (1.0 - mu / mu_raw) * 100.0 if mu_raw > 0 else 0.0,
+                            "exponent": exponent,
+                            "attenuation": attenuation,
+                            "base_factor": base_factor,
+                            "sfd": sfd,
+                            "sfd_m": sfd_m,
+                            "output_val": output_safe,
+                            "t_base_min": t_base,
+                            "kvp_exponent": n,
+                            "kvp_k_factor": k_factor,
+                            "film_class": film_class if tech == "analog" else None,
+                            "film_speed": film_speed if tech == "analog" else None,
+                            "detector_type": detector_type if tech == "digital" else None,
+                            "det_factor": det_factor if tech == "digital" else None,
+                            "target_snr": snr_target_used if tech == "digital" else None,
+                            "snr_factor": snr_factor if tech == "digital" else None,
+                            "srb_factor": srb_factor if tech == "digital" else None,
+                            "srb_ref": srb_ref if tech == "digital" else None,
+                            "app_srb": app_srb if tech == "digital" else None,
+                            "t_minutes_base": t_min,
+                            "time_seconds": time_seconds,
+                        }
+                        return {
+                            "minutes": minutes,
+                            "seconds": seconds,
+                            "time_seconds": time_seconds,
+                            "provenance": prov,
+                        }
+                    fallback_reason = "kvp_law_zero_result"
+
+            # 3b) Analog R-Factor (film / SCRATA slide rule) chart path
             elif eff_chart not in ("dda_frame_method",):
                 resolved_film = self._resolve_chart_film(chart_source, film_model, film_class)
                 if resolved_film is not None:
@@ -2389,7 +2523,7 @@ class RTCalculator:
                                 effective_r = r_factor
                             attenuation = 2.0 ** (w_eq_steel / hvl)
                             density_corr = 10.0 ** ((od_for_rfactor - 2.0) / max(0.1, chart_gradient))
-                            time_seconds = min(864000.0, result * 60.0)
+                            time_seconds = min(86400.0, result * 60.0)
                             minutes = int(time_seconds // 60)
                             seconds = int(time_seconds % 60)
                             prov = {
@@ -2481,8 +2615,8 @@ class RTCalculator:
         if source == "x_ray" and kv_eff is not None and time_minutes > 0:
             self._check_kvp5(kv_eff, time_minutes, material, tech, film_class, testing_class, w_eff=w_eff)
 
-        # ── Convert to seconds and cap at 10 days
-        time_seconds = min(864000.0, time_minutes * 60.0)
+        # ── Convert to seconds and cap at 1 day
+        time_seconds = min(86400.0, time_minutes * 60.0)
 
         # ── DDA Frame Integration (ASTM E2698: N_frames × t_frame) ──────────
         dda_frame = None
@@ -2497,7 +2631,7 @@ class RTCalculator:
             if requested_method == "dda_frame_method":
                 active_method = "dda_frame_method"
                 fallback_reason = None
-                time_seconds = min(864000.0, dda_frame["total_acq_sec"])
+                time_seconds = min(86400.0, dda_frame["total_acq_sec"])
                 time_minutes = time_seconds / 60.0
             elif is_dda and dda_frame:
                 min_acq_floor = max(
@@ -2556,6 +2690,124 @@ class RTCalculator:
             "time_seconds": time_seconds,
             "provenance": prov,
         }
+
+    def calculate_zhong_yi_xxg_200_exposure(
+        self, kV, thickness_mm, material="steel", density=1.5,
+        film_class="C4", ffd=600.0, ffd_ref=600.0, base_density=1.5,
+    ):
+        """
+        Zhong Yi XXG 200 X-ray exposure (mA·min) per NDT Akademi notes.
+
+        Formula:
+            B = B_type_x(kV, t) × Cws(material, kV) × (Dy / base_density)
+                × (Cfy / Cfe) × (ffd / ffd_ref)^2
+
+        Convenience wrapper over :meth:`calculate_xray_exposure_with_factors`
+        using Zhong Yi XXG 200 preset factors.
+        """
+        return self.calculate_xray_exposure_with_factors(
+            kV=kV, thickness_mm=thickness_mm, material=material,
+            density=density, film_class=film_class, ffd=ffd, ffd_ref=ffd_ref,
+            base_density=base_density,
+            kv_values=ExposureChartDatabase.ZHONG_YI_XXG_200_KV_VALUES,
+            material_factors=ExposureChartDatabase.ZHONG_YI_XXG_200_MATERIAL_FACTORS,
+            film_factors=ExposureChartDatabase.ZHONG_YI_XXG_200_FILM_FACTORS,
+            reference_film_class="C4",
+        )
+
+    def calculate_xray_exposure_with_factors(
+        self, kV, thickness_mm, material="steel", density=1.5,
+        film_class="C4", ffd=600.0, ffd_ref=600.0, base_density=1.5,
+        kv_values=None, material_factors=None, film_factors=None,
+        reference_film_class="C4",
+    ):
+        """
+        Generic X-ray exposure (mA·min) for any X-ray device using the Type X
+        steel chart as base exposure and user-supplied device/film factors.
+
+        Formula:
+            B = B_type_x(kV, t) × Cws(material, kV) × (Dy / base_density)
+                × (Cfy / Cfe) × (ffd / ffd_ref)^2
+
+        Parameters
+        ----------
+        kv_values : list of float
+            Supported tube voltages of the device; nearest is selected.
+        material_factors : dict[str, dict[float, float]]
+            Cws factors keyed by material then kV (e.g. IS 2595 Table 4).
+        film_factors : dict[str, float|None]
+            Cfy factors keyed by ISO film class (C1..C6). ``None`` = unknown.
+        reference_film_class : str
+            Film class used as Cfe denominator (default "C4").
+        """
+        from src.core.exposure_charts import ExposureChartDatabase, resource_path
+
+        kv_keys = kv_values or ExposureChartDatabase.ZHONG_YI_XXG_200_KV_VALUES
+        kV_f = float(kV)
+        t_f = float(thickness_mm)
+        kV_eff = min(kv_keys, key=lambda k: abs(k - kV_f))
+
+        chart_db = ExposureChartDatabase()
+        if not getattr(chart_db, "TYPE_X_CHART", None):
+            json_path = resource_path("exposure_chart_dataset.json")
+            if os.path.exists(json_path):
+                chart_db = ExposureChartDatabase(json_path)
+            else:
+                chart_db = ExposureChartDatabase()
+                chart_db.generate_type_x_chart(self)
+
+        base = chart_db.get_type_x_exposure(kV_eff, t_f, interpolate=True)
+        if base is None or base <= 0:
+            return None
+
+        mf = material_factors or {}
+        cws_map = mf.get(material, {})
+        cws = cws_map.get(kV_eff)
+        if cws is None:
+            cws = cws_map.get(max(kv_keys), 1.0)
+        cws = cws or 1.0
+
+        density_factor = float(density) / float(base_density) if base_density > 0 else 1.0
+
+        ff = film_factors or {}
+        cfy = ff.get(film_class)
+        cfe = ff.get(reference_film_class, 1.8)
+        film_factor = (cfy / cfe) if (cfy and cfe) else 1.0
+
+        dist_factor = (float(ffd) / float(ffd_ref)) ** 2
+
+        result = base * cws * density_factor * film_factor * dist_factor
+        return max(0.0, result)
+
+    def calculate_xray_chart_exposure(self, chart_id, kv, thickness_mm, output_ma=None):
+        """
+        Returns the exposure from a digitized X-ray chart and, when a tube
+        current is given, the corresponding exposure time.
+
+        Returns a dict ``{"chart_id", "exposure", "unit", "time_sec"}`` or
+        ``None`` for an unknown chart/input.
+        """
+        from src.core.exposure_charts import ExposureChartDatabase
+
+        db = ExposureChartDatabase()
+        exposure = db.get_xray_chart_exposure(chart_id, kv, thickness_mm)
+        if exposure is None:
+            return None
+        chart = db.XRAY_CHARTS.get(chart_id, {})
+        unit = chart.get("unit")
+        result = {
+            "chart_id": chart_id,
+            "exposure": exposure,
+            "unit": unit,
+            "time_sec": None,
+        }
+        try:
+            ma = float(output_ma) if output_ma is not None else None
+        except (TypeError, ValueError):
+            ma = None
+        if ma and ma > 0:
+            result["time_sec"] = (exposure / ma) if unit == "mA*s" else (exposure * 60.0 / ma)
+        return result
 
     def calculate_trial_shot_correction(self, tech, t1_sec, sfd1, sfd2,
                                         measured_quality, target_quality,
@@ -2958,6 +3210,30 @@ class RTCalculator:
         else:
             limit = 0.5
         return (ug <= limit), limit
+
+    # -----------------------------------------------------------------------
+    # X-ray kVp exponent bands for the kVpⁿ power-law exposure estimate.
+    # Exposure scales approximately as kVp^n; n rises with tube voltage.
+    # Engineering rule of thumb (NDT slide-rule practice):
+    #   < 100 kV  -> n = 2
+    #   100-150 kV -> n = 3
+    #   150-250 kV -> n = 4
+    #   >= 250 kV  -> n = 5
+    # -----------------------------------------------------------------------
+    KVP_EXPONENT_BANDS = (
+        (100.0, 2.0),
+        (150.0, 3.0),
+        (250.0, 4.0),
+        (float("inf"), 5.0),
+    )
+
+    def _kvp_exponent(self, kv):
+        """Returns the kVp exponent n for the kVpⁿ exposure law at the given kV."""
+        kv_f = float(kv)
+        for limit, n in self.KVP_EXPONENT_BANDS:
+            if kv_f < limit:
+                return n
+        return 5.0
 
     # -----------------------------------------------------------------------
     # Radiographic Equivalence Factors (REF) relative to steel

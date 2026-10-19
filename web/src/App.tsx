@@ -505,6 +505,10 @@ export default function App() {
         svgToPngBase64("dynamic-sketch"),
         svgToPngBase64("standard-sketch"),
       ]);
+      const canvas3d = document.querySelector(
+        "canvas.sketch-3d-canvas",
+      ) as HTMLCanvasElement | null;
+      const threedPng = canvas3d ? canvas3d.toDataURL("image/png") : null;
       const data = await pyClient.request<{
         pdf_base64: string;
         filename: string;
@@ -521,6 +525,7 @@ export default function App() {
         report_info: reportInfo,
         sketch_png_base64: sketchPng,
         standard_png_base64: standardPng,
+        threed_png_base64: threedPng,
         filename: `RT_Inspection_Report_${stamp}.pdf`,
       });
       downloadBase64(data.pdf_base64, data.filename);
