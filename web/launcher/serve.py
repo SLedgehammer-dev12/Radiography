@@ -133,13 +133,29 @@ def free_port(preferred: int) -> int:
 
 
 def is_running(port: int, timeout: float = 0.6) -> bool:
-    """True when a Radiography Web server already listens on the port."""
+    """True when a Radiography Web server of the current version listens on port."""
     try:
         with urllib.request.urlopen(
             f"http://127.0.0.1:{port}/healthz", timeout=timeout
         ) as response:
             data = json.loads(response.read().decode("utf-8"))
-            return data.get("app") == APP_MARKER
+            if data.get("app") != APP_MARKER:
+                return False
+            running_ver = data.get("version")
+            curr_ver = app_version()
+            if running_ver and curr_ver and running_ver != curr_ver:
+                old_pid = data.get("pid")
+                if isinstance(old_pid, int) and old_pid > 0:
+                    try:
+                        import signal
+                        import time
+
+                        os.kill(old_pid, signal.SIGTERM)
+                        time.sleep(0.3)
+                    except OSError:
+                        pass
+                return False
+            return True
     except (urllib.error.URLError, ValueError, OSError):
         return False
 

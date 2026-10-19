@@ -23,10 +23,10 @@ import {
   AboutModal,
   CalculationHistoryModal,
   DecayDialog,
-  FALLBACK_VERSION,
   Lvl3Dialog,
   UpdateModal,
 } from "./components/Modals";
+import { FALLBACK_VERSION } from "./version";
 import { useCalculationHistory } from "./state/useCalculationHistory";
 import { makeTranslator } from "./i18n";
 import { downloadBase64, svgToPngBase64 } from "./lib/sketchExport";

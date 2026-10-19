@@ -5,7 +5,7 @@ import { pyClient } from "../pyodide/client";
 import type { CalculationHistoryEntry } from "../state/useCalculationHistory";
 import type { Lvl3Settings } from "../types";
 
-export const FALLBACK_VERSION = "2.0.4";
+import { FALLBACK_VERSION } from "../version";
 
 function useEscapeClose(onClose: () => void) {
   useEffect(() => {
@@ -182,7 +182,7 @@ function AboutModal({ t, onClose, currentVersion = FALLBACK_VERSION }: AboutModa
           <div className="about-title-block">
             <h2>
               <span>{t("app_title").split("(")[0]?.trim() || "Radiography"}</span>
-              <span className="about-version-badge">v{currentVersion}</span>
+              <span className="about-version-badge">v{currentVersion.replace(/^v/, "")}</span>
             </h2>
             <p className="about-owner">{t("app_owner")}</p>
             <div className="about-standards-row">
@@ -337,7 +337,7 @@ function UpdateModal({ t, onClose, currentVersion = FALLBACK_VERSION }: UpdateMo
               <span>🔄 {t("check_updates_btn")}</span>
             </h2>
             <p className="about-owner">
-              Mevcut Yüklü Sürüm: <strong>v{currentVersion}</strong>
+              Mevcut Yüklü Sürüm: <strong>v{currentVersion.replace(/^v/, "")}</strong>
             </p>
           </div>
           <button

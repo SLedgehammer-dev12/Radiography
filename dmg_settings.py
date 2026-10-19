@@ -14,7 +14,18 @@ def _app_version():
         from src.core.version import VERSION
         return str(VERSION)
     except Exception:
-        return "2.0.3"
+        pass
+    vfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src", "core", "version.py")
+    try:
+        import re
+
+        with open(vfile, "r", encoding="utf-8") as f:
+            match = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', f.read())
+            if match:
+                return match.group(1)
+    except OSError:
+        pass
+    return "0.0.0"
 
 
 APP_NAME = "Radiography"
