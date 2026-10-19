@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.0.5] - 2026-10-19
+
+### Changed
+- **Poz süresi üst sınırı 10 gün → 1 gün (86400 s)**: Tüm poz-süresi yöntemlerinde (model, type_x, digital_xray_chart, cr_ips_chart, dda_panel_chart, kvp_law, rfactor) ve DDA kare entegrasyonundaki `total_acq_sec` sınırı 864000 → 86400 saniyeye indirildi.
+
+### Added
+- **X-ray kVpⁿ güç-kanunu yöntemi (`chart_source="kvp_law"`)**: `base_factor × (kV/120)^n × (SFD/1000)² × e^(μ·w)/I` formülü; kV bantına göre n = 2 (<100), 3 (100–150), 4 (150–250), 5 (≥250). Grafiğin dışındaki kV için çapraz-kontrol/alternatif.
+- **Dijitalleştirilmiş X-ray poz çizelgeleri**: Zhong Yi XXG 200 (8 mA, SFD 300 mm, mA·sn), Type X 350 kV (FFD 700 mm, mA·dk, mevcut TYPE_X_CHART ile aynı), Structurix D7 Fig. 7-9 (FFD 700 mm, mA·dk) ve alüminyum X-ray çizelgesi (inç→mm, mA·dk). `ExposureChartDatabase.XRAY_CHARTS` ve `get_xray_chart_exposure()` ile erişilebilir.
+- **Alüminyum doğrudan çizelge yöntemi**: `material="aluminum"` seçildiğinde (varsayılan `model` yolu) çelik × IS-2595 faktörü yerine digitize edilmiş alüminyum çizelgesi kullanılır; açıkça `type_x` seçilirse eski davranış korunur.
+- **PDF raporuna 3D görünüş**: `WeldSetup3D` canvas'ı PNG olarak alınıp PDF raporuna "3D Çekim Geometrisi Görselleştirmesi" bölümü olarak eklenir (`threed_png_base64` → `threed_img_path`).
+- **3D görünüşte Ug geometrik belirsizlik bantı**: Merkezi ışın eksenine dik, dedektör düzlemindeki `Ug` genişliği kesikli bant + `Ug = X.XX mm` etiketi (WeldSetup3D.tsx).
+
 ## [2.0.4] - 2026-10-17
 
 ### Added
