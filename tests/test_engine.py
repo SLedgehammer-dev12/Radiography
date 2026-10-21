@@ -125,6 +125,38 @@ def test_swsi_panoramic_excludes_film_diagonal_coverage(engine):
     assert vd["sfd_min_provenance"]["active"] == "coverage"
 
 
+def test_gamma_ray_excludes_formula_3_and_4_coverage(engine):
+    """ISO 17636-1:2022 Clause 7.6 Formula (3)/(4) applies solely to X-ray tubes.
+
+    Gamma-ray sources (Ir-192, Se-75, etc.) emit isotropically and must not have
+    the 1.4*df opening-angle coverage constraint applied to SFD_min.
+    """
+    # X-ray with 100x480 mm film: 1.4*df (~690 mm) governs over f_min + b (~200 mm)
+    res_xray = engine.calculate({
+        "geometry": "swsi", "std_figure": "fig2", "tech": "analog", "source": "x_ray",
+        "od": 406.4, "t": 5.2, "cap": 2.0, "d": 2.0, "sfd": 700.0,
+        "film_width": 100.0, "film_height": 480.0,
+    })
+    vx = res_xray["values"]
+    assert vx["coverage_min"] > 600.0
+    assert vx["sfd_min_provenance"]["active"] == "coverage"
+    assert any(c["key"] == "coverage" for c in vx["sfd_min_provenance"]["candidates"])
+
+    # Identical setup with Ir-192 (gamma): coverage does not apply, SFD_min = f_min + b
+    res_gamma = engine.calculate({
+        "geometry": "swsi", "std_figure": "fig2", "tech": "analog", "source": "isotope_ir192",
+        "od": 406.4, "t": 5.2, "cap": 2.0, "d": 2.0, "sfd": 700.0,
+        "film_width": 100.0, "film_height": 480.0,
+    })
+    vg = res_gamma["values"]
+    assert vg["coverage_min"] == 0.0
+    assert vg["sfd_min"] == pytest.approx(vg["f_min"] + vg["b_dist"])
+    assert vg["sfd_min_provenance"]["active"] == "f_min_plus_b"
+    assert not any(c["key"] == "coverage" for c in vg["sfd_min_provenance"]["candidates"])
+    # No warning about missing or applied film coverage
+    assert not any("1,4·df" in w or "1.4*df" in w for w in res_gamma["warnings"])
+
+
 def test_dwdi_forced_to_dwsi_over_100mm(engine):
     result = engine.calculate({
         "geometry": "dwdi_elliptic", "od": 200.0, "t": 6.0,

@@ -102,11 +102,14 @@ class TestRTCalculator(unittest.TestCase):
         self.assertIsNone(fms)
         self.assertIsNone(ci)
 
-        # calculate_sdd_min: dd=200, 2beta=40 -> SDD_min >= 1.4 * 200 = 280
+        # calculate_sdd_min: dd=200, 2beta=40 -> SDD_min >= 1.4 * 200 = 280 (X-ray only)
         sdd = self.calc.calculate_sdd_min(200.0)
         self.assertAlmostEqual(sdd, 280.0, places=0)
         sdd = self.calc.calculate_sdd_min(0)
         self.assertEqual(sdd, 0.0)
+        # Gamma sources emit isotropically; Formula (3)/(4)/(7) do not apply:
+        self.assertEqual(self.calc.calculate_sdd_min(200.0, source="isotope_ir192"), 0.0)
+        self.assertEqual(self.calc.calculate_coverage_min(200.0, source="isotope_se75"), 0.0)
 
         # is_central_projection
         self.assertTrue(self.calc.is_central_projection("swsi", "fig5"))

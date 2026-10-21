@@ -83,7 +83,13 @@ def format_sfd_provenance(prov, trans):
             text += f"{l3_note}{gov_tag}"
         lines.append(text)
 
-    if prov.get("is_panoramic"):
+    if not prov.get("is_xray", True):
+        lines.append(
+            "  (Gama ışını kaynakları izotropik ışıma yaptığından Formül 3 / Formül 4 tüp açılma açısı [1,4·df] kapsaması uygulanmaz)"
+            if tr else
+            "  (Gamma-ray sources emit isotropically; Formula 3 / Formula 4 tube opening angle [1.4·df] coverage does not apply)"
+        )
+    elif prov.get("is_panoramic"):
         lines.append(
             "  (Panoramik / merkezi projeksiyonda ışın 360° radyal olduğundan 1,4·df düzlemsel kapsaması uygulanmaz)"
             if tr else
@@ -1263,6 +1269,7 @@ class CalculationEngine:
         d = f["d"]
         testing_class = f["testing_class"]
         standard = f["standard"]
+        source = f["source"]
 
         bed = f["bed"]
         bgap = f["bgap"]
@@ -1328,7 +1335,12 @@ class CalculationEngine:
             dd = None
         receptor_size = dd if is_digital else df
         is_panoramic = calc.is_central_projection(geometry, std_figure)
-        coverage_min = 0.0 if is_panoramic else calc.calculate_coverage_min(receptor_size)
+        is_xray = (source == "x_ray")
+        coverage_min = (
+            calc.calculate_coverage_min(receptor_size, source=source)
+            if (is_xray and not is_panoramic)
+            else 0.0
+        )
 
         dwsi_physical_min = 0.0
         if geometry == "dwsi" and od > 0.0:
@@ -1370,7 +1382,7 @@ class CalculationEngine:
                 "l3_central": lvl3_central,
             },
         ]
-        if not is_panoramic:
+        if is_xray and not is_panoramic:
             candidates.append(
                 {
                     "key": "coverage",
@@ -1392,6 +1404,7 @@ class CalculationEngine:
         provenance = {
             "active": active_source,
             "is_panoramic": is_panoramic,
+            "is_xray": is_xray,
             "candidates": candidates,
             "sfd_applied": sfd,
             "sfd_min": sfd_min,
@@ -1459,6 +1472,7 @@ class CalculationEngine:
             "df": df,
             "dd": dd,
             "is_digital": is_digital,
+            "is_xray": is_xray,
             "dwsi_physical_min": dwsi_physical_min,
             "lvl3_dw": lvl3_dw,
             "lvl3_central": lvl3_central,
@@ -1612,6 +1626,7 @@ class CalculationEngine:
         receptor_h = geo["receptor_h"]
         receptor_size = geo["receptor_size"]
         is_digital = geo["is_digital"]
+        is_xray = geo["is_xray"]
 
         # 4. ASME Sec V Art 2 geometric unsharpness (Ug) limit check
         ug_ok, ug_limit = calc.check_ug_compliance(ug, t, standard)
@@ -2060,7 +2075,9 @@ class CalculationEngine:
             else:
                 warnings.append(f"NOTE (Clause 7.6): Entered bed ({geo['bed_user']:.1f} mm) is smaller than the Formula (10) value ({geo['bed_auto_suggested']:.1f} mm) - please verify.")
 
-        if calc.is_central_projection(geometry, std_figure):
+        if not is_xray:
+            pass  # Gamma-ray sources: ISO 17636-1:2022 Clause 7.6 Formula 3/4 does not apply
+        elif calc.is_central_projection(geometry, std_figure):
             if trans.language == "tr":
                 warnings.append(
                     f"BİLGİ (Madde 7.6): SWSI panoramik (merkezi izdüşüm - Şekil 5) çekimde kaynak boru merkezinde (360° radyal) olduğundan düzlemsel köşegen kapsaması (1,4·df / Formül 4) uygulanmaz; SFD_min = f_min + b ({sfd_min:.1f} mm) geçerlidir."

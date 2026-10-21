@@ -51,6 +51,10 @@ def test_coverage_min_guard(calc):
     assert calc.calculate_coverage_min(0.0) == 0.0
     assert calc.calculate_coverage_min(None) == 0.0
     assert calc.calculate_coverage_min(-5.0) == 0.0
+    # Formula (3)/(4)/(7) do not apply to gamma-ray sources:
+    assert calc.calculate_coverage_min(500.0, source="isotope_ir192") == 0.0
+    assert calc.calculate_coverage_min(500.0, source="isotope_se75") == 0.0
+    assert calc.calculate_sdd_min(500.0, source="isotope_co60") == 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -140,3 +144,23 @@ def test_applied_distance_label_is_mode_aware(win):
     assert "SFD" in win.lbl_app_sfd.text()
     win.rad_digital.setChecked(True)
     assert "SDD" in win.lbl_app_sfd.text()
+
+
+def test_analog_gamma_source_exempts_coverage(win):
+    win.rad_analog.setChecked(True)
+    win.cmb_source.setCurrentIndex(win.cmb_source.findData("isotope_ir192"))
+    win.cmb_geometry.setCurrentIndex(win.cmb_geometry.findData("swsi"))
+    win.txt_custom_od.setText("323.9")
+    win.txt_custom_t.setText("10.0")
+    win.txt_app_sfd.setText("600")
+    # 300 x 400 mm film -> df = 500
+    win.cmb_film_size.setCurrentIndex(win.cmb_film_size.findData("300x400"))
+    win.update_calculations()
+    lc = win.last_calculated
+    assert lc["coverage_min"] == 0.0
+    # SFD_min is f_min + b, NOT 1.4 * 500 = 700 mm
+    assert lc["sfd_min"] < 700.0
+    assert "df" not in win.txt_warnings.text()
+    assert "1,4·df" not in win.txt_warnings.text()
+    # Reset back to X-ray
+    win.cmb_source.setCurrentIndex(win.cmb_source.findData("x_ray"))

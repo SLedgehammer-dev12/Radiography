@@ -411,7 +411,7 @@ class RTCalculator:
             return 0.0
         return math.hypot(w, h)
 
-    def calculate_coverage_min(self, receptor_size):
+    def calculate_coverage_min(self, receptor_size, source="x_ray"):
         """
         Minimum source-to-receptor distance so that the tube opening angle
         (2beta) covers the whole receptor.
@@ -422,9 +422,17 @@ class RTCalculator:
         ISO 17636-2:2022 Formula (6)/(7) for digital detectors:
             SDD >= 0.5 * dd / tan(beta), simplified to SDD >= 1.4 * dd.
 
+        NOTE: Per ISO 17636-1:2022 Clause 7.6, Formulas (3) and (4) are strictly
+        based on the opening angle (2beta) of the X-ray tube window to prevent
+        beam cut-off. Gamma-ray sources (Se-75, Ir-192, Co-60, etc.) emit
+        isotropically (360 deg) and are not subject to tube opening angle limits;
+        hence Formulas (3) and (4) do not apply to gamma-ray sources.
+
         `receptor_size` is the receptor diagonal (df or dd) in mm.
-        Returns 0.0 (no constraint) for missing/invalid input.
+        Returns 0.0 (no constraint) for missing/invalid input or gamma-ray source.
         """
+        if source is not None and source != "x_ray":
+            return 0.0
         try:
             size = float(receptor_size)
         except (TypeError, ValueError):
@@ -433,12 +441,12 @@ class RTCalculator:
             return 0.0
         return 1.4 * size
 
-    def calculate_sdd_min(self, dd):
+    def calculate_sdd_min(self, dd, source="x_ray"):
         """
         Backwards-compatible alias of calculate_coverage_min for the digital
         detector size dd (ISO 17636-2:2022 Formula 7: SDD >= 1.4 * dd).
         """
-        return self.calculate_coverage_min(dd)
+        return self.calculate_coverage_min(dd, source=source)
 
     def is_central_projection(self, geometry, std_figure):
         """
