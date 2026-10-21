@@ -7,7 +7,7 @@
  */
 
 const BASE = new URL(self.registration.scope).pathname; // "/" or "/Radiography/"
-const CACHE = "radiography-v2.0.4";
+const CACHE = "radiography-v2.0.6";
 
 const CORE_ASSETS = [
   `${BASE}index.html`,

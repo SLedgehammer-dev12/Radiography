@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.6] - 2026-10-21
+
+### Fixed
+- **ISO 17636-1:2022 Madde 7.6 Formül (3) ve Formül (4) Kapsaması**: Formül (3) ve basitleştirilmiş Formül (4) ($SFD \ge 1,4 \cdot d_f$) kısıtlamasının X-ışını tüp pencere açılma açısına ($2\beta$) dayandığı standardın Madde 7.6 hükmü gereğince doğrulanarak, yalnızca X-ışını tüpleri (X-ray) için uygulanması sağlandı. Gama ışını kaynakları (Ir-192, Se-75, Co-60, Yb-169, Tm-170) izotropik (360°) ışıma yaptığından bu formüllerden muaf tutuldu; gama çekimlerinde $SFD_{\min}$ değerinin gereksiz yere $1,4 \cdot d_f$ değerine yükseltilmesi ve haksız "Film köşegeni girilmedi" uyarıları giderildi.
+- **Web & Desktop Sürüm Kontrolü ve Zombi Süreç İyileştirmesi**: Port 8765 üzerinde çalışan eski sunucu süreçlerinin yeni sürüm başlatıldığında tespit edilip temizlenmesi (`is_running` sürüm denetimi), Vite derlemesinde dinamik sürüm enjeksiyonu (`FALLBACK_VERSION`) ve Service Worker önbellek senkronizasyonu (`radiography-v2.0.6`).
+- **X-Ray Çizelge Seçimi Web UI**: Film ve X-ışını kombinasyonunda yeni eklenen dijitalleştirilmiş poz çizelgelerinin (Zhong Yi XXG 200, Type X 350 kV, Structurix D7, Alüminyum) web arayüzünde görünürlüğü ve seçimi sağlandı.
+
 ## [2.0.5] - 2026-10-19
 
 ### Changed
