@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.0.7] - 2026-10-31
+
+### Added
+- **ISO 10893-7:2019 Standardı Entegrasyonu (Kaynaklı Çelik Boruların Dijital Radyografik Muayenesi)**:
+  - Tablo 1 uyarınca kaynak dikiş tipine (Dikişsiz/Boyuna ve Helisel dikiş) ve cidar kalınlığına göre maksimum X-ışını tüp gerilimi ($U_{\max}$) sınırlandırması.
+  - Tablo 2 (tel IQI) ve Tablo 3 (dubleks tel IQI) görüntü kalitesi hassasiyet doğrulaması.
+  - Dikişsiz, boyuna ve helisel dikiş kaynak geometrileri desteği.
+  - Madde 4.7 uyarınca 3D kurulumda start-stop boru ilerleme ve dönme (helical seam) simülasyonu (kaynak dikişinin odak ve dedektör arasında sabit kalması).
+  - Web, PyQt masaüstü ve Kivy mobil arayüzlerinde tam standart desteği.
+
+### Fixed
+- **ISO 17636-2 Şekil 2a ve Şekil 2b Ayrımı**: Şekil 2a (esnek dedektör içeride, $b = t$) ile Şekil 2b (planar dedektör, $b = b_{\text{ed}} + b_{\text{gap}} + k \cdot t$) 2D çizimlerinde ve seçimlerinde ayrıştırıldı.
+- **ISO 17636 Annex A Çalışma Noktası ve Bölge Çizelgeleri**: Annex A çalışma grafiğinde tüm $N$ pozlama sınır eğrileri (`boundaries`) ve grafik sınırları dışına çıkan kalın cidarlı borularda uyarı ile grafik gösterimi kalıcı hale getirildi.
+- **ISO 17636-1 Şekil 2 (SWSI) 3D Çekim Düzeni**: Şekil 2 (ve 2a/2b) tek cidar çekiminde 3D kurulum sahnesinde odak borunun dışına ($y > R$), esnek film/dedektör ise borunun alt iç cidarına ($y = -R_i$) yerleştirilerek fiziksel düzen standarda uygun hale getirildi.
+
 ## [2.0.6] - 2026-10-21
 
 ### Fixed
