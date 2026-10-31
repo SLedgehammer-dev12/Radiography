@@ -27,6 +27,7 @@ class ProcedureComplianceChecker:
                 "voltage_pass": "Tüp Voltajı Uygun: {:.1f} kV <= Maksimum {:.1f} kV limit.",
                 "voltage_fail": "TÜP VOLTAJI UYGUN DEĞİL! Uygulanan: {:.1f} kV > Limit: {:.1f} kV.",
                 "voltage_lvl3": "Tüp Voltajı Limiti Aşımı Seviye 3 Yetkisi ile onaylanmıştır ({:.1f} kV).",
+                "voltage_dda_exception": "Tüp Voltajı Uygun (ISO 10893-7 Madde 6.10 DDA İstisnası): Uygulanan {:.1f} kV > Öneri {:.1f} kV (IQI ve SNR sağlandığı için kabul edildi).",
                 
                 "sfd_pass": "Çekim Mesafesi Uygun: {:.1f} mm >= Önerilen Min. {:.1f} mm.",
                 "sfd_fail": "ÇEKİM MESAFESİ UYGUN DEĞİL! Uygulanan: {:.1f} mm < Önerilen Min: {:.1f} mm.",
@@ -73,6 +74,7 @@ class ProcedureComplianceChecker:
                 "voltage_pass": "Tube Voltage Compliant: {:.1f} kV <= Max {:.1f} kV limit.",
                 "voltage_fail": "TUBE VOLTAGE NON-COMPLIANT! Applied: {:.1f} kV > Limit: {:.1f} kV.",
                 "voltage_lvl3": "Tube Voltage Limit Override approved by Level 3 authority ({:.1f} kV).",
+                "voltage_dda_exception": "Tube Voltage Compliant (ISO 10893-7 Clause 6.10 DDA Exception): Applied {:.1f} kV > Recommended {:.1f} kV (accepted because IQI and SNR are met).",
                 
                 "sfd_pass": "Shooting Distance Compliant: {:.1f} mm >= Recommended Min. {:.1f} mm.",
                 "sfd_fail": "SHOOTING DISTANCE NON-COMPLIANT! Applied: {:.1f} mm < Recommended Min: {:.1f} mm.",
@@ -120,6 +122,10 @@ class ProcedureComplianceChecker:
         l_msgs = trans.get(lang, trans["tr"])
 
         # 1. Voltage Check (For X-Ray only)
+        standard = inputs.get("standard", "iso")
+        detector_type = inputs.get("detector_type", "")
+        is_dda = detector_type.startswith("dda_") or detector_type == "dda" or "dda" in detector_type.lower()
+
         if source == "x_ray":
             applied_kv = applied.get("applied_kv", 0.0)
             u_max = calculated.get("u_max", 0.0)
@@ -127,7 +133,23 @@ class ProcedureComplianceChecker:
             if applied_kv <= u_max:
                 checks.append({"name": "voltage", "status": True, "details": l_msgs["voltage_pass"].format(applied_kv, u_max)})
             else:
-                if lvl3_settings.get("voltage_override", False):
+                # ISO 10893-7 Clause 6.10 DDA exception:
+                app_wire = applied.get("applied_wire", 0)
+                req_wire = calculated.get("required_wire_no", calculated.get("wire_no", 0))
+                app_duplex = applied.get("applied_duplex", 0)
+                req_duplex = calculated.get("required_duplex_no", calculated.get("duplex_no", 0))
+                app_snr = applied.get("applied_quality", 0.0)
+                req_snr = calculated.get("required_snr", calculated.get("target_snr", 0.0))
+
+                iqi_snr_ok = (
+                    (app_wire >= req_wire if req_wire else True) and
+                    (app_duplex >= req_duplex if req_duplex else True) and
+                    (app_snr >= req_snr if req_snr else True)
+                )
+
+                if standard == "iso10893_7" and is_dda and iqi_snr_ok:
+                    checks.append({"name": "voltage", "status": True, "details": l_msgs["voltage_dda_exception"].format(applied_kv, u_max)})
+                elif lvl3_settings.get("voltage_override", False):
                     checks.append({"name": "voltage", "status": True, "details": l_msgs["voltage_lvl3"].format(applied_kv)})
                 else:
                     is_compliant = False

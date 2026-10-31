@@ -5,7 +5,7 @@ from kivymd.uix.dialog import MDDialog
 from kivymd.uix.label import MDLabel
 
 DEFECT_TYPES = ["defect_crack", "defect_ip", "defect_if", "defect_ic", "defect_porosity", "defect_slag", "defect_undercut", "defect_burn_through"]
-DEFECT_STANDARDS = ["api1104", "iso5817", "b31_3", "viii"]
+DEFECT_STANDARDS = ["api1104", "iso5817", "b31_3", "viii", "iso10893"]
 
 
 class StepResults(MDScreen):
@@ -86,6 +86,7 @@ class StepResults(MDScreen):
             "iso5817": "ISO 5817",
             "b31_3": "ASME B31.3",
             "viii": "ASME VIII (UW-51/52)",
+            "iso10893": "ISO 10893-7",
         }
         items = [{
             "text": labels[s],
@@ -105,6 +106,7 @@ class StepResults(MDScreen):
             "iso5817": "ISO 5817",
             "b31_3": "ASME B31.3",
             "viii": "ASME VIII (UW-51/52)",
+            "iso10893": "ISO 10893-7",
         }
         self.ids.defect_std_btn.text = f"Standart: {labels.get(value, value)}"
         self.ids.defect_result_label.text = ""

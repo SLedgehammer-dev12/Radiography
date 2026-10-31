@@ -19,6 +19,7 @@ const DEFECT_STANDARDS = [
   { value: "iso5817", labelKey: "defect_std_iso5817" },
   { value: "b31_3", labelKey: "defect_std_b31_3" },
   { value: "viii", labelKey: "defect_std_viii" },
+  { value: "iso10893", labelKey: "defect_std_iso10893" },
 ];
 
 interface DefectPanelProps {
@@ -48,6 +49,7 @@ export function DefectPanel({
         <SelectField
           label={t("defect_standard")}
           value={defect.standard}
+          testId="select-defect-standard"
           options={DEFECT_STANDARDS.map((option) => ({
             value: option.value,
             label: t(option.labelKey),
@@ -73,6 +75,20 @@ export function DefectPanel({
           }}
         />
       </div>
+      {defect.standard === "iso10893" && (
+        <SelectField
+          label={t("quality_level")}
+          value={defect.level ?? "E2"}
+          options={[
+            { value: "E2", label: "E2 (Enhanced)" },
+            { value: "E3", label: "E3 (Standard)" },
+          ]}
+          onChange={(value) => {
+            setDefectActive(true);
+            setDefect((previous) => ({ ...previous, level: value }));
+          }}
+        />
+      )}
       {defect.standard === "iso5817" && (
         <SelectField
           label={t("quality_level")}

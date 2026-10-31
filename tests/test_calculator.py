@@ -1696,6 +1696,41 @@ class TestRTCalculatorEdgeCases(unittest.TestCase):
         self.assertTrue(cov_zero["is_sufficient"])
         self.assertEqual(cov_zero["available_across"], 0.0)
 
+    def test_iso10893_7_calculator_integration(self):
+        # 1. Single Wire IQI per ISO 10893-7 Tables 1 & 2
+        txt_a, wire_a = self.calc.get_single_wire_iqi(6.0, 0.0, "class_a", "swsi", standard="iso10893_7")
+        self.assertEqual(wire_a, 14)
+        txt_b, wire_b = self.calc.get_single_wire_iqi(6.0, 0.0, "class_b", "swsi", standard="iso10893_7")
+        self.assertEqual(wire_b, 16)
+
+        # 2. Duplex Wire IQI & Max SRb per ISO 10893-7
+        d_str_a, d_no_a = self.calc.get_duplex_iqi(6.0, "class_a", standard="iso10893_7")
+        self.assertEqual(d_no_a, 9)
+        d_str_b, d_no_b = self.calc.get_duplex_iqi(6.0, "class_b", standard="iso10893_7")
+        self.assertEqual(d_no_b, 12)
+        srb_a = self.calc.get_max_srb(6.0, "class_a", standard="iso10893_7")
+        self.assertEqual(srb_a, 130)
+        srb_b = self.calc.get_max_srb(6.0, "class_b", standard="iso10893_7")
+        self.assertEqual(srb_b, 63)
+
+        # 3. Target SNR per Clause 7.3
+        snr_a, tbl_a, _ = self.calc.get_target_snr("steel", "x_ray", 120.0, 6.0, "class_a", standard="iso10893_7")
+        self.assertEqual(snr_a, 70)
+        snr_b, tbl_b, _ = self.calc.get_target_snr("steel", "x_ray", 120.0, 6.0, "class_b", standard="iso10893_7")
+        self.assertEqual(snr_b, 100)
+
+        # 4. Defect evaluation with E2 / E3 levels per Clause 10
+        from src.core.iso10893 import ISO10893Evaluator
+        evaluator = ISO10893Evaluator()
+        # Crack reject
+        ok, _ = evaluator.evaluate("crack", 8.0, 5.0, 1.0, 5.0, level="E2")
+        self.assertFalse(ok)
+        # Porosity E2 vs E3 limit for t=8.0 (E2 max_dia=2.0; E3 max_dia=2.67)
+        ok_e2, _ = evaluator.evaluate("porosity", 8.0, 2.3, 2.3, 2.3, level="E2")
+        self.assertFalse(ok_e2)
+        ok_e3, _ = evaluator.evaluate("porosity", 8.0, 2.3, 2.3, 2.3, level="E3")
+        self.assertTrue(ok_e3)
+
 if __name__ == "__main__":
     unittest.main()
 

@@ -486,6 +486,7 @@ export interface SelectOption {
   value: string;
   label: string;
   group?: string;
+  disabled?: boolean;
 }
 
 interface SelectFieldProps {
@@ -496,6 +497,7 @@ interface SelectFieldProps {
   tooltip?: string;
   disabled?: boolean;
   action?: ReactNode;
+  testId?: string;
 }
 
 export function SelectField({
@@ -506,6 +508,7 @@ export function SelectField({
   tooltip,
   disabled,
   action,
+  testId,
 }: SelectFieldProps) {
   const hasGroups = options.some((opt) => Boolean(opt.group));
 
@@ -521,6 +524,7 @@ export function SelectField({
       <select
         className="field-input"
         aria-label={label}
+        data-testid={testId}
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
@@ -551,7 +555,7 @@ export function SelectField({
               ),
             )
           : options.map((option) => (
-              <option key={option.value} value={option.value}>
+              <option key={option.value} value={option.value} disabled={option.disabled}>
                 {option.label}
               </option>
             ))}
@@ -583,11 +587,13 @@ export function RadioGroup({
       </span>
       <div className="radio-row">
         {options.map((option) => (
-          <label key={option.value} className="radio-option">
+          <label key={option.value} className={`radio-option ${option.disabled ? "disabled" : ""}`}>
             <input
               type="radio"
+              value={option.value}
               checked={value === option.value}
-              onChange={() => onChange(option.value)}
+              disabled={option.disabled}
+              onChange={() => !option.disabled && onChange(option.value)}
             />
             <span>{option.label}</span>
           </label>

@@ -245,7 +245,14 @@ class AppState:
         try:
             vals = self.get_form_values()
             approx = False
-            if self.defect_standard == "iso5817":
+            if self.defect_standard in ("iso10893", "iso10893_7"):
+                from core.iso10893 import ISO10893Evaluator
+                self.defect_eval = ISO10893Evaluator().evaluate(
+                    defect_type, vals["t"], length, width, accumulated,
+                    level=getattr(self, "defect_level", "E2"), lang=self.language
+                )
+                approx = True
+            elif self.defect_standard == "iso5817":
                 from core.iso5817 import ISO5817Evaluator
                 self.defect_eval = ISO5817Evaluator().evaluate(
                     defect_type, vals["t"], length, width, accumulated,

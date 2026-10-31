@@ -283,7 +283,7 @@ class StandardSchematicCanvas(FigureCanvas):
         # ISO 17636-2 flexible-detector (a) variants reuse the existing film
         # drawings; only the title is overridden below.
         orig_name = fig_name
-        alias = {"fig2": "fig2b", "fig2a": "fig2b", "fig8": "fig8a", "fig5a": "fig5",
+        alias = {"fig2": "fig2a", "fig8": "fig8a", "fig5a": "fig5",
                  "fig6a": "fig6", "fig7a": "fig7", "fig13a": "fig13",
                  "fig14a": "fig14"}
         fig_name = alias.get(fig_name, fig_name)
@@ -512,6 +512,25 @@ class StandardSchematicCanvas(FigureCanvas):
             self.axes.text(0.6, 0.8, "f", color=text_color, fontsize=10)
             self.axes.set_title(lang_obj.get("fig14b_title"), color=text_color, fontsize=10)
 
+        elif fig_name == "fig2a":  # Fig 2a: SWSI, source outside, flexible detector inside
+            self.axes.add_patch(patches.Circle((0, 0), R, color=pipe_color, fill=False, linewidth=2))
+            self.axes.add_patch(patches.Circle((0, 0), Ri, color=pipe_color, fill=False, linewidth=1.5, linestyle='--'))
+            ys = 1.8
+            self.axes.plot(0, ys, marker='o', color=source_color, markersize=10)
+            self.axes.text(0.1, ys + 0.1, "S", color=text_color, fontsize=9, fontweight='bold')
+            # Flexible detector inside the bottom wall
+            detector_arc = patches.Arc((0, 0), Ri * 2.0, Ri * 2.0, theta1=220, theta2=320, color=det_color, linewidth=4)
+            self.axes.add_patch(detector_arc)
+            # Beam penetrating through bottom weld
+            self.axes.plot([0, R * np.sin(np.radians(-35))], [ys, -Ri * np.cos(np.radians(-35))], color=beam_color, linestyle=':')
+            self.axes.plot([0, R * np.sin(np.radians(35))], [ys, -Ri * np.cos(np.radians(35))], color=beam_color, linestyle=':')
+            self.axes.plot(0, -R, marker='s', color=weld_color, markersize=6)
+            self.axes.annotate('', xy=(0, -R), xytext=(0, ys), arrowprops=dict(arrowstyle='<->', color=text_color))
+            self.axes.text(-0.25, 0.4, "f", color=text_color, fontsize=9)
+            self.axes.text(-0.25, -0.9, "b = t", color=text_color, fontsize=9)
+            title_key = "fig2_title" if orig_name == "fig2" else "fig2a_title"
+            self.axes.set_title(lang_obj.get(title_key), color=text_color, fontsize=10)
+
         elif fig_name == "fig2b":  # Fig 2b: SWSI, source outside, planar detector
             self.axes.add_patch(patches.Circle((0, 0), R, color=pipe_color, fill=False, linewidth=2))
             self.axes.add_patch(patches.Circle((0, 0), Ri, color=pipe_color, fill=False, linewidth=1.5, linestyle='--'))
@@ -523,7 +542,7 @@ class StandardSchematicCanvas(FigureCanvas):
             self.axes.plot([0, 0], [-R, -1.15], color=det_color, linewidth=1, linestyle='--')
             self.axes.plot([0, -0.9], [ys, -1.15], color=beam_color, linestyle=':')
             self.axes.plot([0, 0.9], [ys, -1.15], color=beam_color, linestyle=':')
-            self.axes.plot(0, R, marker='s', color=weld_color, markersize=6)
+            self.axes.plot(0, -R, marker='s', color=weld_color, markersize=6)
             self.axes.text(-0.6, 0.4, "f", color=text_color, fontsize=9)
             self.axes.text(-0.7, -1.0, "b = b_ed + b_gap + k·t", color=text_color, fontsize=8)
             self.axes.set_title(lang_obj.get("fig2b_title"), color=text_color, fontsize=10)

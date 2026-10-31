@@ -215,6 +215,9 @@ def handle(request_json):
         tech = payload.get("tech", "digital")
         geometry = payload.get("geometry", "dwsi")
         curved = bool(payload.get("detector_curved", False))
+        standard = payload.get("standard", "iso")
+        if standard == "iso10893_7":
+            tech = "digital"
         # Butt-weld arrangements only: Figures 6/7/9/10 (and digital a/b
         # equivalents) are set-in/set-on corner welds and are excluded.
         if tech == "digital":

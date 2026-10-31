@@ -11,7 +11,7 @@ export const SOURCES = [
 ];
 const CLASSES = ["class_b", "class_a"];
 export const GEOMETRIES = ["dwsi", "swsi", "dwdi_elliptic", "dwdi_super"];
-const STANDARDS = ["iso", "asme"];
+const STANDARDS = ["iso", "asme", "iso10893_7"];
 export const DETECTORS = [
   "cr_standard",
   "cr_highres",

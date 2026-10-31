@@ -147,6 +147,7 @@ class TranslationMixin:
             self.cmb_standard.clear()
             self.cmb_standard.addItem(self.trans.get("standard_iso"), "iso")
             self.cmb_standard.addItem(self.trans.get("standard_asme"), "asme")
+            self.cmb_standard.addItem(self.trans.get("standard_iso10893_7"), "iso10893_7")
             self.cmb_standard.setCurrentIndex(std_idx)
             self.cmb_standard.blockSignals(False)
 

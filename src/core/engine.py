@@ -1201,7 +1201,7 @@ def normalize_form(form):
         f["testing_class"] = "class_b"
     if f.get("geometry") not in GEOMETRY_KEYS:
         f["geometry"] = "dwsi"
-    if f.get("standard") not in ("iso", "asme"):
+    if f.get("standard") not in ("iso", "asme", "iso10893_7"):
         f["standard"] = "iso"
     if f.get("iqi_type") not in ("wire", "step_hole"):
         f["iqi_type"] = "wire"
@@ -1517,6 +1517,7 @@ class CalculationEngine:
             "next_op": detail["next_op"],
             "clamped": clamped,
             "l3_dw": l3_dw,
+            "boundaries": [[b["ratio"], b["n"]] for b in detail.get("boundaries", [])],
         }
 
     def _swsi_exposures(self, form, geo, calc):
@@ -1539,8 +1540,11 @@ class CalculationEngine:
             detail = annex_a.lookup_detail(
                 t, od, f_distance, testing_class, film_inside=True)
             if detail is not None:
-                return int(detail["n"]), self._annex_provenance(
-                    detail, figure, l3_dw=geo["lvl3_dw"])
+                prov = self._annex_provenance(detail, figure, l3_dw=geo["lvl3_dw"])
+                if detail.get("out_of_chart"):
+                    prov["method"] = "out_of_chart"
+                    prov["film_inside"] = True
+                return int(detail["n"]), prov
             # Outside the digitized Annex A chart. Returning 1 (the old
             # behaviour) grossly under-counts the required exposures, so use
             # the chart cap (highest N curve) as a conservative minimum.
@@ -1551,8 +1555,13 @@ class CalculationEngine:
             detail = annex_a.lookup_detail(
                 t, od, sfd, testing_class, film_inside=False)
             if detail is not None:
-                return max(3, int(detail["n"])), self._annex_provenance(
-                    detail, figure, l3_dw=geo["lvl3_dw"])
+                n_val = max(3, int(detail["n"]))
+                prov = self._annex_provenance(detail, figure, l3_dw=geo["lvl3_dw"])
+                prov["n"] = n_val
+                if detail.get("out_of_chart"):
+                    prov["method"] = "out_of_chart"
+                    prov["film_inside"] = False
+                return n_val, prov
             cap = annex_a.chart_cap(testing_class, film_inside=False) or 3
             cap = max(3, int(cap))
             return cap, {"method": "out_of_chart", "n": cap,
@@ -1666,6 +1675,8 @@ class CalculationEngine:
                 exposures_prov = self._annex_provenance(
                     detail, f.get("std_figure"),
                     clamped=sfd < od, l3_dw=geo["lvl3_dw"])
+                if detail.get("out_of_chart"):
+                    exposures_prov["method"] = "out_of_chart"
             else:
                 exposures_prov = {"method": "geometric_fallback", "n": exposures}
 
@@ -1824,12 +1835,12 @@ class CalculationEngine:
 
         # 7. IQI targets
         if iqi_type == "step_hole":
-            wire_str, wire_no = calc.get_step_hole_iqi(t, cap, testing_class, geometry, tech=tech, film_side=film_side, lang=trans.language)
+            wire_str, wire_no = calc.get_step_hole_iqi(t, cap, testing_class, geometry, tech=tech, film_side=film_side, lang=trans.language, standard=standard)
         else:
-            wire_str, wire_no = calc.get_single_wire_iqi(t, cap, testing_class, geometry, tech=tech, film_side=film_side, lang=trans.language)
+            wire_str, wire_no = calc.get_single_wire_iqi(t, cap, testing_class, geometry, tech=tech, film_side=film_side, lang=trans.language, standard=standard)
 
         if tech == "digital":
-            duplex_str, duplex_no = calc.get_duplex_iqi(w_nom, testing_class, geometry, lang=trans.language)
+            duplex_str, duplex_no = calc.get_duplex_iqi(w_nom, testing_class, geometry, lang=trans.language, standard=standard)
         else:
             duplex_str, duplex_no = "N/A", None
 
@@ -1840,7 +1851,7 @@ class CalculationEngine:
             detector_quality_str = f"{film_class_req} Film"
         else:
             film_class_req = None
-            max_srb_req = calc.get_max_srb(w_nom, testing_class, geometry)
+            max_srb_req = calc.get_max_srb(w_nom, testing_class, geometry, standard=standard)
             detector_quality_str = f"Max {max_srb_req} µm"
 
         # 9. Quality targets and Level 3 distance compensation
@@ -1859,7 +1870,7 @@ class CalculationEngine:
             target_quality = f">= {required_density:.1f} (Max 4.0)"
             target_snr_val = 130.0 if testing_class == "class_b" else 70.0
         else:
-            base_snr, table_name, _desc = calc.get_target_snr(material, source, input_kv, w_nom, testing_class, lang=trans.language)
+            base_snr, table_name, _desc = calc.get_target_snr(material, source, input_kv, w_nom, testing_class, lang=trans.language, standard=standard)
             is_flush = (cap == 0.0)
             se75_thin_class_b = (material in ("steel", "copper_nickel") and source == "isotope_se75" and w_nom < 12.0 and testing_class == "class_b")
             snr_mult = 1.0
@@ -2717,6 +2728,7 @@ class CalculationEngine:
         from src.core.asme_b31_3 import ASMEB31_3Evaluator
         from src.core.asme_viii import ASMEVIIIEvaluator
         from src.core.api1104 import API1104Evaluator
+        from src.core.iso10893 import ISO10893Evaluator
 
         f = normalize_form(form)
         if self.trans.language != lang:
@@ -2732,7 +2744,12 @@ class CalculationEngine:
 
         approx = False
         try:
-            if standard == "iso5817":
+            if standard in ("iso10893", "iso10893_7"):
+                is_ok, reason = ISO10893Evaluator().evaluate(
+                    defect_type, t, length, width, accumulated,
+                    level=defect.get("level", "E2"), lang=lang)
+                approx = True
+            elif standard == "iso5817":
                 is_ok, reason = ISO5817Evaluator().evaluate(
                     defect_type, t, length, width, accumulated,
                     level=defect.get("level", "C"), lang=lang)

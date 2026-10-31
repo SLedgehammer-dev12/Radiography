@@ -1279,11 +1279,21 @@ const FIGURES: Record<string, FigureSpec> = {
       { text: "f", x: 0.6, y: 0.8, size: 10 },
     ],
   },
+  fig2a: {
+    source: { kind: "dot", x: 0, y: 1.8, label: "S" },
+    detector: { kind: "inner", t1: 220, t2: 320 },
+    beams: [{ from: [0, 1.8], angles: [220, 320], radius: 0.8 }],
+    welds: [[0, -1]],
+    labels: [
+      { text: "f", x: -0.6, y: 0.4, size: 10 },
+      { text: "b = t", x: -0.4, y: -0.85, size: 10 },
+    ],
+  },
   fig2b: {
     source: { kind: "dot", x: 0, y: 1.8, label: "S" },
     detector: { kind: "flat", x1: -0.9, x2: 0.9, y: -1.15 },
     beams: [{ from: [0, 1.8], angles: [230, 310], radius: 1.15 }],
-    welds: [[0, 1]],
+    welds: [[0, -1]],
     labels: [
       { text: "f", x: -0.6, y: 0.4, size: 10 },
       { text: "b = b_ed + b_gap + k·t", x: 0, y: -1.35, size: 9 },
@@ -1336,8 +1346,7 @@ const FIGURES: Record<string, FigureSpec> = {
 
 export function StandardFigureSvg({ figure, title }: { figure: string; title: string }) {
   const alias: Record<string, string> = {
-    fig2: "fig2b",
-    fig2a: "fig2b",
+    fig2: "fig2a",
     fig5a: "fig5",
     fig6a: "fig6",
     fig7a: "fig7",

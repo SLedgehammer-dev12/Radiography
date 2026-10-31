@@ -5,7 +5,7 @@ export const UnitContext = createContext<{ inch: boolean }>({ inch: false });
 export type Tech = "analog" | "digital";
 export type TestingClass = "class_a" | "class_b";
 export type Geometry = "dwsi" | "swsi" | "dwdi_elliptic" | "dwdi_super";
-export type Standard = "iso" | "asme";
+export type Standard = "iso" | "asme" | "iso10893_7";
 export type IqiType = "wire" | "step_hole";
 
 export interface FormState {
@@ -100,7 +100,7 @@ export const DEFAULT_FORM: FormState = {
   iqi_type: "wire",
   film_side: false,
   snr_location: "weld",
-  std_figure: null,
+  std_figure: "fig13b",
   detector_curved: false,
   panel_width: 200.0,
   panel_height: 200.0,
@@ -197,7 +197,7 @@ export interface PipeData {
 }
 
 export interface DefectInput {
-  standard: "api1104" | "iso5817" | "b31_3" | "viii";
+  standard: "api1104" | "iso5817" | "b31_3" | "viii" | "iso10893";
   type: string;
   length: number;
   width: number;

@@ -120,18 +120,19 @@ def lookup_detail(t, de, distance, testing_class="class_b",
 
     x = t / de
     y = de / distance
-    if x > data["x_max"] or y > data["y_max"]:
-        return None
+    is_out = (x > data["x_max"] or y > data["y_max"])
 
     n = minimum_exposures(t, de, distance, testing_class, film_inside, key)
     if n is None:
-        return None
+        is_out = True
+        n = chart_cap(testing_class, film_inside, key) or 1
 
+    x_interp = min(x, data["x_max"])
     x_values = data["x"]
     curves = data["curves"]
     boundaries = []
     for m in sorted(int(value) for value in curves):
-        curve_y = _interpolate(x_values, curves[str(m)], x)
+        curve_y = _interpolate(x_values, curves[str(m)], x_interp)
         if curve_y is None or curve_y <= 1e-9:
             continue
         boundaries.append({
@@ -156,6 +157,7 @@ def lookup_detail(t, de, distance, testing_class="class_b",
         # For A.2/A.4 the stricter N needs ratio <= boundary; for A.1/A.3 it
         # needs ratio >= boundary.
         "next_op": "le" if data["y_axis"] == "De_SFD" else "ge",
+        "out_of_chart": is_out,
     }
 
 

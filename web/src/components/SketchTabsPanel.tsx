@@ -112,6 +112,8 @@ export function SketchTabsPanel({
               supervisedRadiusM={
                 (result.values.r_supervised as number | undefined) ?? null
               }
+              standard={form.standard}
+              stdFigure={form.std_figure ?? undefined}
               theme={theme}
               lang={lang}
             />
@@ -205,19 +207,33 @@ export function SketchTabsPanel({
               : "5. ISO 17636 Annex A Operating Point Chart"
           }
         >
-          {exposuresProvenance && exposuresProvenance.method === "annex_a" ? (
-            <AnnexAChartSvg
-              figure={exposuresProvenance.figure}
-              tOverDe={exposuresProvenance.t_over_de}
-              ratioName={exposuresProvenance.ratio_name}
-              ratio={exposuresProvenance.ratio}
-              n={exposuresProvenance.n}
-              nextN={exposuresProvenance.next_n}
-              nextRatio={exposuresProvenance.next_ratio}
-              nextDistanceMm={exposuresProvenance.next_distance_mm}
-              boundaries={exposuresProvenance.boundaries}
-              lang={lang}
-            />
+          {exposuresProvenance &&
+          (exposuresProvenance.method === "annex_a" ||
+            exposuresProvenance.method === "out_of_chart" ||
+            Boolean(exposuresProvenance.figure && exposuresProvenance.boundaries && exposuresProvenance.boundaries.length > 0)) ? (
+            <>
+              {exposuresProvenance.method === "out_of_chart" && (
+                <div className="inline-alert" style={{ marginBottom: "0.75rem" }}>
+                  <span>
+                    {lang === "tr"
+                      ? `⚠ Çalışma noktası (${exposuresProvenance.ratio_name} = ${exposuresProvenance.ratio?.toFixed(2)}, t/De = ${exposuresProvenance.t_over_de?.toFixed(3)}) Annex A grafik sınırları dışındadır. Grafikteki muhafazakâr üst sınır N = ${exposuresProvenance.n} poz uygulanıyor.`
+                      : `⚠ Operating point (${exposuresProvenance.ratio_name} = ${exposuresProvenance.ratio?.toFixed(2)}, t/De = ${exposuresProvenance.t_over_de?.toFixed(3)}) is outside Annex A chart bounds. Applying conservative upper bound N = ${exposuresProvenance.n} exposures.`}
+                  </span>
+                </div>
+              )}
+              <AnnexAChartSvg
+                figure={exposuresProvenance.figure}
+                tOverDe={exposuresProvenance.t_over_de}
+                ratioName={exposuresProvenance.ratio_name}
+                ratio={exposuresProvenance.ratio}
+                n={exposuresProvenance.n}
+                nextN={exposuresProvenance.next_n}
+                nextRatio={exposuresProvenance.next_ratio}
+                nextDistanceMm={exposuresProvenance.next_distance_mm}
+                boundaries={exposuresProvenance.boundaries}
+                lang={lang}
+              />
+            </>
           ) : (
             <p className="muted">
               {exposuresProvenanceText ||

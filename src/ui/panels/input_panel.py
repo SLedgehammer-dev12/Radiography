@@ -145,6 +145,7 @@ class InputPanelMixin:
         self.cmb_standard = QComboBox()
         self.cmb_standard.addItem(self.trans.get("standard_iso"), "iso")
         self.cmb_standard.addItem(self.trans.get("standard_asme"), "asme")
+        self.cmb_standard.addItem(self.trans.get("standard_iso10893_7"), "iso10893_7")
         self.cmb_standard.currentIndexChanged.connect(self.update_calculations)
         grp_inputs_layout.addRow(self.trans.get("standard"), self.cmb_standard)
 

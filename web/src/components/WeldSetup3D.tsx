@@ -30,6 +30,10 @@ export interface WeldSetup3DProps {
   duplexStr?: string;
   safetyRadiusM?: number | null;
   supervisedRadiusM?: number | null;
+  standard?: string;
+  stdFigure?: string;
+  seamType?: "girth" | "longitudinal" | "helical";
+  onSeamTypeChange?: (seam: "girth" | "longitudinal" | "helical") => void;
   theme?: "dark" | "light" | "outdoor";
   lang?: string;
 }
@@ -78,6 +82,10 @@ export function WeldSetup3D({
   duplexStr = "D6",
   safetyRadiusM = null,
   supervisedRadiusM = null,
+  standard = "iso",
+  stdFigure,
+  seamType,
+  onSeamTypeChange,
   theme = "dark",
   lang = "tr",
 }: WeldSetup3DProps) {
@@ -87,6 +95,19 @@ export function WeldSetup3D({
   const [zoom, setZoom] = useState<number>(1.05);
   const [panX, setPanX] = useState<number>(0);
   const [panY, setPanY] = useState<number>(15);
+
+  // Seam type & start-stop feed animation (ISO 10893-7 Clause 4.7)
+  const [seamTypeState, setSeamTypeState] = useState<"girth" | "longitudinal" | "helical">(
+    seamType ?? (standard === "iso10893_7" ? "longitudinal" : "girth")
+  );
+  const activeSeamType = seamType ?? seamTypeState;
+  const [feedTime, setFeedTime] = useState<number>(0); // 0.0..4.0 continuous start-stop timeline
+
+  useEffect(() => {
+    if (standard === "iso10893_7" && !seamType) {
+      setSeamTypeState("longitudinal");
+    }
+  }, [standard, seamType]);
 
   // Interactive 3D inspection controls
   const [cutaway, setCutaway] = useState<boolean>(true);
@@ -162,12 +183,28 @@ export function WeldSetup3D({
       : (2 * Math.PI) / totalStations;
 
   useEffect(() => {
-    if (!playing || totalStations <= 1) return;
-    const timer = window.setInterval(() => {
-      setActiveStation((prev) => (prev + 1) % totalStations);
-    }, 1100);
-    return () => window.clearInterval(timer);
-  }, [playing, totalStations]);
+    if (!playing) return;
+    if (activeSeamType === "girth") {
+      if (totalStations <= 1) return;
+      const timer = window.setInterval(() => {
+        setActiveStation((prev) => (prev + 1) % totalStations);
+      }, 1100);
+      return () => window.clearInterval(timer);
+    } else {
+      // 60 FPS fluid start-stop feed animation along Z & helical rotation (Clause 4.7)
+      let animId: number;
+      let lastTime = performance.now();
+      const loop = (now: number) => {
+        const dt = Math.min((now - lastTime) / 1000, 0.08);
+        lastTime = now;
+        // ~2.0s cycle per station (0.9s stationary exposure dwell, 1.1s fluid transit)
+        setFeedTime((prev) => (prev + dt * 0.5) % 4.0);
+        animId = requestAnimationFrame(loop);
+      };
+      animId = requestAnimationFrame(loop);
+      return () => cancelAnimationFrame(animId);
+    }
+  }, [playing, totalStations, activeSeamType]);
 
   const applyCameraPreset = useCallback((preset: CameraPreset) => {
     setPanX(0);
@@ -240,19 +277,66 @@ export function WeldSetup3D({
     const wCap = Math.max(cap, R * 0.05);
     const pipeLen = Math.max(R * 3.4, (weldWidth || R * 0.25) * 4.8);
     const halfLen = pipeLen / 2;
-    const detY = -R - Math.max(bgap, R * 0.08);
+    const feedZOffsets = [
+      -halfLen * 0.42,
+      -halfLen * 0.14,
+      halfLen * 0.14,
+      halfLen * 0.42,
+    ];
+
+    // Smooth Start-Stop interpolation (ISO 10893-7 Clause 4.7)
+    // 0..0.45: stationary dwell (exposure captured while pipe is still)
+    // 0.45..1.0: smooth 60fps transit to next station
+    const feedStation = Math.min(3, Math.floor(feedTime));
+    const feedPhase = feedTime - feedStation;
+    const isStationary = feedPhase < 0.45;
+    let feedZ = 0;
+    if (activeSeamType !== "girth") {
+      if (isStationary) {
+        feedZ = feedZOffsets[feedStation];
+      } else {
+        const u = (feedPhase - 0.45) / 0.55;
+        const ease = u * u * (3 - 2 * u); // smooth cubic hermite easing
+        const nextStation = (feedStation + 1) % 4;
+        feedZ =
+          feedZOffsets[feedStation] * (1 - ease) + feedZOffsets[nextStation] * ease;
+      }
+    }
+
+    const spiralPitch = R * 3.2;
+    // Positive sign ensures the helical weld at z = 0 stays precisely at theta = -PI/2 (0, -R, 0)
+    // between the source (top) and panel (bottom) at all times!
+    const feedRot =
+      activeSeamType === "helical"
+        ? (feedZ / spiralPitch) * 2 * Math.PI
+        : 0;
+
+    const isFilmInside =
+      activeGeo === "swsi" &&
+      Boolean(
+        stdFigure
+          ? stdFigure.startsWith("fig2") || stdFigure.startsWith("fig7")
+          : false,
+      );
+    const isSourceEccentric =
+      activeGeo === "swsi" && Boolean(stdFigure && stdFigure.startsWith("fig8"));
+    const detY = isFilmInside ? -Ri : -R - Math.max(bgap, R * 0.08);
 
     // Clamp visual source height so pipe & weld remain clearly legible while preserving SFD proportions
-    const rawYSrc = Math.max(sfd - R, R * 1.25);
+    const rawYSrc = Math.max(sfd - (isFilmInside ? Ri : R), R * 1.25);
     const ySourceBase =
       activeGeo === "swsi"
-        ? 0
+        ? isFilmInside
+          ? Math.min(rawYSrc, R * 2.6)
+          : isSourceEccentric
+            ? Ri * 0.55
+            : 0
         : activeGeo === "dwsi"
           ? Math.min(rawYSrc, R * 2.6)
           : Math.min(Math.max(rawYSrc, R * 1.8), R * 3.2);
 
     // Axial Z-offset of the source:
-    // - swsi:          z = 0 (inside pipe center)
+    // - swsi:          z = 0 (aligned with weld ring at z = 0)
     // - dwdi_super:    z = 0 (directly over weld plane -> top & bottom welds superimpose at z = 0)
     // - dwsi:          z > 0 (offset beside top weld cap so beam enters upper parent metal & hits ONLY bottom weld at z = 0)
     // - dwdi_elliptic: z > 0 (offset so beam covers BOTH top & bottom welds and separates them into an ellipse on detector)
@@ -298,7 +382,8 @@ export function WeldSetup3D({
     const cosP = Math.cos(pitch);
     const sinP = Math.sin(pitch);
 
-    const centerYOffset = activeGeo === "swsi" ? 0 : (ySourceBase - R) * 0.28;
+    const centerYOffset =
+      activeGeo === "swsi" && !isFilmInside ? 0 : (ySourceBase - R) * 0.28;
 
     const project = (pt: Vec3): ProjectedPoint => {
       const px = pt.x;
@@ -381,8 +466,8 @@ export function WeldSetup3D({
     };
 
     for (let iz = 0; iz < nSegZ; iz += 1) {
-      const z0 = -halfLen + (iz / nSegZ) * pipeLen;
-      const z1 = -halfLen + ((iz + 1) / nSegZ) * pipeLen;
+      const z0 = -halfLen + (iz / nSegZ) * pipeLen + feedZ;
+      const z1 = -halfLen + ((iz + 1) / nSegZ) * pipeLen + feedZ;
       const zMid = (z0 + z1) / 2;
 
       for (let it = 0; it < nSegTheta; it += 1) {
@@ -393,9 +478,9 @@ export function WeldSetup3D({
         // Cutaway on the front half (z >= 0) for the cutout angular sector
         if (zMid >= 0 && isCutawayAngle(degMid)) continue;
 
-        const r0 = (deg0 * Math.PI) / 180;
-        const r1 = (deg1 * Math.PI) / 180;
-        const rMid = (degMid * Math.PI) / 180;
+        const r0 = ((deg0 * Math.PI) / 180) + feedRot;
+        const r1 = ((deg1 * Math.PI) / 180) + feedRot;
+        const rMid = ((degMid * Math.PI) / 180) + feedRot;
 
         // Outer cylinder quad
         const p00 = project({ x: R * Math.cos(r0), y: R * Math.sin(r0), z: z0 });
@@ -444,14 +529,15 @@ export function WeldSetup3D({
       : `rgba(30, 41, 59, ${wallFaceAlpha})`;
     const wallFaceStroke = isDark ? "rgba(100, 116, 139, 0.55)" : "rgba(15, 23, 42, 0.65)";
 
-    for (const zEnd of [-halfLen, halfLen]) {
+    for (const zEndBase of [-halfLen, halfLen]) {
+      const zEnd = zEndBase + feedZ;
       for (let it = 0; it < nSegTheta; it += 1) {
         const deg0 = (it / nSegTheta) * 360;
         const deg1 = ((it + 1) / nSegTheta) * 360;
         const degMid = (deg0 + deg1) / 2;
         if (zEnd > 0 && isCutawayAngle(degMid)) continue;
-        const r0 = (deg0 * Math.PI) / 180;
-        const r1 = (deg1 * Math.PI) / 180;
+        const r0 = ((deg0 * Math.PI) / 180) + feedRot;
+        const r1 = ((deg1 * Math.PI) / 180) + feedRot;
         const e0 = project({ x: R * Math.cos(r0), y: R * Math.sin(r0), z: zEnd });
         const e1 = project({ x: R * Math.cos(r1), y: R * Math.sin(r1), z: zEnd });
         const e2 = project({ x: Ri * Math.cos(r1), y: Ri * Math.sin(r1), z: zEnd });
@@ -498,61 +584,154 @@ export function WeldSetup3D({
     const zTape0 = -wHalf - tapeGap - tapeWidth;
     const zTape1 = -wHalf - tapeGap;
 
-    for (let it = 0; it < nSegTheta; it += 1) {
-      const deg0 = (it / nSegTheta) * 360;
-      const deg1 = ((it + 1) / nSegTheta) * 360;
-      const degMid = (deg0 + deg1) / 2;
+    if (activeSeamType === "girth") {
+      for (let it = 0; it < nSegTheta; it += 1) {
+        const deg0 = (it / nSegTheta) * 360;
+        const deg1 = ((it + 1) / nSegTheta) * 360;
+        const degMid = (deg0 + deg1) / 2;
 
-      const r0 = (deg0 * Math.PI) / 180;
-      const r1 = (deg1 * Math.PI) / 180;
-      const shade = 0.65 + 0.35 * Math.sin(((degMid + 35) * Math.PI) / 180);
+        const r0 = ((deg0 * Math.PI) / 180) + feedRot;
+        const r1 = ((deg1 * Math.PI) / 180) + feedRot;
+        const shade = 0.65 + 0.35 * Math.sin(((degMid + 35) * Math.PI) / 180);
 
-      // Circumferential Measuring Tape (Şerit Metre) wrapped right beside the girth weld (z < 0 side)
-      const tp00 = project({ x: rTape * Math.cos(r0), y: rTape * Math.sin(r0), z: zTape0 });
-      const tp10 = project({ x: rTape * Math.cos(r1), y: rTape * Math.sin(r1), z: zTape0 });
-      const tp11 = project({ x: rTape * Math.cos(r1), y: rTape * Math.sin(r1), z: zTape1 });
-      const tp01 = project({ x: rTape * Math.cos(r0), y: rTape * Math.sin(r0), z: zTape1 });
-      const trR = Math.round(250 * (0.72 + 0.28 * shade));
-      const trG = Math.round(204 * (0.72 + 0.28 * shade));
-      const trB = Math.round(21 * (0.72 + 0.28 * shade));
-      quads.push({
-        pts: [tp00, tp10, tp11, tp01],
-        fill: `rgba(${trR}, ${trG}, ${trB}, ${Math.min(0.95, pipeOpacity + 0.25).toFixed(2)})`,
-        stroke: "rgba(113, 63, 18, 0.55)",
-        lineWidth: 0.6,
-        avgDepth: (tp00.depth + tp10.depth + tp11.depth + tp01.depth) / 4 + 0.18,
-      });
+        // Circumferential Measuring Tape (Şerit Metre) wrapped right beside the girth weld (z < 0 side)
+        const tp00 = project({ x: rTape * Math.cos(r0), y: rTape * Math.sin(r0), z: zTape0 + feedZ });
+        const tp10 = project({ x: rTape * Math.cos(r1), y: rTape * Math.sin(r1), z: zTape0 + feedZ });
+        const tp11 = project({ x: rTape * Math.cos(r1), y: rTape * Math.sin(r1), z: zTape1 + feedZ });
+        const tp01 = project({ x: rTape * Math.cos(r0), y: rTape * Math.sin(r0), z: zTape1 + feedZ });
+        const trR = Math.round(250 * (0.72 + 0.28 * shade));
+        const trG = Math.round(204 * (0.72 + 0.28 * shade));
+        const trB = Math.round(21 * (0.72 + 0.28 * shade));
+        quads.push({
+          pts: [tp00, tp10, tp11, tp01],
+          fill: `rgba(${trR}, ${trG}, ${trB}, ${Math.min(0.95, pipeOpacity + 0.25).toFixed(2)})`,
+          stroke: "rgba(113, 63, 18, 0.55)",
+          lineWidth: 0.6,
+          avgDepth: (tp00.depth + tp10.depth + tp11.depth + tp01.depth) / 4 + 0.18,
+        });
 
-      if (isCutawayAngle(degMid)) continue;
+        if (isCutawayAngle(degMid)) continue;
 
-      // Outer weld cap band
-      const w00 = project({ x: rWeldCrown * Math.cos(r0), y: rWeldCrown * Math.sin(r0), z: -wHalf });
-      const w10 = project({ x: rWeldCrown * Math.cos(r1), y: rWeldCrown * Math.sin(r1), z: -wHalf });
-      const w11 = project({ x: rWeldCrown * Math.cos(r1), y: rWeldCrown * Math.sin(r1), z: wHalf });
-      const w01 = project({ x: rWeldCrown * Math.cos(r0), y: rWeldCrown * Math.sin(r0), z: wHalf });
+        // Outer weld cap band
+        const w00 = project({ x: rWeldCrown * Math.cos(r0), y: rWeldCrown * Math.sin(r0), z: -wHalf + feedZ });
+        const w10 = project({ x: rWeldCrown * Math.cos(r1), y: rWeldCrown * Math.sin(r1), z: -wHalf + feedZ });
+        const w11 = project({ x: rWeldCrown * Math.cos(r1), y: rWeldCrown * Math.sin(r1), z: wHalf + feedZ });
+        const w01 = project({ x: rWeldCrown * Math.cos(r0), y: rWeldCrown * Math.sin(r0), z: wHalf + feedZ });
 
+        const wr = Math.round(235 * shade);
+        const wg = Math.round(145 * shade);
+        const wb = Math.round(45 * shade);
+        quads.push({
+          pts: [w00, w10, w11, w01],
+          fill: `rgba(${wr}, ${wg}, ${wb}, 0.88)`,
+          stroke: isDark ? "rgba(255, 200, 110, 0.45)" : "rgba(160, 80, 10, 0.45)",
+          lineWidth: 0.8,
+          avgDepth: (w00.depth + w10.depth + w11.depth + w01.depth) / 4 + 0.2,
+        });
+
+        // Inner root pass band
+        const rt00 = project({ x: rWeldRoot * Math.cos(r0), y: rWeldRoot * Math.sin(r0), z: -wHalf * 0.65 + feedZ });
+        const rt10 = project({ x: rWeldRoot * Math.cos(r1), y: rWeldRoot * Math.sin(r1), z: -wHalf * 0.65 + feedZ });
+        const rt11 = project({ x: rWeldRoot * Math.cos(r1), y: rWeldRoot * Math.sin(r1), z: wHalf * 0.65 + feedZ });
+        const rt01 = project({ x: rWeldRoot * Math.cos(r0), y: rWeldRoot * Math.sin(r0), z: wHalf * 0.65 + feedZ });
+
+        quads.push({
+          pts: [rt00, rt10, rt11, rt01],
+          fill: `rgba(${wr}, ${Math.round(wg * 0.85)}, ${wb}, 0.78)`,
+          avgDepth: (rt00.depth + rt10.depth + rt11.depth + rt01.depth) / 4 + 0.1,
+        });
+      }
+    } else if (activeSeamType === "longitudinal") {
+      // Longitudinal straight weld along Z (ISO 10893-7 boyuna kaynak dikişi)
+      const thMid = (3 * Math.PI) / 2 + feedRot;
+      const dTh = Math.min(0.22, wHalf / R);
+      const th0 = thMid - dTh;
+      const th1 = thMid + dTh;
+      const shade = 0.88;
       const wr = Math.round(235 * shade);
       const wg = Math.round(145 * shade);
       const wb = Math.round(45 * shade);
-      quads.push({
-        pts: [w00, w10, w11, w01],
-        fill: `rgba(${wr}, ${wg}, ${wb}, 0.88)`,
-        stroke: isDark ? "rgba(255, 200, 110, 0.45)" : "rgba(160, 80, 10, 0.45)",
-        lineWidth: 0.8,
-        avgDepth: (w00.depth + w10.depth + w11.depth + w01.depth) / 4 + 0.2,
-      });
 
-      // Inner root pass band
-      const rt00 = project({ x: rWeldRoot * Math.cos(r0), y: rWeldRoot * Math.sin(r0), z: -wHalf * 0.65 });
-      const rt10 = project({ x: rWeldRoot * Math.cos(r1), y: rWeldRoot * Math.sin(r1), z: -wHalf * 0.65 });
-      const rt11 = project({ x: rWeldRoot * Math.cos(r1), y: rWeldRoot * Math.sin(r1), z: wHalf * 0.65 });
-      const rt01 = project({ x: rWeldRoot * Math.cos(r0), y: rWeldRoot * Math.sin(r0), z: wHalf * 0.65 });
+      const nSegWeldZ = 28;
+      for (let iz = 0; iz < nSegWeldZ; iz += 1) {
+        const z0 = -halfLen + (iz / nSegWeldZ) * pipeLen + feedZ;
+        const z1 = -halfLen + ((iz + 1) / nSegWeldZ) * pipeLen + feedZ;
 
-      quads.push({
-        pts: [rt00, rt10, rt11, rt01],
-        fill: `rgba(${wr}, ${Math.round(wg * 0.85)}, ${wb}, 0.78)`,
-        avgDepth: (rt00.depth + rt10.depth + rt11.depth + rt01.depth) / 4 + 0.1,
-      });
+        // Outer cap band
+        const w00 = project({ x: rWeldCrown * Math.cos(th0), y: rWeldCrown * Math.sin(th0), z: z0 });
+        const w10 = project({ x: rWeldCrown * Math.cos(th1), y: rWeldCrown * Math.sin(th1), z: z0 });
+        const w11 = project({ x: rWeldCrown * Math.cos(th1), y: rWeldCrown * Math.sin(th1), z: z1 });
+        const w01 = project({ x: rWeldCrown * Math.cos(th0), y: rWeldCrown * Math.sin(th0), z: z1 });
+
+        quads.push({
+          pts: [w00, w10, w11, w01],
+          fill: `rgba(${wr}, ${wg}, ${wb}, 0.92)`,
+          stroke: isDark ? "rgba(255, 200, 110, 0.55)" : "rgba(160, 80, 10, 0.55)",
+          lineWidth: 0.8,
+          avgDepth: (w00.depth + w10.depth + w11.depth + w01.depth) / 4 + 0.22,
+        });
+
+        // Inner root pass band
+        const rt00 = project({ x: rWeldRoot * Math.cos(th0 * 0.9 + th1 * 0.1), y: rWeldRoot * Math.sin(th0 * 0.9 + th1 * 0.1), z: z0 });
+        const rt10 = project({ x: rWeldRoot * Math.cos(th1 * 0.9 + th0 * 0.1), y: rWeldRoot * Math.sin(th1 * 0.9 + th0 * 0.1), z: z0 });
+        const rt11 = project({ x: rWeldRoot * Math.cos(th1 * 0.9 + th0 * 0.1), y: rWeldRoot * Math.sin(th1 * 0.9 + th0 * 0.1), z: z1 });
+        const rt01 = project({ x: rWeldRoot * Math.cos(th0 * 0.9 + th1 * 0.1), y: rWeldRoot * Math.sin(th0 * 0.9 + th1 * 0.1), z: z1 });
+
+        quads.push({
+          pts: [rt00, rt10, rt11, rt01],
+          fill: `rgba(${wr}, ${Math.round(wg * 0.85)}, ${wb}, 0.82)`,
+          avgDepth: (rt00.depth + rt10.depth + rt11.depth + rt01.depth) / 4 + 0.12,
+        });
+      }
+    } else {
+      // Helical / spiral weld seam (ISO 10893-7 helisel kaynak dikişi)
+      const nSegHelix = 120;
+      const totalTurns = (pipeLen * 2.2) / spiralPitch;
+      const totalRad = totalTurns * 2 * Math.PI;
+      const phiStart = -totalRad / 2;
+      const dPhi = totalRad / nSegHelix;
+
+      for (let i = 0; i < nSegHelix; i += 1) {
+        const phi0 = phiStart + i * dPhi;
+        const phi1 = phiStart + (i + 1) * dPhi;
+        const z0 = (phi0 / (2 * Math.PI)) * spiralPitch + feedZ;
+        const z1 = (phi1 / (2 * Math.PI)) * spiralPitch + feedZ;
+        if (z0 < -halfLen + feedZ || z1 > halfLen + feedZ) continue;
+
+        const ang0 = phi0 + feedRot - Math.PI / 2;
+        const ang1 = phi1 + feedRot - Math.PI / 2;
+        const degMid = ((ang0 + ang1) / 2 * 180) / Math.PI;
+        if (isCutawayAngle(degMid) && (z0 + z1) / 2 >= 0) continue;
+
+        const shade = 0.65 + 0.35 * Math.sin(ang0);
+        const wr = Math.round(235 * shade);
+        const wg = Math.round(145 * shade);
+        const wb = Math.round(45 * shade);
+
+        const w00 = project({ x: rWeldCrown * Math.cos(ang0), y: rWeldCrown * Math.sin(ang0), z: z0 - wHalf * 0.5 });
+        const w10 = project({ x: rWeldCrown * Math.cos(ang0), y: rWeldCrown * Math.sin(ang0), z: z0 + wHalf * 0.5 });
+        const w11 = project({ x: rWeldCrown * Math.cos(ang1), y: rWeldCrown * Math.sin(ang1), z: z1 + wHalf * 0.5 });
+        const w01 = project({ x: rWeldCrown * Math.cos(ang1), y: rWeldCrown * Math.sin(ang1), z: z1 - wHalf * 0.5 });
+
+        quads.push({
+          pts: [w00, w10, w11, w01],
+          fill: `rgba(${wr}, ${wg}, ${wb}, 0.90)`,
+          stroke: isDark ? "rgba(255, 200, 110, 0.45)" : "rgba(160, 80, 10, 0.45)",
+          lineWidth: 0.8,
+          avgDepth: (w00.depth + w10.depth + w11.depth + w01.depth) / 4 + 0.2,
+        });
+
+        const rt00 = project({ x: rWeldRoot * Math.cos(ang0), y: rWeldRoot * Math.sin(ang0), z: z0 - wHalf * 0.35 });
+        const rt10 = project({ x: rWeldRoot * Math.cos(ang0), y: rWeldRoot * Math.sin(ang0), z: z0 + wHalf * 0.35 });
+        const rt11 = project({ x: rWeldRoot * Math.cos(ang1), y: rWeldRoot * Math.sin(ang1), z: z1 + wHalf * 0.35 });
+        const rt01 = project({ x: rWeldRoot * Math.cos(ang1), y: rWeldRoot * Math.sin(ang1), z: z1 - wHalf * 0.35 });
+
+        quads.push({
+          pts: [rt00, rt10, rt11, rt01],
+          fill: `rgba(${wr}, ${Math.round(wg * 0.85)}, ${wb}, 0.78)`,
+          avgDepth: (rt00.depth + rt10.depth + rt11.depth + rt01.depth) / 4 + 0.1,
+        });
+      }
     }
 
     // Sort and draw pipe + weld + tape quads back-to-front
@@ -574,58 +753,60 @@ export function WeldSetup3D({
     }
 
     // 3b. Draw 3D Graduation Ticks & Centimeter Numbers on Circumferential Measuring Tape (Şerit Metre)
-    const circumCm = Math.max(5, (Math.PI * od) / 10);
-    const zTapeMid = (zTape0 + zTape1) / 2;
-    for (let deg = 0; deg < 360; deg += 5) {
-      const rad = (deg * Math.PI) / 180;
-      const nx = Math.cos(rad);
-      const ny = Math.sin(rad);
-      // Camera-space Z normal check so ticks/numbers are drawn only on camera-facing half of the pipe
-      const nz1 = -nx * sinY;
-      const nzCam = ny * sinP + nz1 * cosP;
-      if (nzCam < -0.05) continue;
+    if (activeSeamType === "girth") {
+      const circumCm = Math.max(5, (Math.PI * od) / 10);
+      const zTapeMid = (zTape0 + zTape1) / 2;
+      for (let deg = 0; deg < 360; deg += 5) {
+        const rad = (deg * Math.PI) / 180;
+        const nx = Math.cos(rad);
+        const ny = Math.sin(rad);
+        // Camera-space Z normal check so ticks/numbers are drawn only on camera-facing half of the pipe
+        const nz1 = -nx * sinY;
+        const nzCam = ny * sinP + nz1 * cosP;
+        if (nzCam < -0.05) continue;
 
-      const isMajor = deg % 30 === 0;
-      const zTickEnd = isMajor ? zTape0 + tapeWidth * 0.15 : zTape1 - tapeWidth * 0.45;
-      const tStart = project({ x: (rTape + 0.2) * nx, y: (rTape + 0.2) * ny, z: zTape1 });
-      const tEnd = project({ x: (rTape + 0.2) * nx, y: (rTape + 0.2) * ny, z: zTickEnd });
-      ctx.beginPath();
-      ctx.moveTo(tStart.x, tStart.y);
-      ctx.lineTo(tEnd.x, tEnd.y);
-      ctx.strokeStyle = isMajor ? "#1c1917" : "rgba(28, 25, 23, 0.7)";
-      ctx.lineWidth = isMajor ? 1.4 : 0.8;
-      ctx.stroke();
+        const isMajor = deg % 30 === 0;
+        const zTickEnd = isMajor ? zTape0 + tapeWidth * 0.15 : zTape1 - tapeWidth * 0.45;
+        const tStart = project({ x: (rTape + 0.2) * nx, y: (rTape + 0.2) * ny, z: zTape1 });
+        const tEnd = project({ x: (rTape + 0.2) * nx, y: (rTape + 0.2) * ny, z: zTickEnd });
+        ctx.beginPath();
+        ctx.moveTo(tStart.x, tStart.y);
+        ctx.lineTo(tEnd.x, tEnd.y);
+        ctx.strokeStyle = isMajor ? "#1c1917" : "rgba(28, 25, 23, 0.7)";
+        ctx.lineWidth = isMajor ? 1.4 : 0.8;
+        ctx.stroke();
 
-      if (isMajor && nzCam > 0.12) {
-        // Clockwise from 12 o'clock (90 deg) in cm
-        const clockwiseDeg = ((90 - deg) % 360 + 360) % 360;
-        const cmVal = Math.round((clockwiseDeg / 360) * circumCm);
-        const numPt = project({
-          x: (rTape + 0.4) * nx,
-          y: (rTape + 0.4) * ny,
-          z: zTapeMid - tapeWidth * 0.12,
-        });
-        ctx.fillStyle = "#1c1917";
-        ctx.font = "800 8px system-ui, sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(`${cmVal}`, numPt.x, numPt.y);
+        if (isMajor && nzCam > 0.12) {
+          // Clockwise from 12 o'clock (90 deg) in cm
+          const clockwiseDeg = ((90 - deg) % 360 + 360) % 360;
+          const cmVal = Math.round((clockwiseDeg / 360) * circumCm);
+          const numPt = project({
+            x: (rTape + 0.4) * nx,
+            y: (rTape + 0.4) * ny,
+            z: zTapeMid - tapeWidth * 0.12,
+          });
+          ctx.fillStyle = "#1c1917";
+          ctx.font = "800 8px system-ui, sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(`${cmVal}`, numPt.x, numPt.y);
+        }
       }
-    }
-    if (showDimensions) {
-      const tapeCalloutPt = project({
-        x: -rTape * Math.cos((35 * Math.PI) / 180),
-        y: rTape * Math.sin((35 * Math.PI) / 180),
-        z: zTape0,
-      });
-      ctx.font = "600 9px system-ui, sans-serif";
-      ctx.fillStyle = isDark ? "#fde047" : "#854d0e";
-      ctx.textAlign = "right";
-      ctx.fillText(
-        lang === "tr" ? "Şerit Metre (cm)" : "Measuring Tape (cm)",
-        tapeCalloutPt.x - 6,
-        tapeCalloutPt.y - 4,
-      );
+      if (showDimensions) {
+        const tapeCalloutPt = project({
+          x: -rTape * Math.cos((35 * Math.PI) / 180),
+          y: rTape * Math.sin((35 * Math.PI) / 180),
+          z: zTape0,
+        });
+        ctx.font = "600 9px system-ui, sans-serif";
+        ctx.fillStyle = isDark ? "#fde047" : "#854d0e";
+        ctx.textAlign = "right";
+        ctx.fillText(
+          lang === "tr" ? "Şerit Metre (cm)" : "Measuring Tape (cm)",
+          tapeCalloutPt.x - 6,
+          tapeCalloutPt.y - 4,
+        );
+      }
     }
 
     // Draw pipe end rings (at z = -halfLen and z = +halfLen)
@@ -667,11 +848,11 @@ export function WeldSetup3D({
     // If cutaway is active, highlight the exposed longitudinal wall thickness faces at z >= 0 with dark gunmetal steel + cross-hatching
     if (cutaway) {
       for (const cutDeg of [315, 45]) {
-        const rad = (cutDeg * Math.PI) / 180;
-        const c0 = project({ x: Ri * Math.cos(rad), y: Ri * Math.sin(rad), z: 0 });
-        const c1 = project({ x: R * Math.cos(rad), y: R * Math.sin(rad), z: 0 });
-        const c2 = project({ x: R * Math.cos(rad), y: R * Math.sin(rad), z: halfLen });
-        const c3 = project({ x: Ri * Math.cos(rad), y: Ri * Math.sin(rad), z: halfLen });
+        const rad = ((cutDeg * Math.PI) / 180) + feedRot;
+        const c0 = project({ x: Ri * Math.cos(rad), y: Ri * Math.sin(rad), z: 0 + feedZ });
+        const c1 = project({ x: R * Math.cos(rad), y: R * Math.sin(rad), z: 0 + feedZ });
+        const c2 = project({ x: R * Math.cos(rad), y: R * Math.sin(rad), z: halfLen + feedZ });
+        const c3 = project({ x: Ri * Math.cos(rad), y: Ri * Math.sin(rad), z: halfLen + feedZ });
         ctx.beginPath();
         ctx.moveTo(c0.x, c0.y);
         ctx.lineTo(c1.x, c1.y);
@@ -689,8 +870,8 @@ export function WeldSetup3D({
         ctx.strokeStyle = isDark ? "rgba(148, 163, 184, 0.45)" : "rgba(203, 213, 225, 0.55)";
         ctx.lineWidth = 0.9;
         for (let ih = 1; ih < nHatch; ih += 1) {
-          const zH0 = ((ih - 0.35) / nHatch) * halfLen;
-          const zH1 = ((ih + 0.35) / nHatch) * halfLen;
+          const zH0 = ((ih - 0.35) / nHatch) * halfLen + feedZ;
+          const zH1 = ((ih + 0.35) / nHatch) * halfLen + feedZ;
           const hIn = project({ x: Ri * Math.cos(rad), y: Ri * Math.sin(rad), z: zH0 });
           const hOut = project({ x: R * Math.cos(rad), y: R * Math.sin(rad), z: zH1 });
           ctx.beginPath();
@@ -749,7 +930,7 @@ export function WeldSetup3D({
 
       // Detector corners or curved strip in station local coords
       if ((isPlanar && isDigital) || activeGeo === "dwdi_elliptic" || activeGeo === "dwdi_super") {
-        const hw = detW / 2;
+        const hw = isFilmInside ? Math.min(detW / 2, Ri * 0.9) : detW / 2;
         const cornersLocal: Vec3[] = [
           { x: -hw, y: detY, z: zMinDet },
           { x: hw, y: detY, z: zMinDet },
@@ -798,7 +979,7 @@ export function WeldSetup3D({
         }
       } else {
         // Curved flexible film / CR wrapped along bottom arc
-        const rFilm = R + Math.max(bgap, R * 0.06);
+        const rFilm = isFilmInside ? Ri : R + Math.max(bgap, R * 0.06);
         const spanDeg = Math.min(130, Math.max(65, 360 / totalStations + 18));
         const aStart = 270 - spanDeg / 2;
         const aEnd = 270 + spanDeg / 2;
@@ -840,8 +1021,9 @@ export function WeldSetup3D({
 
       // Station index badge
       if (totalStations > 1) {
+        const badgeY = isFilmInside ? detY + R * 0.16 : detY - R * 0.16;
         const badgePt = project(
-          rotZ({ x: 0, y: detY - R * 0.16, z: detCenterZ }, stAngle),
+          rotZ({ x: 0, y: badgeY, z: detCenterZ }, stAngle),
         );
         ctx.beginPath();
         ctx.arc(badgePt.x, badgePt.y, isCurrent ? 10 : 8, 0, Math.PI * 2);
@@ -1148,39 +1330,77 @@ export function WeldSetup3D({
         ctx.lineWidth = 2.5;
         ctx.stroke();
       } else {
-        // SWSI or DWSI: SINGLE bottom weld shadow at z = 0 (upper weld is avoided in DWSI!)
-        ctx.beginPath();
-        let started = false;
-        for (let deg = 225; deg <= 315; deg += 5) {
-          const rad = (deg * Math.PI) / 180;
-          const hit = project(
-            rotZ(
-              {
-                x: Math.max(-detW * 0.45, Math.min(detW * 0.45, R * Math.cos(rad))),
-                y: detY + 0.5,
-                z: 0,
-              },
-              activeAngle,
-            ),
+        // SWSI or DWSI:
+        if (activeSeamType === "longitudinal") {
+          // Longitudinal straight seam shadow along Z
+          ctx.beginPath();
+          const hitA = project(
+            rotZ({ x: 0, y: detY + 0.5, z: -detH * 0.46 }, activeAngle)
           );
-          if (!started) {
-            ctx.moveTo(hit.x, hit.y);
-            started = true;
-          } else {
-            ctx.lineTo(hit.x, hit.y);
+          const hitB = project(
+            rotZ({ x: 0, y: detY + 0.5, z: detH * 0.46 }, activeAngle)
+          );
+          ctx.moveTo(hitA.x, hitA.y);
+          ctx.lineTo(hitB.x, hitB.y);
+          ctx.strokeStyle = "#fbbf24";
+          ctx.lineWidth = 4.2;
+          ctx.stroke();
+        } else if (activeSeamType === "helical") {
+          // Helical seam diagonal shadow crossing detector right through the center
+          const slope = Math.min(1.2, spiralPitch / (2 * Math.PI * R));
+          const spanX = detW * 0.40;
+          const spanZ = spanX * slope;
+          ctx.beginPath();
+          const hitA = project(
+            rotZ({ x: -spanX, y: detY + 0.5, z: -spanZ }, activeAngle)
+          );
+          const hitB = project(
+            rotZ({ x: spanX, y: detY + 0.5, z: spanZ }, activeAngle)
+          );
+          ctx.moveTo(hitA.x, hitA.y);
+          ctx.lineTo(hitB.x, hitB.y);
+          ctx.strokeStyle = isStationary ? "#10b981" : "#fbbf24";
+          ctx.lineWidth = isStationary ? 5.2 : 4.2;
+          ctx.stroke();
+        } else {
+          // Girth weld arc shadow
+          ctx.beginPath();
+          let started = false;
+          for (let deg = 225; deg <= 315; deg += 5) {
+            const rad = (deg * Math.PI) / 180;
+            const hit = project(
+              rotZ(
+                {
+                  x: Math.max(-detW * 0.45, Math.min(detW * 0.45, R * Math.cos(rad))),
+                  y: detY + 0.5,
+                  z: 0,
+                },
+                activeAngle,
+              ),
+            );
+            if (!started) {
+              ctx.moveTo(hit.x, hit.y);
+              started = true;
+            } else {
+              ctx.lineTo(hit.x, hit.y);
+            }
           }
+          ctx.strokeStyle = "#fbbf24";
+          ctx.lineWidth = 3.4;
+          ctx.stroke();
         }
-        ctx.strokeStyle = "#fbbf24";
-        ctx.lineWidth = 3.4;
-        ctx.stroke();
       }
     }
 
     // 7. Realistic 3D IQI Model (ISO 19232-1 Wire Pouch / ISO 19232-2 Step-Hole Plaque)
     const iqiYLocal = filmSide
-      ? -R - wCap - Math.max(bgap * 0.22, R * 0.025) // Film side: outer bottom wall over weld
+      ? isFilmInside
+        ? -Ri + Math.max(0.8, R * 0.03) // Film inside: film-side IQI placed on inner wall over film
+        : -R - wCap - Math.max(bgap * 0.22, R * 0.025) // Film outside: outer bottom wall over weld
       : activeGeo === "swsi"
-        ? -Ri + Math.max(0.8, R * 0.03) // SWSI source side: inner bottom surface over weld
+        ? isFilmInside
+          ? -R - wCap - Math.max(0.8, R * 0.03) // Source outside: source-side IQI placed on outer bottom wall
+          : -Ri + Math.max(0.8, R * 0.03) // SWSI panoramic source side: inner bottom surface over weld
         : R + wCap + Math.max(0.8, R * 0.03); // DWSI/DWDI source side: top outer wall over weld
     const iqiCenterX = R * 0.22;
     const iqiHalfW = Math.max(wHalf * 1.15, R * 0.16); // Circumferential half-width (across 6 wires)
@@ -1348,7 +1568,15 @@ export function WeldSetup3D({
               ? lang === "tr"
                 ? " • Z=0 (Dik / Üst+Alt Çakışık)"
                 : " • Z=0 (Perpendicular / Superimposed)"
-              : "";
+              : isFilmInside
+                ? lang === "tr"
+                  ? " • Odak Dışarıda"
+                  : " • Source Outside"
+                : isSourceEccentric
+                  ? lang === "tr"
+                    ? " • Odak İçeride (Eksantrik)"
+                    : " • Source Inside (Eccentric)"
+                  : "";
       ctx.fillText(
         `S (d=${Number(d || 0).toFixed(1)} mm)${srcOffsetNote}`,
         srcProj.x + 12,
@@ -1388,9 +1616,13 @@ export function WeldSetup3D({
               ? lang === "tr"
                 ? "Çift Görüntü (Üst + Alt Kaynak Üst Üste Çakışık)"
                 : "Double Image (Top + Bottom Weld Superimposed)"
-              : lang === "tr"
-                ? "Tek Cidar Tek Görüntü (Alt Kaynak)"
-                : "Single Wall Single Image";
+              : isFilmInside
+                ? lang === "tr"
+                  ? "Tek Cidar Tek Görüntü (Film İçeride, Odak Dışarıda)"
+                  : "Single Wall Single Image (Film Inside, Source Outside)"
+                : lang === "tr"
+                  ? "Tek Cidar Tek Görüntü (Panoramik / Odak İçeride)"
+                  : "Single Wall Single Image (Panoramic / Source Inside)";
       const bSafe = Number(bDist || 0);
       const detTag = isDigital
         ? `${isPlanar ? "DDA Panel" : "Esnek CR"} • b=${bSafe.toFixed(1)} mm • ${projModeTag}`
@@ -1515,6 +1747,8 @@ export function WeldSetup3D({
     totalStations,
     isFullscreen,
     containerWidth,
+    activeSeamType,
+    feedTime,
   ]);
 
   const tr = lang === "tr";
@@ -1604,6 +1838,39 @@ export function WeldSetup3D({
             }
           >
             {tr ? "Işın Gözü" : "Beam's-Eye"}
+          </button>
+        </div>
+
+        <div className="sketch-btn-group" title={tr ? "Kaynak Dikiş Türü (ISO 10893-7 Boru Kaynakları)" : "Weld Seam Type (ISO 10893-7 Welded Tubes)"}>
+          <button
+            type="button"
+            className={`sketch-mini-btn ${activeSeamType === "girth" ? "active" : ""}`}
+            onClick={() => {
+              setSeamTypeState("girth");
+              onSeamTypeChange?.("girth");
+            }}
+          >
+            {tr ? "Alın (Çevresel)" : "Girth"}
+          </button>
+          <button
+            type="button"
+            className={`sketch-mini-btn ${activeSeamType === "longitudinal" ? "active" : ""}`}
+            onClick={() => {
+              setSeamTypeState("longitudinal");
+              onSeamTypeChange?.("longitudinal");
+            }}
+          >
+            {tr ? "Boyuna Düz" : "Longitudinal"}
+          </button>
+          <button
+            type="button"
+            className={`sketch-mini-btn ${activeSeamType === "helical" ? "active" : ""}`}
+            onClick={() => {
+              setSeamTypeState("helical");
+              onSeamTypeChange?.("helical");
+            }}
+          >
+            {tr ? "Helisel (Spiral)" : "Helical"}
           </button>
         </div>
 
@@ -1725,40 +1992,94 @@ export function WeldSetup3D({
             />
             <span style={{ minWidth: 32 }}>{Math.round(pipeOpacity * 100)}%</span>
           </label>
-          <button
-            type="button"
-            className={`sketch-mini-btn ${showAllStations ? "active" : ""}`}
-            onClick={() => setShowAllStations((v) => !v)}
-          >
-            {tr
-              ? `Tüm İstasyonlar (${totalStations})`
-              : `All Stations (${totalStations})`}
-          </button>
-          {totalStations > 1 && (
+          {activeSeamType === "girth" ? (
+            <>
+              <button
+                type="button"
+                className={`sketch-mini-btn ${showAllStations ? "active" : ""}`}
+                onClick={() => setShowAllStations((v) => !v)}
+              >
+                {tr
+                  ? `Tüm İstasyonlar (${totalStations})`
+                  : `All Stations (${totalStations})`}
+              </button>
+              {totalStations > 1 && (
+                <>
+                  <button
+                    type="button"
+                    className={`sketch-mini-btn ${playing ? "active" : ""}`}
+                    onClick={() => setPlaying((v) => !v)}
+                  >
+                    {playing ? (tr ? "⏸ Durdur" : "⏸ Pause") : tr ? "▶ Poz Döndür" : "▶ Rotate"}
+                  </button>
+                  <input
+                    type="range"
+                    min={0}
+                    max={totalStations - 1}
+                    step={1}
+                    value={safeStation}
+                    onChange={(event) => {
+                      setPlaying(false);
+                      setActiveStation(Number(event.target.value));
+                    }}
+                    aria-label={tr ? "Poz İstasyonu" : "Exposure Station"}
+                  />
+                  <span className="sketch-station-label">
+                    {tr
+                      ? `İstasyon #${safeStation + 1}/${totalStations} (${Math.round((safeStation * stationStepRad * 180) / Math.PI)}°)`
+                      : `Station #${safeStation + 1}/${totalStations} (${Math.round((safeStation * stationStepRad * 180) / Math.PI)}°)`}
+                  </span>
+                </>
+              )}
+            </>
+          ) : (
             <>
               <button
                 type="button"
                 className={`sketch-mini-btn ${playing ? "active" : ""}`}
                 onClick={() => setPlaying((v) => !v)}
               >
-                {playing ? (tr ? "⏸ Durdur" : "⏸ Pause") : tr ? "▶ Poz Döndür" : "▶ Rotate"}
+                {playing
+                  ? (tr ? "⏸ Durdur" : "⏸ Pause")
+                  : (tr ? "▶ Akıcı İlerleme (Start-Stop)" : "▶ Fluid Feed (Start-Stop)")}
               </button>
+              <div className="sketch-mini-station-group" style={{ display: "inline-flex", gap: "2px" }}>
+                {[0, 1, 2, 3].map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    className={`sketch-mini-btn ${Math.floor(feedTime) === s ? "active" : ""}`}
+                    style={{ padding: "2px 7px", fontSize: "11px" }}
+                    onClick={() => {
+                      setPlaying(false);
+                      setFeedTime(s);
+                    }}
+                    title={tr ? `İstasyon #${s + 1} Pozisyonuna Git` : `Jump to Station #${s + 1}`}
+                  >
+                    #{s + 1}
+                  </button>
+                ))}
+              </div>
               <input
                 type="range"
                 min={0}
-                max={totalStations - 1}
-                step={1}
-                value={safeStation}
+                max={3.99}
+                step={0.01}
+                value={feedTime}
                 onChange={(event) => {
                   setPlaying(false);
-                  setActiveStation(Number(event.target.value));
+                  setFeedTime(Number(event.target.value));
                 }}
-                aria-label={tr ? "Poz İstasyonu" : "Exposure Station"}
+                aria-label={tr ? "Boru İlerleme Zamanı (Madde 4.7)" : "Pipe Feed Timeline (Clause 4.7)"}
               />
               <span className="sketch-station-label">
-                {tr
-                  ? `İstasyon #${safeStation + 1}/${totalStations} (${Math.round((safeStation * stationStepRad * 180) / Math.PI)}°)`
-                  : `Station #${safeStation + 1}/${totalStations} (${Math.round((safeStation * stationStepRad * 180) / Math.PI)}°)`}
+                {(feedTime - Math.floor(feedTime)) < 0.45
+                  ? (tr
+                      ? `📸 İstasyon #${Math.min(3, Math.floor(feedTime)) + 1}/4 (Pozlama / Sabit)`
+                      : `📸 Station #${Math.min(3, Math.floor(feedTime)) + 1}/4 (Exposing / Stationary)`)
+                  : (tr
+                      ? `🔄 Akıcı İlerleme & Dönme (#${Math.min(3, Math.floor(feedTime)) + 1} ➔ #${((Math.min(3, Math.floor(feedTime)) + 1) % 4) + 1})`
+                      : `🔄 Moving & Rotating (#${Math.min(3, Math.floor(feedTime)) + 1} ➔ #${((Math.min(3, Math.floor(feedTime)) + 1) % 4) + 1})`)}
               </span>
             </>
           )}

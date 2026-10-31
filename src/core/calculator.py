@@ -531,11 +531,78 @@ class RTCalculator:
             return required > 0.0, float("inf")
         return required > base + 1e-9, required / base
 
-    def get_single_wire_iqi(self, t, cap, testing_class, geometry, tech="digital", film_side=False, lang="tr"):
+    def get_single_wire_iqi(self, t, cap, testing_class, geometry, tech="digital", film_side=False, lang="tr", standard="iso"):
         """
         Determines target single wire IQI number (Step 8)
-        Based on ISO 17636-1 Annex B for Analog, ISO 17636-2 Annex B for Digital.
+        Based on ISO 17636-1 Annex B for Analog, ISO 17636-2 Annex B for Digital,
+        or ISO 10893-7:2019 Table 1 & Table 2 for welded steel tube seams.
         """
+        if standard == "iso10893_7":
+            # ISO 10893-7:2019 Table 1 (Class A) & Table 2 (Class B)
+            # Per Clause 7.4: for double-wall, ref_thickness is twice specified wall thickness
+            if geometry in ["dwsi", "dwdi_elliptic", "dwdi_super"]:
+                ref_thickness = 2.0 * t
+            else:
+                ref_thickness = float(t)
+
+            if testing_class == "class_a":
+                table_name = "ISO 10893-7 Table 1" if lang == "en" else "ISO 10893-7 Tablo 1"
+                if ref_thickness <= 1.2:
+                    wire = 18
+                elif ref_thickness <= 2.0:
+                    wire = 17
+                elif ref_thickness <= 3.5:
+                    wire = 16
+                elif ref_thickness <= 5.0:
+                    wire = 15
+                elif ref_thickness <= 7.0:
+                    wire = 14
+                elif ref_thickness <= 10.0:
+                    wire = 13
+                elif ref_thickness <= 15.0:
+                    wire = 12
+                elif ref_thickness <= 25.0:
+                    wire = 11
+                elif ref_thickness <= 32.0:
+                    wire = 10
+                elif ref_thickness <= 40.0:
+                    wire = 9
+                elif ref_thickness <= 55.0:
+                    wire = 8
+                else:
+                    wire = 7
+            else:  # class_b
+                table_name = "ISO 10893-7 Table 2" if lang == "en" else "ISO 10893-7 Tablo 2"
+                if ref_thickness <= 1.5:
+                    wire = 19
+                elif ref_thickness <= 2.5:
+                    wire = 18
+                elif ref_thickness <= 4.0:
+                    wire = 17
+                elif ref_thickness <= 6.0:
+                    wire = 16
+                elif ref_thickness <= 8.0:
+                    wire = 15
+                elif ref_thickness <= 12.0:
+                    wire = 14
+                elif ref_thickness <= 20.0:
+                    wire = 13
+                elif ref_thickness <= 30.0:
+                    wire = 12
+                elif ref_thickness <= 35.0:
+                    wire = 11
+                elif ref_thickness <= 45.0:
+                    wire = 10
+                elif ref_thickness <= 65.0:
+                    wire = 9
+                else:
+                    wire = 8
+
+            t_label = "2 * T" if geometry in ["dwsi", "dwdi_elliptic", "dwdi_super"] else "T"
+            thickness_desc = f"{t_label} = {ref_thickness:.2f} mm"
+            dia = self.wire_diameters.get(wire, 0.0)
+            display_str = f"W {wire} ({dia:.3f} mm) [{table_name}, {thickness_desc}]"
+            return display_str, wire
         # ISO 17636-1/2:2022 Annex B tables are indexed by the nominal wall
         # thickness t (single-wall) or the penetrated thickness w = 2t
         # (double-wall). Definitions 3.1/3.3 exclude weld reinforcement (cap),
@@ -781,11 +848,66 @@ class RTCalculator:
         display_str = f"W {wire} ({dia:.3f} mm) [{table_name}, {thickness_desc}]"
         return display_str, wire
 
-    def get_step_hole_iqi(self, t, cap, testing_class, geometry, tech="digital", film_side=False, lang="tr"):
+    def get_step_hole_iqi(self, t, cap, testing_class, geometry, tech="digital", film_side=False, lang="tr", standard="iso"):
         """
         Determines target step-and-hole IQI number (designator H1-H18)
-        Based on ISO 17636-1/2 Annex B tables B.2, B.4, B.6, B.8, B.10, B.12.
+        Based on ISO 17636-1/2 Annex B tables B.2, B.4, B.6, B.8, B.10, B.12,
+        or ISO 10893-7:2019 Table 1 & Table 2.
         """
+        if standard == "iso10893_7":
+            if geometry in ["dwsi", "dwdi_elliptic", "dwdi_super"]:
+                ref_thickness = 2.0 * t
+            else:
+                ref_thickness = float(t)
+
+            if testing_class == "class_a":
+                table_name = "ISO 10893-7 Table 1" if lang == "en" else "ISO 10893-7 Tablo 1"
+                if ref_thickness <= 2.0:
+                    hole = 3
+                elif ref_thickness <= 3.5:
+                    hole = 4
+                elif ref_thickness <= 6.0:
+                    hole = 5
+                elif ref_thickness <= 10.0:
+                    hole = 6
+                elif ref_thickness <= 15.0:
+                    hole = 7
+                elif ref_thickness <= 24.0:
+                    hole = 8
+                elif ref_thickness <= 30.0:
+                    hole = 9
+                elif ref_thickness <= 40.0:
+                    hole = 10
+                elif ref_thickness <= 60.0:
+                    hole = 11
+                else:
+                    hole = 12
+            else:  # class_b
+                table_name = "ISO 10893-7 Table 2" if lang == "en" else "ISO 10893-7 Tablo 2"
+                if ref_thickness <= 2.5:
+                    hole = 2
+                elif ref_thickness <= 4.0:
+                    hole = 3
+                elif ref_thickness <= 8.0:
+                    hole = 4
+                elif ref_thickness <= 12.0:
+                    hole = 5
+                elif ref_thickness <= 20.0:
+                    hole = 6
+                elif ref_thickness <= 30.0:
+                    hole = 7
+                elif ref_thickness <= 40.0:
+                    hole = 8
+                elif ref_thickness <= 60.0:
+                    hole = 9
+                else:
+                    hole = 10
+
+            t_label = "2 * T" if geometry in ["dwsi", "dwdi_elliptic", "dwdi_super"] else "T"
+            thickness_desc = f"{t_label} = {ref_thickness:.2f} mm"
+            dia = self.step_hole_dias.get(hole, 0.0)
+            display_str = f"H {hole} ({dia:.2f} mm) [{table_name}, {thickness_desc}]"
+            return display_str, hole
         # ISO 17636-1/2:2022 Annex B tables are indexed by the nominal wall
         # thickness t (single-wall) or the penetrated thickness w = 2t
         # (double-wall). Definitions 3.1/3.3 exclude weld reinforcement (cap),
@@ -969,11 +1091,18 @@ class RTCalculator:
         display_str = f"H {hole} ({dia:.3f} mm) [{table_name}, {thickness_desc}]"
         return display_str, hole
 
-    def get_target_snr(self, material, source, kv, w_nom, testing_class, lang="tr"):
+    def get_target_snr(self, material, source, kv, w_nom, testing_class, lang="tr", standard="iso"):
         """
-        Determines target baseline SNR_N based on ISO 17636-2 Table 3 and Table 4.
+        Determines target baseline SNR_N based on ISO 17636-2 Table 3 and Table 4
+        or ISO 10893-7:2019 Clause 7.3.
         Returns: (target_snr, table_name, selection_desc)
         """
+        if standard == "iso10893_7":
+            table_name = "ISO 10893-7 Clause 7.3" if lang == "en" else "ISO 10893-7 Madde 7.3"
+            base_snr = 70 if testing_class == "class_a" else 100
+            desc = "ISO 10893-7 (Class A: >70, Class B: >100)"
+            return base_snr, table_name, desc
+
         table_3_title = "Table 3" if lang == "en" else "Tablo 3"
         table_4_title = "Table 4" if lang == "en" else "Tablo 4"
 
@@ -1059,10 +1188,11 @@ class RTCalculator:
 
         return base_snr, table_name, desc
 
-    def get_duplex_iqi(self, w_nom, testing_class, geometry="swsi", lang="tr"):
+    def get_duplex_iqi(self, w_nom, testing_class, geometry="swsi", lang="tr", standard="iso"):
         """
         Determines target duplex wire IQI D-number (Step 8, Digital ONLY)
-        Reference: ISO 17636-2:2022 Annex B Tables B.13 (Class A) and B.14 (Class B).
+        Reference: ISO 17636-2:2022 Annex B Tables B.13 (Class A) and B.14 (Class B),
+        or ISO 10893-7:2019 Table 1 (Class A) and Table 2 (Class B).
         Per footnote a: For DWSI (double-wall single-image), the nominal thickness t
         shall be used instead of the penetrated thickness w.
         - SWSI: single wall, ref = w_nom = t
@@ -1073,17 +1203,58 @@ class RTCalculator:
           D9=0.125mm, D8=0.160mm, D7=0.200mm, D6=0.250mm, D5=0.320mm, D4=0.400mm
         Returns tuple of (display_string, integer_number)
         """
-        # Select reference thickness per ISO footnote a
-        if geometry == "dwsi":
-            ref = w_nom / 2.0  # single wall thickness t
-        else:
-            ref = w_nom
-
         # D-wire diameters per ISO 19232-5
         d_wire_diameters = {
             14: 0.040, 13: 0.050, 12: 0.063, 11: 0.080, 10: 0.100,
             9: 0.125, 8: 0.160, 7: 0.200, 6: 0.250, 5: 0.320, 4: 0.400
         }
+
+        if standard == "iso10893_7":
+            if geometry in ["dwsi", "dwdi_elliptic", "dwdi_super"]:
+                ref = w_nom  # Clause 7.4: twice specified wall thickness
+            else:
+                ref = w_nom
+
+            if testing_class == "class_a":
+                table_name = "ISO 10893-7 Table 1" if lang == "en" else "ISO 10893-7 Tablo 1"
+                if ref <= 2.0:
+                    d_val, d_num = "D 11", 11
+                elif ref <= 5.0:
+                    d_val, d_num = "D 10", 10
+                elif ref <= 10.0:
+                    d_val, d_num = "D 9", 9
+                elif ref <= 25.0:
+                    d_val, d_num = "D 8", 8
+                elif ref <= 55.0:
+                    d_val, d_num = "D 7", 7
+                else:
+                    d_val, d_num = "D 6", 6
+            else:
+                table_name = "ISO 10893-7 Table 2" if lang == "en" else "ISO 10893-7 Tablo 2"
+                if ref <= 1.5:
+                    d_val, d_num = "D 14 (D 13+)", 14
+                elif ref <= 4.0:
+                    d_val, d_num = "D 13", 13
+                elif ref <= 8.0:
+                    d_val, d_num = "D 12", 12
+                elif ref <= 12.0:
+                    d_val, d_num = "D 11", 11
+                elif ref <= 40.0:
+                    d_val, d_num = "D 10", 10
+                else:
+                    d_val, d_num = "D 9", 9
+
+            dia = d_wire_diameters.get(d_num, 0.0)
+            t_label = "2 * T" if geometry in ["dwsi", "dwdi_elliptic", "dwdi_super"] else "T"
+            thickness_desc = f"{t_label} = {ref:.2f} mm"
+            d_str = f"{d_val} ({dia:.3f} mm) [{table_name}, {thickness_desc}]"
+            return d_str, d_num
+
+        # Select reference thickness per ISO footnote a
+        if geometry == "dwsi":
+            ref = w_nom / 2.0  # single wall thickness t
+        else:
+            ref = w_nom
 
         if testing_class == "class_a":
             # Table B.13 — Class A (ISO 17636-2:2022)
@@ -2949,16 +3120,46 @@ class RTCalculator:
             # Aluminium / titanium — Table 4: class A C5, class B C3
             return "C5" if testing_class == "class_a" else "C3"
 
-    def get_max_srb(self, w_nom, testing_class, geometry="swsi"):
+    def get_max_srb(self, w_nom, testing_class, geometry="swsi", standard="iso"):
         """
         Determines the maximum allowed basic spatial resolution (SR_b^max) of the detector in µm (Step 7)
-        Based on ISO 17636-2:2022 Tables B.13 (Class A) and B.14 (Class B).
+        Based on ISO 17636-2:2022 Tables B.13 (Class A) and B.14 (Class B),
+        or ISO 10893-7:2019 Table 1 (Class A) and Table 2 (Class B).
         Per footnote a: For DWSI (double-wall single-image), the nominal thickness t
         shall be used instead of the penetrated thickness w.
         - SWSI: ref = w_nom = t
         - DWSI: ref = w_nom / 2 = t
         - DWDI: ref = w_nom = 2t
         """
+        if standard == "iso10893_7":
+            ref = w_nom
+            if testing_class == "class_a":
+                if ref <= 2.0:
+                    return 80
+                elif ref <= 5.0:
+                    return 100
+                elif ref <= 10.0:
+                    return 130
+                elif ref <= 25.0:
+                    return 160
+                elif ref <= 55.0:
+                    return 200
+                else:
+                    return 250
+            else:
+                if ref <= 1.5:
+                    return 40
+                elif ref <= 4.0:
+                    return 50
+                elif ref <= 8.0:
+                    return 63
+                elif ref <= 12.0:
+                    return 80
+                elif ref <= 40.0:
+                    return 100
+                else:
+                    return 130
+
         if geometry == "dwsi":
             ref = w_nom / 2.0
         else:

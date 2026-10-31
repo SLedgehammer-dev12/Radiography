@@ -115,6 +115,21 @@ const CHART_OPTION_META: Record<string, { labelKey?: string; label?: string }> =
   dda_panel_chart: { labelKey: "chart_dda_panel" },
   digital_xray_chart: { labelKey: "chart_digital_xray" },
 };
+function getDefaultFigure(
+  geo: FormState["geometry"],
+  tech: FormState["tech"],
+  curved: boolean,
+): string {
+  if (tech === "digital") {
+    if (geo === "swsi") return curved ? "fig2a" : "fig2b";
+    if (geo === "dwdi_elliptic" || geo === "dwdi_super") return "fig11";
+    return curved ? "fig13a" : "fig13b";
+  }
+  if (geo === "swsi") return "fig2";
+  if (geo === "dwdi_elliptic" || geo === "dwdi_super") return "fig11";
+  return "fig13";
+}
+
 export default function App() {
   const {
     form,
@@ -243,6 +258,7 @@ export default function App() {
         tech: form.tech,
         geometry: form.geometry,
         detector_curved: form.detector_curved,
+        standard: form.standard,
       })
       .then((data) => {
         setFigures(data.figures);
@@ -255,7 +271,19 @@ export default function App() {
       })
       .catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, form.tech, form.geometry, form.detector_curved]);
+  }, [ready, form.tech, form.geometry, form.detector_curved, form.standard]);
+
+  // ISO 10893-7 requires Digital (CR/DDA) and X-ray source only.
+  useEffect(() => {
+    if (form.standard === "iso10893_7") {
+      setForm((previous) => {
+        if (previous.tech !== "digital" || previous.source !== "x_ray") {
+          return { ...previous, tech: "digital", source: "x_ray" };
+        }
+        return previous;
+      });
+    }
+  }, [form.standard]);
 
   // Keeps the film-size selector in sync when dimensions change externally
   // (preset/project import, unit conversion).
@@ -282,6 +310,7 @@ export default function App() {
   const xray = form.source === "x_ray";
   const planar = digital && !form.detector_curved;
   const isAsme = form.standard === "asme";
+  const isIso10893 = form.standard === "iso10893_7";
   const dwdi = form.geometry === "dwdi_elliptic" || form.geometry === "dwdi_super";
 
   // Desktop-parity output visibility (see _update_output_visibility):
@@ -314,7 +343,11 @@ export default function App() {
     value,
     label: t(value),
   }));
-  const sourceOptions = SOURCES.map((value) => ({ value, label: t(value) }));
+  const sourceOptions = SOURCES.map((value) => ({
+    value,
+    label: t(value),
+    disabled: isIso10893 && value !== "x_ray",
+  }));
   const activePipeTable = useMemo(() => {
     if (!pipeData) return null;
     return pipeStd === "b36_19" && pipeData.b36_19
@@ -1282,21 +1315,24 @@ export default function App() {
                 label={t("rt_tech")}
                 value={form.tech}
                 options={[
-                  { value: "analog", label: t("analog_film") },
+                  { value: "analog", label: t("analog_film"), disabled: isIso10893 },
                   { value: "digital", label: t("digital_cr_dda") },
                 ]}
                 onChange={(value) => {
                   const tech = value as FormState["tech"];
                   const validCharts = getActiveChartKeys(tech, form.detector_type, form.source);
-                  patch("tech", tech);
-                  patch("app_quality", tech === "digital" ? 140 : 2.5);
-                  if (!validCharts.includes(form.chart_source)) {
-                    patch("chart_source", validCharts[0] ?? "model");
-                  }
-                  if (tech === "analog") {
-                    patch("f_source", null);
-                    patch("b_object", null);
-                  }
+                  const nextFig = getDefaultFigure(form.geometry, tech, form.detector_curved);
+                  setForm((prev) => ({
+                    ...prev,
+                    tech,
+                    std_figure: nextFig,
+                    app_quality: tech === "digital" ? 140 : 2.5,
+                    chart_source: !validCharts.includes(prev.chart_source)
+                      ? (validCharts[0] ?? "model")
+                      : prev.chart_source,
+                    f_source: tech === "analog" ? null : prev.f_source,
+                    b_object: tech === "analog" ? null : prev.b_object,
+                  }));
                 }}
               />
               <div className="field-row-2">
@@ -1459,9 +1495,11 @@ export default function App() {
                 <SelectField
                   label={t("standard")}
                   value={form.standard}
+                  testId="select-standard"
                   options={[
                     { value: "iso", label: t("standard_iso") },
                     { value: "asme", label: t("standard_asme") },
+                    { value: "iso10893_7", label: t("standard_iso10893_7") },
                   ]}
                   onChange={(value) =>
                     patch("standard", value as FormState["standard"])
@@ -1475,9 +1513,11 @@ export default function App() {
                   value,
                   label: t(value),
                 }))}
-                onChange={(value) =>
-                  patch("geometry", value as FormState["geometry"])
-                }
+                onChange={(value) => {
+                  const newGeo = value as FormState["geometry"];
+                  const nextFig = getDefaultFigure(newGeo, form.tech, form.detector_curved);
+                  setForm((prev) => ({ ...prev, geometry: newGeo, std_figure: nextFig }));
+                }}
               />
               {dwdi && form.od > 100 && (
                 <div className="inline-alert" role="status">
@@ -1501,7 +1541,10 @@ export default function App() {
                     <button
                       type="button"
                       className="sync-btn"
-                      onClick={() => patch("geometry", "dwsi")}
+                      onClick={() => {
+                        const nextFig = getDefaultFigure("dwsi", form.tech, form.detector_curved);
+                        setForm((prev) => ({ ...prev, geometry: "dwsi", std_figure: nextFig }));
+                      }}
                     >
                       {lang === "tr" ? "DWSI Seç" : "Switch to DWSI"}
                     </button>
@@ -1509,7 +1552,7 @@ export default function App() {
                 </div>
               )}
               <SelectField
-                label={t("standard_fig")}
+                label={isIso10893 ? t("standard_fig_iso10893_7") : t("standard_fig")}
                 value={form.std_figure ?? ""}
                 options={figures.map((figure) => ({
                   value: figure,
@@ -1525,7 +1568,15 @@ export default function App() {
                     { value: "flat", label: t("detector_planar") },
                     { value: "curved", label: t("detector_flexible") },
                   ]}
-                  onChange={(value) => patch("detector_curved", value === "curved")}
+                  onChange={(value) => {
+                    const isCurved = value === "curved";
+                    const nextFig = getDefaultFigure(form.geometry, form.tech, isCurved);
+                    setForm((prev) => ({
+                      ...prev,
+                      detector_curved: isCurved,
+                      std_figure: nextFig,
+                    }));
+                  }}
                 />
               )}
               {planar && (
