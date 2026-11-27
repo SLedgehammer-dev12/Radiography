@@ -9,6 +9,8 @@
   --text-muted: #98a0bd;
   --accent: #7aa2ff;
   --accent-2: #8b5cf6;
+  --on-accent: #11111b;
+  --on-danger: #11111b;
   --accent-soft: rgba(122, 162, 255, 0.12);
   --green: #6ee7a8;
   --green-bg: #14532d;
@@ -43,6 +45,8 @@
   --text-muted: #5b6478;
   --accent: #2f6bff;
   --accent-2: #7c3aed;
+  --on-accent: #ffffff;
+  --on-danger: #ffffff;
   --accent-soft: rgba(47, 107, 255, 0.1);
   --green: #15803d;
   --green-bg: #bbf7d0;
@@ -74,6 +78,8 @@
   --text-muted: #1a1a1a;
   --accent: #0044cc;
   --accent-2: #4a00e0;
+  --on-accent: #ffffff;
+  --on-danger: #ffffff;
   --accent-soft: rgba(0, 68, 204, 0.15);
   --green: #006600;
   --green-bg: #c8e6c9;
@@ -173,15 +179,26 @@ button:disabled {
 }
 
 button.primary {
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  color: #fff;
+  background: linear-gradient(135deg, #2b5ce6, #5b3fd6);
+  color: #ffffff;
   border-color: transparent;
   font-weight: 600;
-  box-shadow: 0 6px 18px rgba(122, 162, 255, 0.28);
+  box-shadow: 0 6px 18px rgba(43, 92, 230, 0.28);
 }
 
 button.primary:hover {
   filter: brightness(1.06);
+  background: linear-gradient(135deg, #2b5ce6, #5b3fd6);
+}
+
+[data-theme="light"] button.primary,
+[data-theme="outdoor"] button.primary {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: var(--on-accent);
+}
+
+[data-theme="light"] button.primary:hover,
+[data-theme="outdoor"] button.primary:hover {
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
 }
 
@@ -245,10 +262,7 @@ button:focus-visible {
 .boot-screen h1 {
   margin: 0;
   font-size: 26px;
-  background: linear-gradient(120deg, var(--accent), var(--accent-2));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--accent);
 }
 
 .boot-note {
@@ -268,5 +282,19 @@ button:focus-visible {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button {
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  button:active {
+    transform: none;
+  }
+  .spinner {
+    animation: none;
+    border-color: var(--accent);
+    border-style: dashed;
   }
 }

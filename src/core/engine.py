@@ -2152,26 +2152,54 @@ class CalculationEngine:
                 else:
                     warnings.append(f"NOTE (Clause 7.6): The DWSI physical floor raised SFD_min to {geo['dwsi_physical_min']:.1f} mm (OD+bgap); f_min itself is determined only by wall thickness.")
 
-        if geometry == "dwsi" and std_figure in ("fig14", "fig14a", "fig14b"):
+        figure_conflict = None
+        if geometry == "dwsi" and std_figure in ("fig14", "fig14a", "fig14b") and od > 0.0:
             f_min_val = geo.get("f_min", 0.0)
-            if od > 0.0 and f_min_val > od:
+            surface_max_sfd = od + max(0.0, bgap)
+            f_min_exceeds = f_min_val > od
+            sfd_min_exceeds = sfd_min > surface_max_sfd + 1e-6
+            if f_min_exceeds or sfd_min_exceeds:
                 is_dig = geo.get("is_digital", False)
+                rec_fig = ("fig13a" if std_figure == "fig14a" else "fig13b") if is_dig else "fig13"
                 fig13_name = ("Şekil 13a" if std_figure == "fig14a" else "Şekil 13b") if is_dig else "Şekil 13"
                 fig13_name_en = ("Figure 13a" if std_figure == "fig14a" else "Figure 13b") if is_dig else "Figure 13"
-                if trans.language == "tr":
-                    warnings.append(
-                        f"GEOMETRİ/ŞEKİL UYARISI (ISO 17636 Madde 7.6): DWSI Odak Yüzeyde ({std_figure}) tekniğinde "
-                        f"gereken asgari odak mesafesi (f_min = {f_min_val:.1f} mm), boru dış çapından (OD = {od:.1f} mm) büyüktür! "
-                        f"Kaynak boru yüzeyine konulduğunda geometrik bulanıklık (Ug) standardı aşar. "
-                        f"Seçilen şekil ({std_figure}) uygun DEĞİLDİR; kaynak borudan geri çekilerek {fig13_name} kullanılmalıdır."
-                    )
+                dist_label = "SDD_min" if is_dig else "SFD_min"
+                if f_min_exceeds:
+                    if trans.language == "tr":
+                        conflict_msg = (
+                            f"GEOMETRİ/ŞEKİL UYARISI (ISO 17636 Madde 7.6): DWSI Odak Yüzeyde ({std_figure}) tekniğinde "
+                            f"gereken asgari odak mesafesi (f_min = {f_min_val:.1f} mm), boru dış çapından (OD = {od:.1f} mm) büyüktür! "
+                            f"Kaynak boru yüzeyine konulduğunda geometrik bulanıklık (Ug) standardı aşar. "
+                            f"Seçilen şekil ({std_figure}) uygun DEĞİLDİR; kaynak borudan geri çekilerek {fig13_name} kullanılmalıdır."
+                        )
+                    else:
+                        conflict_msg = (
+                            f"GEOMETRY/FIGURE WARNING (ISO 17636 Clause 7.6): In DWSI Source-on-Surface ({std_figure}), "
+                            f"required minimum distance (f_min = {f_min_val:.1f} mm) exceeds pipe outer diameter (OD = {od:.1f} mm)! "
+                            f"Placing source on surface violates geometric unsharpness (Ug) limits. "
+                            f"Selected figure ({std_figure}) is INVALID; move source back and use {fig13_name_en}."
+                        )
                 else:
-                    warnings.append(
-                        f"GEOMETRY/FIGURE WARNING (ISO 17636 Clause 7.6): In DWSI Source-on-Surface ({std_figure}), "
-                        f"required minimum distance (f_min = {f_min_val:.1f} mm) exceeds pipe outer diameter (OD = {od:.1f} mm)! "
-                        f"Placing source on surface violates geometric unsharpness (Ug) limits. "
-                        f"Selected figure ({std_figure}) is INVALID; move source back and use {fig13_name_en}."
-                    )
+                    if trans.language == "tr":
+                        conflict_msg = (
+                            f"GEOMETRİ/ŞEKİL UYARISI (ISO 17636 Madde 7.6): DWSI Odak Yüzeyde ({std_figure}) tekniğinde "
+                            f"gereken {dist_label} ({sfd_min:.1f} mm), kaynağın boru yüzeyinde ulaşabileceği fiziksel mesafeden "
+                            f"(OD + bgap = {surface_max_sfd:.1f} mm) büyüktür! Kaynak boru yüzeyine temas ederken bu mesafe sağlanamaz; "
+                            f"kaynak borudan geri çekilerek {fig13_name} kullanılmalıdır."
+                        )
+                    else:
+                        conflict_msg = (
+                            f"GEOMETRY/FIGURE WARNING (ISO 17636 Clause 7.6): In DWSI Source-on-Surface ({std_figure}), "
+                            f"required {dist_label} ({sfd_min:.1f} mm) exceeds the physical distance reachable with the source on the pipe surface "
+                            f"(OD + bgap = {surface_max_sfd:.1f} mm)! Move the source back and use {fig13_name_en}."
+                        )
+                warnings.append(conflict_msg)
+                figure_conflict = {
+                    "figure": std_figure,
+                    "recommended": rec_fig,
+                    "recommended_label": fig13_name if trans.language == "tr" else fig13_name_en,
+                    "message": conflict_msg,
+                }
 
         if calc.is_double_wall_technique(geometry):
             if geo["lvl3_dw"]:
@@ -2528,6 +2556,7 @@ class CalculationEngine:
             "film_side": film_side,
             "snr_location": snr_location,
             "std_figure": std_figure,
+            "figure_conflict": figure_conflict,
             "input_kv": input_kv,
             "w_nom": w_nom,
             "w_eff": w_eff,

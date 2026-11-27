@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { InfoTip } from "../components";
 import { formatExposuresProvenance, type Translator } from "../i18n";
 import type {
@@ -16,7 +17,7 @@ interface HeroSummaryPanelProps {
   onNotify?: (message: string, kind?: "info" | "success" | "error") => void;
 }
 
-export function HeroSummaryPanel({
+export const HeroSummaryPanel = memo(function HeroSummaryPanel({
   result,
   compliance,
   form,
@@ -142,40 +143,69 @@ export function HeroSummaryPanel({
 
   const copySummary = () => {
     if (!result) return;
+    const tr = lang === "tr";
     const distLabel = digital ? "SDD" : "SFD";
     const iqiLabel = isAsme
       ? (result.display.asme_iqi ?? "-")
       : (result.display.single_wire_iqi ?? "-");
-    const summary = [
-      `RT Muayene Özeti:`,
-      `• Geometri: ${form.geometry.toUpperCase()} (${form.od} mm OD × ${form.t} mm t)`,
-      `• Kaynak: ${form.source.toUpperCase()} ${
-        form.source === "x_ray"
-          ? `(${form.app_kv} kV, ${form.output_val} mA)`
-          : `(${form.output_val} Ci)`
-      }`,
-      `• Teknik: ${
-        digital
-          ? `Dijital (${form.detector_type})`
-          : `Analog Film (${form.film_class_used})`
-      }`,
-      `• Mesafe (${distLabel}): Min ${result.display.sfd_min ?? "-"} mm | Uygulanan: ${form.sfd} mm`,
-      `• Poz Süresi: Min ${result.display.calc_time ?? "-"} | Uygulanan: ${form.app_time} sn`,
-      `• Poz Sayısı: Min ${result.display.req_exposures ?? "-"} | Uygulanan: ${form.app_exposures}`,
-      `• IQI Şartı: ${iqiLabel}`,
-      `• Uygunluk: ${
-        compliance != null
-          ? compliance.is_compliant
-            ? (lang === "tr" ? "UYGUN (COMPLIANT)" : "COMPLIANT")
-            : (lang === "tr" ? "UYGUN DEĞİL (NON-COMPLIANT)" : "NON-COMPLIANT")
-          : "-"
-      }`,
-    ].join("\n");
+    const summary = tr
+      ? [
+          `RT Muayene Özeti:`,
+          `• Geometri: ${form.geometry.toUpperCase()} (${form.od} mm OD × ${form.t} mm t)`,
+          `• Kaynak: ${form.source.toUpperCase()} ${
+            form.source === "x_ray"
+              ? `(${form.app_kv} kV, ${form.output_val} mA)`
+              : `(${form.output_val} Ci)`
+          }`,
+          `• Teknik: ${
+            digital
+              ? `Dijital (${form.detector_type})`
+              : `Analog Film (${form.film_class_used})`
+          }`,
+          `• Mesafe (${distLabel}): Min ${result.display.sfd_min ?? "-"} mm | Uygulanan: ${form.sfd} mm`,
+          `• Poz Süresi: Min ${result.display.calc_time ?? "-"} | Uygulanan: ${form.app_time} sn`,
+          `• Poz Sayısı: Min ${result.display.req_exposures ?? "-"} | Uygulanan: ${form.app_exposures}`,
+          `• IQI Şartı: ${iqiLabel}`,
+          `• Emniyet Bariyeri: ${result.display.barrier_distance ?? "-"}`,
+          `• Uygunluk: ${
+            compliance != null
+              ? compliance.is_compliant
+                ? "UYGUN (COMPLIANT)"
+                : "UYGUN DEĞİL (NON-COMPLIANT)"
+              : "-"
+          }`,
+        ].join("\n")
+      : [
+          `RT Inspection Summary:`,
+          `• Geometry: ${form.geometry.toUpperCase()} (${form.od} mm OD × ${form.t} mm t)`,
+          `• Source: ${form.source.toUpperCase()} ${
+            form.source === "x_ray"
+              ? `(${form.app_kv} kV, ${form.output_val} mA)`
+              : `(${form.output_val} Ci)`
+          }`,
+          `• Technique: ${
+            digital
+              ? `Digital (${form.detector_type})`
+              : `Analog Film (${form.film_class_used})`
+          }`,
+          `• Distance (${distLabel}): Min ${result.display.sfd_min ?? "-"} mm | Applied: ${form.sfd} mm`,
+          `• Exposure Time: Min ${result.display.calc_time ?? "-"} | Applied: ${form.app_time} s`,
+          `• Exposures: Min ${result.display.req_exposures ?? "-"} | Applied: ${form.app_exposures}`,
+          `• IQI Requirement: ${iqiLabel}`,
+          `• Safety Barrier: ${result.display.barrier_distance ?? "-"}`,
+          `• Compliance: ${
+            compliance != null
+              ? compliance.is_compliant
+                ? "COMPLIANT"
+                : "NON-COMPLIANT"
+              : "-"
+          }`,
+        ].join("\n");
     if (navigator?.clipboard?.writeText) {
       navigator.clipboard.writeText(summary).then(
         () =>
           onNotify?.(
-            lang === "tr"
+            tr
               ? "Hesaplama özeti panoya kopyalandı."
               : "Inspection summary copied to clipboard.",
             "success",
@@ -255,9 +285,11 @@ export function HeroSummaryPanel({
             )}
           </div>
           <div className="hero-right">
-            <div
+            <button
+              type="button"
               className="hero-value"
               data-testid="output-calc_time"
+              aria-label={`${t("calc_time").replace(/:\s*$/, "")}: ${result?.display.calc_time ?? "-"}`}
               onClick={() =>
                 copyToClipboard(
                   result?.display.calc_time ?? "",
@@ -267,7 +299,7 @@ export function HeroSummaryPanel({
               title={lang === "tr" ? "Kopyalamak için tıklayın" : "Click to copy"}
             >
               {result?.display.calc_time ?? "-"}
-            </div>
+            </button>
             {result && (
               <span
                 className={`hero-status ${
@@ -295,8 +327,10 @@ export function HeroSummaryPanel({
             )}
           </div>
           <div className="hero-right">
-            <div
+            <button
+              type="button"
               className="hero-value"
+              aria-label={`${t(digital ? "sfd_min" : "sfd_min_analog").replace(/:\s*$/, "")}: ${result?.display.sfd_min ?? "-"}`}
               onClick={() =>
                 copyToClipboard(
                   result?.display.sfd_min ?? "",
@@ -306,7 +340,7 @@ export function HeroSummaryPanel({
               title={lang === "tr" ? "Kopyalamak için tıklayın" : "Click to copy"}
             >
               {result?.display.sfd_min ?? "-"}
-            </div>
+            </button>
             {result && (
               <span
                 className={`hero-status ${
@@ -366,8 +400,10 @@ export function HeroSummaryPanel({
             </div>
           </div>
           <div className="hero-right">
-            <div
+            <button
+              type="button"
               className="hero-value"
+              aria-label={`f_min: ${result?.display.f_min ?? "-"}`}
               onClick={() =>
                 copyToClipboard(
                   result?.display.f_min ?? "",
@@ -377,7 +413,7 @@ export function HeroSummaryPanel({
               title={lang === "tr" ? "Kopyalamak için tıklayın" : "Click to copy"}
             >
               {result?.display.f_min ?? "-"}
-            </div>
+            </button>
             {result && (
               <span className="hero-status ok">
                 {isAsme ? "ASME" : "ISO"} ✓
@@ -403,8 +439,10 @@ export function HeroSummaryPanel({
             )}
           </div>
           <div className="hero-right">
-            <div
+            <button
+              type="button"
               className="hero-value"
+              aria-label={`Ug: ${result?.display.ug ?? "-"}`}
               onClick={() =>
                 copyToClipboard(
                   result?.display.ug ?? "",
@@ -414,7 +452,7 @@ export function HeroSummaryPanel({
               title={lang === "tr" ? "Kopyalamak için tıklayın" : "Click to copy"}
             >
               {result?.display.ug ?? "-"}
-            </div>
+            </button>
             {result && isAsme && (
               <span
                 className={`hero-status ${
@@ -451,7 +489,7 @@ export function HeroSummaryPanel({
                   className="hero-alert-banner"
                   role="alert"
                   style={{
-                    color: "var(--color-warn, #d97706)",
+                    color: "var(--orange)",
                     fontWeight: 600,
                     fontSize: "0.82rem",
                     marginTop: "6px",
@@ -465,8 +503,10 @@ export function HeroSummaryPanel({
               )}
           </div>
           <div className="hero-right">
-            <div
+            <button
+              type="button"
               className="hero-value"
+              aria-label={`${t("req_exposures").replace(/:\s*$/, "")}: ${result?.display.req_exposures ?? "-"}`}
               onClick={() =>
                 copyToClipboard(
                   String(result?.display.req_exposures ?? ""),
@@ -476,7 +516,7 @@ export function HeroSummaryPanel({
               title={lang === "tr" ? "Kopyalamak için tıklayın" : "Click to copy"}
             >
               {result?.display.req_exposures ?? "-"}
-            </div>
+            </button>
             {result && (
               <span
                 className={`hero-status ${
@@ -501,6 +541,28 @@ export function HeroSummaryPanel({
           </div>
         </div>
       </div>
+      {result?.display?.barrier_distance &&
+        result.display.barrier_distance !== "-" && (
+          <div
+            className="hero-safety-callout"
+            role="status"
+            data-testid="hero-safety-callout"
+          >
+            <div className="hero-safety-main">
+              <span className="hero-safety-label">
+                ☢ {t("barrier_distance").replace(/:\s*$/, "")}
+              </span>
+              <span className="hero-safety-sub">
+                {lang === "tr"
+                  ? `Kontrollü alan sınırı (${form.barrier_limit_usvh} µSv/h)`
+                  : `Controlled exclusion zone (${form.barrier_limit_usvh} µSv/h)`}
+              </span>
+            </div>
+            <strong className="hero-safety-value">
+              {result.display.barrier_distance}
+            </strong>
+          </div>
+        )}
       {digital && ddaFrame && (
         <div className="dda-integration-card" data-testid="dda-integration-card">
           <div className="dda-card-header">
@@ -529,7 +591,7 @@ export function HeroSummaryPanel({
                 {lang === "tr" ? "Kare Süresi" : "Frame Time"}
               </span>
               <span className="dda-metric-value">
-                {ddaFrame.t_frame_sec.toFixed(2)} sn
+                {ddaFrame.t_frame_sec.toFixed(2)} {lang === "tr" ? "sn" : "s"}
               </span>
               <span className="dda-metric-sub">
                 {(ddaFrame.t_frame_ms ?? ddaFrame.t_frame_sec * 1000).toFixed(0)}{" "}
@@ -578,4 +640,4 @@ export function HeroSummaryPanel({
       )}
     </>
   );
-}
+});

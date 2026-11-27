@@ -1,11 +1,14 @@
-import type { Dispatch, SetStateAction } from "react";
+import { lazy, memo, Suspense, type Dispatch, type SetStateAction } from "react";
 
 import { Group } from "../components";
 import { formatExposuresProvenance } from "../i18n";
 import type { EngineResult, ExposuresProvenance, FormState } from "../types";
 import type { AppTheme } from "../state/usePersistedAppState";
 import { AnnexAChartSvg, StandardFigureSvg, WeldSetupSvg } from "./SketchView";
-import { WeldSetup3D } from "./WeldSetup3D";
+
+const WeldSetup3D = lazy(() =>
+  import("./WeldSetup3D").then((m) => ({ default: m.WeldSetup3D })),
+);
 
 type SketchTab = "3d" | "dynamic" | "figure" | "annex_a";
 
@@ -20,7 +23,7 @@ interface SketchTabsPanelProps {
   t: (key: string, ...args: unknown[]) => string;
 }
 
-export function SketchTabsPanel({
+export const SketchTabsPanel = memo(function SketchTabsPanel({
   sketchTab,
   setSketchTab,
   result,
@@ -39,9 +42,15 @@ export function SketchTabsPanel({
   );
   return (
     <>
-      <div className="tabs">
+      <div
+        className="tabs"
+        role="tablist"
+        aria-label={lang === "tr" ? "Görünüm Sekmeleri" : "Visualization Tabs"}
+      >
         <button
           type="button"
+          role="tab"
+          aria-selected={sketchTab === "3d"}
           className={sketchTab === "3d" ? "tab active" : "tab"}
           onClick={() => setSketchTab("3d")}
         >
@@ -49,6 +58,8 @@ export function SketchTabsPanel({
         </button>
         <button
           type="button"
+          role="tab"
+          aria-selected={sketchTab === "dynamic"}
           className={sketchTab === "dynamic" ? "tab active" : "tab"}
           onClick={() => setSketchTab("dynamic")}
         >
@@ -56,6 +67,8 @@ export function SketchTabsPanel({
         </button>
         <button
           type="button"
+          role="tab"
+          aria-selected={sketchTab === "figure"}
           className={sketchTab === "figure" ? "tab active" : "tab"}
           onClick={() => setSketchTab("figure")}
         >
@@ -63,6 +76,8 @@ export function SketchTabsPanel({
         </button>
         <button
           type="button"
+          role="tab"
+          aria-selected={sketchTab === "annex_a"}
           className={sketchTab === "annex_a" ? "tab active" : "tab"}
           onClick={() => setSketchTab("annex_a")}
         >
@@ -79,44 +94,52 @@ export function SketchTabsPanel({
           }
         >
           {result ? (
-            <WeldSetup3D
-              od={result.values.od}
-              t={result.values.t}
-              cap={result.values.cap}
-              weldWidth={form.weld_width}
-              d={form.d}
-              geometry={result.values.geometry}
-              userGeometry={form.geometry}
-              geometryForced={Boolean(result.values.geometry_forced)}
-              sfd={result.values.sfd}
-              fMin={result.values.f_min}
-              bDist={result.values.b_dist}
-              bed={Number(result.values.bed ?? 0)}
-              bgap={form.bgap}
-              ug={result.values.ug}
-              isPlanar={Boolean(result.values.is_planar)}
-              isDigital={digital}
-              filmSide={form.film_side}
-              panelWidth={form.panel_width}
-              panelHeight={form.panel_height}
-              filmWidth={form.film_width}
-              filmHeight={form.film_height}
-              overlapPct={
-                digital ? result.values.panel_overlap : form.app_overlap
+            <Suspense
+              fallback={
+                <p className="muted">
+                  {lang === "tr" ? "3D sahne yükleniyor…" : "Loading 3D scene…"}
+                </p>
               }
-              nRequired={result.values.n_required}
-              nApplied={form.app_exposures}
-              wireStr={String(result.values.wire_str ?? "W10")}
-              duplexStr={String(result.values.duplex_str ?? "D6")}
-              safetyRadiusM={result.values.safety_radius_m}
-              supervisedRadiusM={
-                (result.values.r_supervised as number | undefined) ?? null
-              }
-              standard={form.standard}
-              stdFigure={form.std_figure ?? undefined}
-              theme={theme}
-              lang={lang}
-            />
+            >
+              <WeldSetup3D
+                od={result.values.od}
+                t={result.values.t}
+                cap={result.values.cap}
+                weldWidth={form.weld_width}
+                d={form.d}
+                geometry={result.values.geometry}
+                userGeometry={form.geometry}
+                geometryForced={Boolean(result.values.geometry_forced)}
+                sfd={result.values.sfd}
+                fMin={result.values.f_min}
+                bDist={result.values.b_dist}
+                bed={Number(result.values.bed ?? 0)}
+                bgap={form.bgap}
+                ug={result.values.ug}
+                isPlanar={Boolean(result.values.is_planar)}
+                isDigital={digital}
+                filmSide={form.film_side}
+                panelWidth={form.panel_width}
+                panelHeight={form.panel_height}
+                filmWidth={form.film_width}
+                filmHeight={form.film_height}
+                overlapPct={
+                  digital ? result.values.panel_overlap : form.app_overlap
+                }
+                nRequired={result.values.n_required}
+                nApplied={form.app_exposures}
+                wireStr={String(result.values.wire_str ?? "W10")}
+                duplexStr={String(result.values.duplex_str ?? "D6")}
+                safetyRadiusM={result.values.safety_radius_m}
+                supervisedRadiusM={
+                  (result.values.r_supervised as number | undefined) ?? null
+                }
+                standard={form.standard}
+                stdFigure={form.std_figure ?? undefined}
+                theme={theme}
+                lang={lang}
+              />
+            </Suspense>
           ) : (
             <p className="muted">…</p>
           )}
@@ -246,4 +269,4 @@ export function SketchTabsPanel({
       )}
     </>
   );
-}
+});

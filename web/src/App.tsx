@@ -115,6 +115,16 @@ const CHART_OPTION_META: Record<string, { labelKey?: string; label?: string }> =
   dda_panel_chart: { labelKey: "chart_dda_panel" },
   digital_xray_chart: { labelKey: "chart_digital_xray" },
 };
+type NoticeAction = {
+  label: string;
+  onClick: () => void;
+};
+
+function formatError(caught: unknown): string {
+  const msg = caught instanceof Error ? caught.message : String(caught);
+  return msg.replace(/^Error:\s*/i, "");
+}
+
 function getDefaultFigure(
   geo: FormState["geometry"],
   tech: FormState["tech"],
@@ -173,12 +183,17 @@ export default function App() {
   const [showDecay, setShowDecay] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
-  const [notice, setNotice] = useState<
-    { text: string; kind: "info" | "success" | "error" } | null
-  >(null);
+  const [notice, setNotice] = useState<{
+    text: string;
+    kind: "info" | "success" | "error";
+    action?: NoticeAction;
+  } | null>(null);
   const notify = useCallback(
-    (text: string, kind: "info" | "success" | "error" = "info") =>
-      setNotice({ text, kind }),
+    (
+      text: string,
+      kind: "info" | "success" | "error" = "info",
+      action?: NoticeAction,
+    ) => setNotice({ text, kind, action }),
     [],
   );
   const presetInput = useRef<HTMLInputElement>(null);
@@ -188,6 +203,10 @@ export default function App() {
     "file" | "settings" | "level3" | "view" | "help" | null
   >(null);
   const menuContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
 
   useEffect(() => {
     if (!openMenu) return;
@@ -212,18 +231,19 @@ export default function App() {
     };
   }, [openMenu]);
 
-  // Auto-dismiss the toast: errors linger longer than success/info.
+  // Auto-dismiss the toast: errors and undoable notices linger longer.
   useEffect(() => {
     if (!notice) return;
     const handle = setTimeout(
       () => setNotice(null),
-      notice.kind === "error" ? 8000 : 4500,
+      notice.kind === "error" || notice.action ? 8000 : 4500,
     );
     return () => clearTimeout(handle);
   }, [notice]);
 
   const { result, compliance, error, busy, ready } = useEngine(form, lvl3, lang);
-  const { history, clearHistory, historyCount } = useCalculationHistory(form, result, busy);
+  const { history, clearHistory, restoreHistory, historyCount } =
+    useCalculationHistory(form, result, busy);
   const t = useMemo(() => makeTranslator(strings), [strings]);
 
   useEffect(() => {
@@ -430,12 +450,26 @@ export default function App() {
   };
 
   const resetForm = () => {
+    const snapshot = {
+      form: { ...form },
+      lvl3: { ...lvl3 },
+      reportInfo: { ...reportInfo },
+    };
     setForm({ ...DEFAULT_FORM });
     setLvl3(DEFAULT_LVL3);
     setReportInfo({});
     notify(
       lang === "tr" ? "Form varsayılana sıfırlandı." : "Form reset to defaults.",
-      "success",
+      "info",
+      {
+        label: lang === "tr" ? "Geri Al" : "Undo",
+        onClick: () => {
+          setForm(snapshot.form);
+          setLvl3(snapshot.lvl3);
+          setReportInfo(snapshot.reportInfo);
+          setNotice(null);
+        },
+      },
     );
   };
 
@@ -568,7 +602,7 @@ export default function App() {
       downloadBase64(data.pdf_base64, data.filename);
       notify(t("report_saved", data.filename), "success");
     } catch (caught) {
-      notify(String(caught), "error");
+      notify(formatError(caught), "error");
     } finally {
       setPdfBusy(false);
     }
@@ -742,6 +776,15 @@ export default function App() {
             role={notice.kind === "error" ? "alert" : "status"}
           >
             <span className="toast-text">{notice.text}</span>
+            {notice.action && (
+              <button
+                type="button"
+                className="toast-action"
+                onClick={notice.action.onClick}
+              >
+                {notice.action.label}
+              </button>
+            )}
             <button
               type="button"
               className="toast-close"
@@ -768,7 +811,7 @@ export default function App() {
               <span className="dropdown-arrow">{openMenu === "file" ? "▲" : "▼"}</span>
             </button>
             {openMenu === "file" && (
-              <div className="dropdown-menu" role="menu">
+              <div className="dropdown-menu">
                 <button
                   type="button"
                   className="dropdown-item primary-action"
@@ -789,6 +832,7 @@ export default function App() {
                 <div className="menu-select-wrapper">
                   <select
                     className="menu-select"
+                    aria-label={t("section_presets")}
                     value=""
                     onChange={(event) => {
                       if (event.target.value) {
@@ -903,7 +947,7 @@ export default function App() {
               <span className="dropdown-arrow">{openMenu === "settings" ? "▲" : "▼"}</span>
             </button>
             {openMenu === "settings" && (
-              <div className="dropdown-menu" role="menu">
+              <div className="dropdown-menu">
                 <button
                   type="button"
                   className="dropdown-item"
@@ -972,7 +1016,7 @@ export default function App() {
               <span className="dropdown-arrow">{openMenu === "level3" ? "▲" : "▼"}</span>
             </button>
             {openMenu === "level3" && (
-              <div className="dropdown-menu" role="menu">
+              <div className="dropdown-menu">
                 <button
                   type="button"
                   className="dropdown-item"
@@ -1003,7 +1047,7 @@ export default function App() {
               <span className="dropdown-arrow">{openMenu === "view" ? "▲" : "▼"}</span>
             </button>
             {openMenu === "view" && (
-              <div className="dropdown-menu" role="menu">
+              <div className="dropdown-menu">
                 <button
                   type="button"
                   className="dropdown-item"
@@ -1074,7 +1118,7 @@ export default function App() {
               <span className="dropdown-arrow">{openMenu === "help" ? "▲" : "▼"}</span>
             </button>
             {openMenu === "help" && (
-              <div className="dropdown-menu" role="menu">
+              <div className="dropdown-menu">
                 <button
                   type="button"
                   className="dropdown-item"
@@ -1133,7 +1177,7 @@ export default function App() {
                 applyDesktopState(data.state ?? {});
                 notify(lang === "tr" ? "Şablon yüklendi." : "Preset loaded.", "success");
               } catch (caught) {
-                notify(String(caught), "error");
+                notify(formatError(caught), "error");
               }
               event.target.value = "";
             }}
@@ -1152,7 +1196,7 @@ export default function App() {
                 applyDesktopState(data.state ?? {});
                 notify(lang === "tr" ? "Proje içe aktarıldı." : "Project imported.", "success");
               } catch (caught) {
-                notify(String(caught), "error");
+                notify(formatError(caught), "error");
               }
               event.target.value = "";
             }}
@@ -1167,7 +1211,7 @@ export default function App() {
                 applyDesktopState(parseCsv(await readFile(event.target.files?.[0])));
                 notify(lang === "tr" ? "CSV içe aktarıldı." : "CSV imported.", "success");
               } catch (caught) {
-                notify(String(caught), "error");
+                notify(formatError(caught), "error");
               }
               event.target.value = "";
             }}
@@ -1180,6 +1224,39 @@ export default function App() {
           aria-hidden={!working}
         />
         </div>
+
+        {result && (
+          <div className="mobile-summary-strip" aria-label={lang === "tr" ? "Hızlı Özet" : "Quick Summary"}>
+            <div className="mobile-summary-metrics">
+              <span>
+                <strong>{result.display.calc_time ?? "-"}</strong>
+              </span>
+              <span>
+                {digital ? "SDD" : "SFD"} ≥ <strong>{result.display.sfd_min ?? "-"}</strong>
+              </span>
+              <span
+                className={`mobile-summary-badge ${
+                  compliance?.is_compliant ? "ok" : "fail"
+                }`}
+              >
+                {compliance?.is_compliant
+                  ? (lang === "tr" ? "Uygun" : "OK")
+                  : (lang === "tr" ? "Uygun Değil" : "Fail")}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="sync-btn"
+              onClick={() => {
+                document
+                  .querySelector(".column.outputs")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+            >
+              {lang === "tr" ? "Sonuçlar ↓" : "Results ↓"}
+            </button>
+          </div>
+        )}
 
         <main
           ref={layoutRef}
@@ -1462,13 +1539,13 @@ export default function App() {
                     className="field-help warn"
                     role="alert"
                     style={{
-                      color: "var(--color-warn, #d97706)",
+                      color: "var(--orange)",
                       fontWeight: 600,
                       marginTop: "6px",
                       padding: "6px 10px",
-                      background: "rgba(217, 119, 6, 0.12)",
+                      background: "color-mix(in srgb, var(--orange) 12%, transparent)",
                       borderRadius: "4px",
-                      border: "1px solid rgba(217, 119, 6, 0.3)",
+                      border: "1px solid color-mix(in srgb, var(--orange) 35%, transparent)",
                       lineHeight: 1.35,
                     }}
                   >
@@ -1560,6 +1637,34 @@ export default function App() {
                 }))}
                 onChange={(value) => patch("std_figure", value || null)}
               />
+              {(() => {
+                const figureConflict = result?.values?.figure_conflict as
+                  | {
+                      figure: string;
+                      recommended: string;
+                      recommended_label: string;
+                      message: string;
+                    }
+                  | null
+                  | undefined;
+                if (!figureConflict) return null;
+                return (
+                  <div className="inline-alert" role="alert" data-testid="figure-conflict-alert">
+                    <span>⚠ {figureConflict.message}</span>
+                    <div className="inline-alert-actions">
+                      <button
+                        type="button"
+                        className="sync-btn"
+                        onClick={() => patch("std_figure", figureConflict.recommended)}
+                      >
+                        {lang === "tr"
+                          ? `${figureConflict.recommended_label} Seç`
+                          : `Switch to ${figureConflict.recommended_label}`}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
               {digital && (
                 <RadioGroup
                   label={t("detector_type")}
@@ -2128,31 +2233,13 @@ export default function App() {
                 onChange={(value) => patch("app_exposures", Math.round(value ?? 0))}
               />
               {digital && (
-                <>
-                  <div className="field-row-2">
-                    <LengthField
-                      label={t("panel_width")}
-                      value={form.panel_width}
-                      min={1}
-                      max={2000}
-                      onChange={(value) => patch("panel_width", value ?? 200)}
-                    />
-                    <LengthField
-                      label={t("panel_height")}
-                      value={form.panel_height}
-                      min={1}
-                      max={2000}
-                      onChange={(value) => patch("panel_height", value ?? 200)}
-                    />
-                  </div>
-                  <NumberField
-                    label={t("panel_overlap")}
-                    value={form.panel_overlap}
-                    min={0}
-                    max={50}
-                    onChange={(value) => patch("panel_overlap", value ?? 10)}
-                  />
-                </>
+                <NumberField
+                  label={t("panel_overlap")}
+                  value={form.panel_overlap}
+                  min={0}
+                  max={50}
+                  onChange={(value) => patch("panel_overlap", value ?? 10)}
+                />
               )}
             </Group>
 
@@ -2199,13 +2286,20 @@ export default function App() {
             />
             <OutputsPanel
               t={t}
+              lang={lang}
               result={result}
               error={error}
               strings={strings}
               digital={digital}
               hiddenOutputs={hiddenOutputs}
             />
-            <CompliancePanel t={t} error={error} compliance={compliance} />
+            <CompliancePanel
+              t={t}
+              error={error}
+              compliance={compliance}
+              isLvl3Active={isLvl3Active}
+              lang={lang}
+            />
           </div>
 
           <div
@@ -2234,6 +2328,8 @@ export default function App() {
           </div>
 
           <div className="column warnings">
+            <WarningsPanel t={t} warnings={result?.warnings ?? []} />
+
             <SketchTabsPanel
               sketchTab={sketchTab}
               setSketchTab={setSketchTab}
@@ -2244,8 +2340,6 @@ export default function App() {
               lang={lang}
               t={t}
             />
-
-            <WarningsPanel t={t} warnings={result?.warnings ?? []} />
 
             <DefectPanel
               t={t}
@@ -2271,6 +2365,7 @@ export default function App() {
         {showDecay && (
           <DecayDialog
             t={t}
+            lang={lang}
             source={form.source}
             initialActivity={form.output_val ?? 40}
             onApply={(activity) => {
@@ -2290,6 +2385,7 @@ export default function App() {
         {showUpdates && (
           <UpdateModal
             t={t}
+            lang={lang}
             currentVersion={pyClient.version ?? FALLBACK_VERSION}
             onClose={() => setShowUpdates(false)}
           />
@@ -2311,10 +2407,20 @@ export default function App() {
               );
             }}
             onClear={() => {
+              const snapshot = [...history];
               clearHistory();
               notify(
                 lang === "tr" ? "Hesaplama geçmişi temizlendi." : "Calculation history cleared.",
                 "info",
+                snapshot.length > 0
+                  ? {
+                      label: lang === "tr" ? "Geri Al" : "Undo",
+                      onClick: () => {
+                        restoreHistory(snapshot);
+                        setNotice(null);
+                      },
+                    }
+                  : undefined,
               );
             }}
             onClose={() => setShowHistory(false)}

@@ -605,6 +605,18 @@ def test_dwsi_figure14_warning_when_fmin_exceeds_od(engine):
     }, {}, "en")
     assert any("GEOMETRY/FIGURE WARNING" in w and "fig14b" in w and "Figure 13" in w for w in res_en["warnings"])
 
+    # Case 4: fig14b where f_min <= OD, but SDD_min > OD + bgap (e.g. coverage requirement)
+    res_sdd = engine.calculate({
+        "tech": "digital", "detector_curved": False, "geometry": "dwsi", "std_figure": "fig14b",
+        "od": 200.0, "t": 6.02, "d": 2.0, "bgap": 5.0, "panel_width": 200.0, "panel_height": 200.0,
+        "testing_class": "class_b",
+    }, {}, "tr")
+    assert res_sdd["values"]["f_min"] <= 200.0
+    assert res_sdd["values"]["sfd_min"] > 205.0
+    assert res_sdd["values"]["figure_conflict"] is not None
+    assert res_sdd["values"]["figure_conflict"]["recommended"] == "fig13b"
+    assert any("GEOMETRİ/ŞEKİL UYARISI" in w and "fig14b" in w and "Şekil 13b" in w for w in res_sdd["warnings"])
+
 
 def test_dwdi_coverage_in_engine(engine):
     """Verifies that DWDI exposures check validates film/detector size coverage

@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Group } from "../components";
 
 interface WarningsPanelProps {
@@ -5,11 +6,21 @@ interface WarningsPanelProps {
   warnings: string[];
 }
 
-export function WarningsPanel({ t, warnings }: WarningsPanelProps) {
+export const WarningsPanel = memo(function WarningsPanel({
+  t,
+  warnings,
+}: WarningsPanelProps) {
+  const title =
+    warnings.length > 0 ? `${t("warnings")} (${warnings.length})` : t("warnings");
   return (
-    <Group title={t("warnings")}>
+    <Group
+      key={warnings.length > 0 ? "has-warnings" : "no-warnings"}
+      title={title}
+      className={warnings.length > 0 ? "warnings-active" : undefined}
+      open={warnings.length > 0}
+    >
       {warnings.length ? (
-        <ul className="warning-list">
+        <ul className="warning-list" role="alert">
           {warnings.map((warning, index) => (
             <li key={index}>{warning}</li>
           ))}
@@ -19,4 +30,4 @@ export function WarningsPanel({ t, warnings }: WarningsPanelProps) {
       )}
     </Group>
   );
-}
+});

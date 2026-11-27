@@ -134,9 +134,20 @@ export function useCalculationHistory(
     }
   }, []);
 
+  const restoreHistory = useCallback((entries: CalculationHistoryEntry[]) => {
+    const clamped = entries.slice(0, MAX_ENTRIES);
+    setHistory(clamped);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(clamped));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   return {
     history,
     clearHistory,
+    restoreHistory,
     historyCount: history.length,
   };
 }

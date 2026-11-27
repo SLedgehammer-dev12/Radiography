@@ -1,31 +1,45 @@
+import { memo } from "react";
 import { Group, OutputRow } from "../components";
 import type { EngineResult } from "../types";
 
-const OUTPUT_KEYS = [
-  "w_nom",
-  "w_eff",
-  "u_max",
-  "f_min",
-  "f_min_asme",
-  "sfd_min",
-  "ug",
-  "req_exposures",
-  "exposures_panel",
-  "exposures_applied",
-  "exposures_check",
-  "single_wire_iqi",
-  "duplex_iqi",
-  "asme_iqi",
-  "quality_target",
-  "calc_time",
-  "total_joint_time",
-  "detector_quality",
-  "barrier_distance",
-  "filter_recommendation",
+const OUTPUT_GROUPS: {
+  id: string;
+  tr: string;
+  en: string;
+  keys: string[];
+}[] = [
+  {
+    id: "geometry",
+    tr: "Geometri ve Odak",
+    en: "Geometry & Focal",
+    keys: ["w_nom", "w_eff", "u_max", "f_min", "f_min_asme", "sfd_min", "ug"],
+  },
+  {
+    id: "iqi",
+    tr: "IQI ve Görüntü Kalitesi",
+    en: "IQI & Image Quality",
+    keys: ["single_wire_iqi", "duplex_iqi", "asme_iqi", "quality_target", "detector_quality"],
+  },
+  {
+    id: "exposure",
+    tr: "Pozlama ve Emniyet",
+    en: "Exposure & Safety",
+    keys: [
+      "req_exposures",
+      "exposures_panel",
+      "exposures_applied",
+      "exposures_check",
+      "calc_time",
+      "total_joint_time",
+      "barrier_distance",
+      "filter_recommendation",
+    ],
+  },
 ];
 
 interface OutputsPanelProps {
   t: (key: string, ...args: unknown[]) => string;
+  lang?: string;
   result: EngineResult | null;
   error?: string | null;
   strings: Record<string, string>;
@@ -33,8 +47,9 @@ interface OutputsPanelProps {
   hiddenOutputs: Set<string>;
 }
 
-export function OutputsPanel({
+export const OutputsPanel = memo(function OutputsPanel({
   t,
+  lang = "tr",
   result,
   error,
   strings,
@@ -58,29 +73,42 @@ export function OutputsPanel({
   return (
     <Group title={t("outputs")}>
       {result ? (
-        OUTPUT_KEYS.filter((key) => !hiddenOutputs.has(key)).map((key) => (
-          <OutputRow
-            key={key}
-            testId={`output-${key}`}
-            label={outputLabel(key)}
-            value={result?.display[key] ?? "-"}
-            tooltip={(() => {
-              const dynamicProv = result?.values?.[`${key}_provenance_text`] as
-                | string
-                | undefined;
-              if (dynamicProv) {
-                const base = strings[`tt_${key}`] ?? "";
-                return `${base}\n\n${dynamicProv}`.trim();
-              }
-              if (key === "exposures_panel") {
-                return (
-                  strings[digital ? "tt_exposures_panel" : "tt_exposures_film"] ?? ""
-                );
-              }
-              return strings[`tt_${key}`];
-            })()}
-          />
-        ))
+        OUTPUT_GROUPS.map((grp) => {
+          const visibleKeys = grp.keys.filter((key) => !hiddenOutputs.has(key));
+          if (visibleKeys.length === 0) return null;
+          return (
+            <div key={grp.id} className="outputs-subgroup">
+              <div className="outputs-subgroup-title">
+                {lang === "tr" ? grp.tr : grp.en}
+              </div>
+              {visibleKeys.map((key) => (
+                <OutputRow
+                  key={key}
+                  testId={`output-${key}`}
+                  label={outputLabel(key)}
+                  value={result?.display[key] ?? "-"}
+                  tooltip={(() => {
+                    const dynamicProv = result?.values?.[
+                      `${key}_provenance_text`
+                    ] as string | undefined;
+                    if (dynamicProv) {
+                      const base = strings[`tt_${key}`] ?? "";
+                      return `${base}\n\n${dynamicProv}`.trim();
+                    }
+                    if (key === "exposures_panel") {
+                      return (
+                        strings[
+                          digital ? "tt_exposures_panel" : "tt_exposures_film"
+                        ] ?? ""
+                      );
+                    }
+                    return strings[`tt_${key}`];
+                  })()}
+                />
+              ))}
+            </div>
+          );
+        })
       ) : (
         <p className="muted">
           {error ? "—" : "Hesaplanıyor… / Calculating…"}
@@ -88,4 +116,4 @@ export function OutputsPanel({
       )}
     </Group>
   );
-}
+});

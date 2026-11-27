@@ -183,9 +183,9 @@ export const DEFAULT_BASE_E_BY_SOURCE: Record<string, number> = {
 };
 
 export const NAMED_PRESETS: Record<string, Partial<FormState>> = {
-  "4 inç SCH40 DWDI X-Ray Atölye": {
+  "4 inç SCH40 DWSI X-Ray Atölye": {
     source: "x_ray",
-    geometry: "dwdi_elliptic",
+    geometry: "dwsi",
     od: 114.3,
     output_val: 5.0,
     app_kv: 200.0,

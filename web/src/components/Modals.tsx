@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 
 import { NumberField } from "../components";
 import { pyClient } from "../pyodide/client";
@@ -7,33 +7,90 @@ import type { Lvl3Settings } from "../types";
 
 import { FALLBACK_VERSION } from "../version";
 
-function useEscapeClose(onClose: () => void) {
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+export function useModalFocusTrap(
+  dialogRef: RefObject<HTMLElement | null>,
+  onClose: () => void,
+  active = true,
+) {
+  const onCloseRef = useRef(onClose);
   useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    onCloseRef.current = onClose;
   }, [onClose]);
+
+  useEffect(() => {
+    if (!active) return;
+    const prevFocus = document.activeElement as HTMLElement | null;
+    const dialog = dialogRef.current;
+    if (dialog) {
+      const first = dialog.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+      (first ?? dialog).focus();
+    }
+
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== "Tab" || !dialog) return;
+      const focusables = Array.from(
+        dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+      );
+      if (focusables.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => {
+      window.removeEventListener("keydown", handler);
+      prevFocus?.focus?.();
+    };
+  }, [dialogRef, active]);
 }
 
 interface DecayDialogProps {
   t: (key: string, ...args: unknown[]) => string;
+  lang?: string;
   source: string;
   initialActivity?: number;
   onApply: (activity: number) => void;
   onClose: () => void;
 }
 
-function DecayDialog({ t, source, initialActivity, onApply, onClose }: DecayDialogProps) {
-  useEscapeClose(onClose);
+function DecayDialog({ t, lang = "tr", source, initialActivity, onApply, onClose }: DecayDialogProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalFocusTrap(dialogRef, onClose);
   const [initial, setInitial] = useState(initialActivity ?? 40);
   const [calibDate, setCalibDate] = useState("");
   const [current, setCurrent] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const displayCurrent = calibDate ? current : null;
 
   useEffect(() => {
-    if (!calibDate) return;
+    if (!calibDate) {
+      setLoading(false);
+      setErrorMsg(null);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setErrorMsg(null);
     const handle = setTimeout(async () => {
       try {
         const data = await pyClient.request<{
@@ -44,23 +101,43 @@ function DecayDialog({ t, source, initialActivity, onApply, onClose }: DecayDial
           calib_date: calibDate,
           isotope: source,
         });
-        setCurrent(data.current_activity);
-      } catch {
-        setCurrent(null);
+        if (!cancelled) {
+          setCurrent(data.current_activity);
+          setErrorMsg(null);
+        }
+      } catch (err: unknown) {
+        if (!cancelled) {
+          setCurrent(null);
+          setErrorMsg(
+            err instanceof Error
+              ? err.message
+              : lang === "tr"
+                ? "Bozunum hesabı yapılamadı."
+                : "Decay calculation failed.",
+          );
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     }, 250);
-    return () => clearTimeout(handle);
-  }, [initial, calibDate, source]);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [initial, calibDate, source, lang]);
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
+        ref={dialogRef}
         className="modal"
         role="dialog"
         aria-modal="true"
+        aria-labelledby="decay-dialog-title"
+        tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
       >
-        <h2>{t("decay_dialog")}</h2>
+        <h2 id="decay-dialog-title">{t("decay_dialog")}</h2>
         <NumberField
           label={t("decay_initial")}
           value={initial}
@@ -77,17 +154,27 @@ function DecayDialog({ t, source, initialActivity, onApply, onClose }: DecayDial
             onChange={(event) => setCalibDate(event.target.value)}
           />
         </label>
-        <p>
+        <p aria-live="polite">
           {t("decay_current")}{" "}
           <strong>
-            {displayCurrent === null ? "-" : `${displayCurrent.toFixed(1)} Ci`}
+            {loading
+              ? (lang === "tr" ? "Hesaplanıyor…" : "Calculating…")
+              : displayCurrent === null
+                ? "-"
+                : `${displayCurrent.toFixed(1)} Ci`}
           </strong>
         </p>
+        {errorMsg && (
+          <p className="field-error" role="alert">
+            {errorMsg}
+          </p>
+        )}
         <div className="modal-actions">
-          <button onClick={onClose}>{t("dialog_cancel")}</button>
+          <button type="button" onClick={onClose}>{t("dialog_cancel")}</button>
           <button
+            type="button"
             className="primary"
-            disabled={displayCurrent === null}
+            disabled={loading || displayCurrent === null}
             onClick={() => {
               if (displayCurrent !== null) onApply(displayCurrent);
               onClose();
@@ -109,7 +196,10 @@ interface Lvl3DialogProps {
 }
 
 function Lvl3Dialog({ lvl3, t, onChange, onClose }: Lvl3DialogProps) {
-  useEscapeClose(onClose);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalFocusTrap(dialogRef, onClose);
+  const [draft, setDraft] = useState<Lvl3Settings>(() => ({ ...lvl3 }));
+
   const options: [keyof Lvl3Settings, string][] = [
     ["sfd_comp", "lvl3_sfd_compensation"],
     ["voltage_override", "lvl3_voltage_override"],
@@ -121,19 +211,22 @@ function Lvl3Dialog({ lvl3, t, onChange, onClose }: Lvl3DialogProps) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
+        ref={dialogRef}
         className="modal"
         role="dialog"
         aria-modal="true"
+        aria-labelledby="lvl3-dialog-title"
+        tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
       >
-        <h2>{t("level3_section")}</h2>
+        <h2 id="lvl3-dialog-title">{t("level3_section")}</h2>
         {options.map(([key, labelKey]) => (
           <label className="field field-inline" key={key}>
             <input
               type="checkbox"
-              checked={Boolean(lvl3[key])}
+              checked={Boolean(draft[key])}
               onChange={(event) =>
-                onChange({ ...lvl3, [key]: event.target.checked })
+                setDraft((prev) => ({ ...prev, [key]: event.target.checked }))
               }
             />
             <span>{t(labelKey)}</span>
@@ -145,15 +238,22 @@ function Lvl3Dialog({ lvl3, t, onChange, onClose }: Lvl3DialogProps) {
             className="field-input"
             rows={3}
             placeholder={t("level3_approval_placeholder")}
-            value={lvl3.approval_note}
+            value={draft.approval_note}
             onChange={(event) =>
-              onChange({ ...lvl3, approval_note: event.target.value })
+              setDraft((prev) => ({ ...prev, approval_note: event.target.value }))
             }
           />
         </label>
         <div className="modal-actions">
-          <button onClick={onClose}>{t("dialog_cancel")}</button>
-          <button className="primary" onClick={onClose}>
+          <button type="button" onClick={onClose}>{t("dialog_cancel")}</button>
+          <button
+            type="button"
+            className="primary"
+            onClick={() => {
+              onChange(draft);
+              onClose();
+            }}
+          >
             {t("dialog_ok")}
           </button>
         </div>
@@ -169,18 +269,22 @@ interface AboutModalProps {
 }
 
 function AboutModal({ t, onClose, currentVersion = FALLBACK_VERSION }: AboutModalProps) {
-  useEscapeClose(onClose);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalFocusTrap(dialogRef, onClose);
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
+        ref={dialogRef}
         className="modal about-modal"
         role="dialog"
         aria-modal="true"
+        aria-labelledby="about-dialog-title"
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="about-header">
           <div className="about-title-block">
-            <h2>
+            <h2 id="about-dialog-title">
               <span>{t("app_title").split("(")[0]?.trim() || "Radiography"}</span>
               <span className="about-version-badge">v{currentVersion.replace(/^v/, "")}</span>
             </h2>
@@ -231,7 +335,7 @@ function AboutModal({ t, onClose, currentVersion = FALLBACK_VERSION }: AboutModa
         </div>
 
         <div className="modal-actions">
-          <button className="primary" onClick={onClose}>
+          <button type="button" className="primary" onClick={onClose}>
             {t("dialog_ok")}
           </button>
         </div>
@@ -242,6 +346,7 @@ function AboutModal({ t, onClose, currentVersion = FALLBACK_VERSION }: AboutModa
 
 interface UpdateModalProps {
   t: (key: string, ...args: unknown[]) => string;
+  lang?: string;
   onClose: () => void;
   currentVersion?: string;
 }
@@ -303,8 +408,10 @@ async function fetchReleaseStatus(
   }
 }
 
-function UpdateModal({ t, onClose, currentVersion = FALLBACK_VERSION }: UpdateModalProps) {
-  useEscapeClose(onClose);
+function UpdateModal({ t, lang = "tr", onClose, currentVersion = FALLBACK_VERSION }: UpdateModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalFocusTrap(dialogRef, onClose);
+  const tr = lang === "tr";
   const [updateState, setUpdateState] = useState<UpdateStatus>({
     status: "checking",
   });
@@ -326,25 +433,29 @@ function UpdateModal({ t, onClose, currentVersion = FALLBACK_VERSION }: UpdateMo
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
+        ref={dialogRef}
         className="modal update-modal"
         role="dialog"
         aria-modal="true"
+        aria-labelledby="update-dialog-title"
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="about-header">
           <div className="about-title-block">
-            <h2>
+            <h2 id="update-dialog-title">
               <span>🔄 {t("check_updates_btn")}</span>
             </h2>
             <p className="about-owner">
-              Mevcut Yüklü Sürüm: <strong>v{currentVersion.replace(/^v/, "")}</strong>
+              {tr ? "Mevcut Yüklü Sürüm:" : "Installed Version:"}{" "}
+              <strong>v{currentVersion.replace(/^v/, "")}</strong>
             </p>
           </div>
           <button
             type="button"
             className="info-modal-close"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={tr ? "Kapat" : "Close"}
           >
             ✕
           </button>
@@ -367,9 +478,9 @@ function UpdateModal({ t, onClose, currentVersion = FALLBACK_VERSION }: UpdateMo
                 onClick={() => {
                   void handleCheckUpdates();
                 }}
-                title="Tekrar Kontrol Et"
+                title={tr ? "Tekrar Kontrol Et" : "Check Again"}
               >
-                🔄 Yenile
+                🔄 {tr ? "Yenile" : "Refresh"}
               </button>
             </div>
           )}
@@ -390,12 +501,9 @@ function UpdateModal({ t, onClose, currentVersion = FALLBACK_VERSION }: UpdateMo
           )}
 
           {updateState.status === "error" && (
-            <div
-              className="about-update-status available"
-              style={{ borderColor: "#f38ba8", color: "#f38ba8" }}
-            >
+            <div className="about-update-status error" role="alert">
               <span>
-                ⚠️ {updateState.errorMessage || "Kontrol başarısız oldu."}
+                ⚠️ {updateState.errorMessage || (tr ? "Kontrol başarısız oldu." : "Update check failed.")}
               </span>
               <button
                 type="button"
@@ -405,14 +513,14 @@ function UpdateModal({ t, onClose, currentVersion = FALLBACK_VERSION }: UpdateMo
                   void handleCheckUpdates();
                 }}
               >
-                Yeniden Dene
+                {tr ? "Yeniden Dene" : "Retry"}
               </button>
             </div>
           )}
         </div>
 
         <div className="modal-actions">
-          <button className="primary" onClick={onClose}>
+          <button type="button" className="primary" onClick={onClose}>
             {t("dialog_ok")}
           </button>
         </div>
@@ -438,16 +546,19 @@ function CalculationHistoryModal({
   onClear,
   onClose,
 }: CalculationHistoryModalProps) {
-  useEscapeClose(onClose);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalFocusTrap(dialogRef, onClose);
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
+        ref={dialogRef}
         className="modal history-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="history-modal-title"
         data-testid="history-modal"
+        tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
         style={{ maxWidth: 640 }}
       >

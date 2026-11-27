@@ -151,6 +151,7 @@ export function WeldSetup3D({
     };
   }, [isFullscreen]);
 
+  const dragRafRef = useRef<number | null>(null);
   const dragRef = useRef<{
     active: boolean;
     shift: boolean;
@@ -184,6 +185,9 @@ export function WeldSetup3D({
 
   useEffect(() => {
     if (!playing) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      return;
+    }
     if (activeSeamType === "girth") {
       if (totalStations <= 1) return;
       const timer = window.setInterval(() => {
@@ -255,8 +259,9 @@ export function WeldSetup3D({
     ctx.scale(dpr, dpr);
 
     const isDark = theme === "dark";
+    const isOutdoor = theme === "outdoor";
     const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
-    if (theme === "outdoor") {
+    if (isOutdoor) {
       bgGrad.addColorStop(0, "#ffffff");
       bgGrad.addColorStop(1, "#f1f3f7");
     } else if (isDark) {
@@ -427,7 +432,11 @@ export function WeldSetup3D({
     const gridY = -R - Math.max(bgap + bed, R * 0.18);
     const gridExtent = maxExtent * 0.65;
     const gridSteps = 6;
-    ctx.strokeStyle = isDark ? "rgba(255,255,255,0.05)" : "rgba(15,23,42,0.06)";
+    ctx.strokeStyle = isDark
+      ? "rgba(255,255,255,0.05)"
+      : isOutdoor
+        ? "rgba(0,0,0,0.12)"
+        : "rgba(15,23,42,0.06)";
     ctx.lineWidth = 1;
     for (let i = -gridSteps; i <= gridSteps; i += 1) {
       const pos = (i / gridSteps) * gridExtent;
@@ -799,7 +808,7 @@ export function WeldSetup3D({
           z: zTape0,
         });
         ctx.font = "600 9px system-ui, sans-serif";
-        ctx.fillStyle = isDark ? "#fde047" : "#854d0e";
+        ctx.fillStyle = isDark ? "#fde047" : isOutdoor ? "#000000" : "#854d0e";
         ctx.textAlign = "right";
         ctx.fillText(
           lang === "tr" ? "Şerit Metre (cm)" : "Measuring Tape (cm)",
@@ -946,17 +955,23 @@ export function WeldSetup3D({
         ctx.fillStyle = isCurrent
           ? isDark
             ? "rgba(16, 185, 129, 0.34)"
-            : "rgba(5, 150, 105, 0.28)"
+            : isOutdoor
+              ? "rgba(0, 102, 0, 0.30)"
+              : "rgba(5, 150, 105, 0.28)"
           : isDark
             ? "rgba(16, 185, 129, 0.10)"
             : "rgba(5, 150, 105, 0.09)";
         ctx.strokeStyle = isCurrent
           ? isDark
             ? "#34d399"
-            : "#059669"
+            : isOutdoor
+              ? "#006600"
+              : "#059669"
           : isDark
             ? "rgba(52, 211, 153, 0.35)"
-            : "rgba(5, 150, 105, 0.35)";
+            : isOutdoor
+              ? "rgba(0, 102, 0, 0.55)"
+              : "rgba(5, 150, 105, 0.35)";
         ctx.lineWidth = isCurrent ? 2.2 : 1;
         ctx.fill();
         ctx.stroke();
@@ -1142,7 +1157,7 @@ export function WeldSetup3D({
       ctx.beginPath();
       ctx.moveTo(srcProj.x, srcProj.y);
       ctx.lineTo(detCenterProj.x, detCenterProj.y);
-      ctx.strokeStyle = isDark ? "#facc15" : "#ea580c";
+      ctx.strokeStyle = isDark ? "#facc15" : isOutdoor ? "#b45309" : "#ea580c";
       ctx.lineWidth = 1.8;
       ctx.setLineDash([6, 3]);
       ctx.stroke();
@@ -1167,7 +1182,7 @@ export function WeldSetup3D({
         ctx.setLineDash([7, 5]);
         ctx.stroke();
         ctx.setLineDash([]);
-        ctx.fillStyle = isDark ? "#fde047" : "#c2410c";
+        ctx.fillStyle = isDark ? "#fde047" : isOutdoor ? "#000000" : "#c2410c";
         ctx.font = "700 8px system-ui, sans-serif";
         ctx.fillText(
           `Ug = ${ug.toFixed(2)} mm`,
@@ -1901,6 +1916,24 @@ export function WeldSetup3D({
         <div className="sketch-btn-group">
           <button
             type="button"
+            className="sketch-mini-btn"
+            aria-label={tr ? "Yakınlaştır" : "Zoom In"}
+            title={tr ? "Yakınlaştır" : "Zoom In"}
+            onClick={() => setZoom((z) => Math.min(3.0, z * 1.15))}
+          >
+            +
+          </button>
+          <button
+            type="button"
+            className="sketch-mini-btn"
+            aria-label={tr ? "Uzaklaştır" : "Zoom Out"}
+            title={tr ? "Uzaklaştır" : "Zoom Out"}
+            onClick={() => setZoom((z) => Math.max(0.45, z / 1.15))}
+          >
+            −
+          </button>
+          <button
+            type="button"
             className={`sketch-mini-btn ${isFullscreen ? "active" : ""}`}
             style={{ fontWeight: 700 }}
             onClick={() => setIsFullscreen((v) => !v)}
@@ -1942,24 +1975,37 @@ export function WeldSetup3D({
           if (!dragRef.current.active) return;
           const dx = event.clientX - dragRef.current.startX;
           const dy = event.clientY - dragRef.current.startY;
-          if (dragRef.current.shift) {
-            setPanX(dragRef.current.startPanX + dx);
-            setPanY(dragRef.current.startPanY + dy);
-          } else {
-            setYaw(dragRef.current.startYaw + dx * 0.01);
-            setPitch(
-              Math.max(
-                -Math.PI / 2 + 0.05,
-                Math.min(Math.PI / 2 - 0.05, dragRef.current.startPitch + dy * 0.01),
-              ),
-            );
-          }
+          if (dragRafRef.current !== null) cancelAnimationFrame(dragRafRef.current);
+          dragRafRef.current = requestAnimationFrame(() => {
+            dragRafRef.current = null;
+            if (dragRef.current.shift) {
+              setPanX(dragRef.current.startPanX + dx);
+              setPanY(dragRef.current.startPanY + dy);
+            } else {
+              setYaw(dragRef.current.startYaw + dx * 0.01);
+              setPitch(
+                Math.max(
+                  -Math.PI / 2 + 0.05,
+                  Math.min(Math.PI / 2 - 0.05, dragRef.current.startPitch + dy * 0.01),
+                ),
+              );
+            }
+          });
         }}
         onPointerUp={(event) => {
           dragRef.current.active = false;
           if (event.currentTarget.hasPointerCapture(event.pointerId)) {
             event.currentTarget.releasePointerCapture(event.pointerId);
           }
+        }}
+        onPointerCancel={(event) => {
+          dragRef.current.active = false;
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          }
+        }}
+        onLostPointerCapture={() => {
+          dragRef.current.active = false;
         }}
         onWheel={(event) => {
           event.preventDefault();

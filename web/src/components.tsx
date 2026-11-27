@@ -1,5 +1,6 @@
 import {
   useContext,
+  useId,
   useEffect,
   useRef,
   useState,
@@ -7,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 
+import { useModalFocusTrap } from "./components/Modals";
 import { UnitContext } from "./types";
 
 /**
@@ -15,14 +17,9 @@ import { UnitContext } from "./types";
  */
 export function InfoTip({ text, title }: { text?: string; title?: string }) {
   const [open, setOpen] = useState(false);
-  useEffect(() => {
-    if (!open) return;
-    const handler = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [open]);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  useModalFocusTrap(dialogRef, () => setOpen(false), open);
   if (!text) return null;
   return (
     <>
@@ -55,13 +52,16 @@ export function InfoTip({ text, title }: { text?: string; title?: string }) {
           }}
         >
           <div
+            ref={dialogRef}
             className="modal info-modal"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
+            aria-labelledby={titleId}
+            tabIndex={-1}
           >
             <div className="info-modal-header">
-              <h3>{title || "Bilgi / Information"}</h3>
+              <h3 id={titleId}>{title || "Bilgi / Information"}</h3>
               <button
                 type="button"
                 className="info-modal-close"
@@ -160,9 +160,11 @@ export function PageScrollbar() {
       setDragging(false);
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
   };
 
   const jumpTo = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -215,10 +217,22 @@ export function NumberField({
   disabled,
   action,
 }: NumberFieldProps) {
-  const invalid =
-    value === null ||
-    (value !== null && min !== undefined && value < min) ||
-    (value !== null && max !== undefined && value > max);
+  const errId = useId();
+  const outOfMin = value !== null && min !== undefined && value < min;
+  const outOfMax = value !== null && max !== undefined && value > max;
+  const invalid = value === null || outOfMin || outOfMax;
+  const errText =
+    value === null
+      ? "Değer gerekli / Value required"
+      : outOfMin && max !== undefined
+        ? `${min} – ${max}`
+        : outOfMin
+          ? `≥ ${min}`
+          : outOfMax && min !== undefined
+            ? `${min} – ${max}`
+            : outOfMax
+              ? `≤ ${max}`
+              : null;
   return (
     <div className="field" title={tooltip}>
       <div className="field-head">
@@ -233,6 +247,8 @@ export function NumberField({
         type="number"
         inputMode="decimal"
         aria-label={label}
+        aria-invalid={invalid || undefined}
+        aria-describedby={errText ? errId : undefined}
         value={value === null || Number.isNaN(value) ? "" : value}
         min={min}
         max={max}
@@ -249,6 +265,11 @@ export function NumberField({
           onChange(Number.isFinite(parsed) ? parsed : null);
         }}
       />
+      {errText && (
+        <span id={errId} className="field-error" role="alert">
+          {errText}
+        </span>
+      )}
     </div>
   );
 }
@@ -339,6 +360,7 @@ export function SliderField({
       <input
         className="slider"
         type="range"
+        aria-label={label}
         min={sliderLo}
         max={sliderHi}
         step={step}
@@ -440,6 +462,7 @@ export function DurationSliderField({
         <input
           className="slider"
           type="range"
+          aria-label={label}
           min={5}
           max={1800}
           step={5}
@@ -649,7 +672,7 @@ export function Group({
   if (!collapsible) {
     return (
       <section id={id} className={classes}>
-        <h3 className="group-title">{title}</h3>
+        <h2 className="group-title">{title}</h2>
         <div className="group-body">{children}</div>
       </section>
     );

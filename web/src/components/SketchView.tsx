@@ -815,7 +815,7 @@ export function AnnexAChartSvg({
               y1={yTop}
               x2={padL + plotW}
               y2={yTop}
-              stroke={isCurrentZone ? "#10b981" : "var(--border)"}
+              stroke={isCurrentZone ? "#10b981" : "var(--panel-border)"}
               strokeWidth={isCurrentZone ? 1.5 : 1}
               strokeDasharray="4 3"
             />
@@ -844,7 +844,7 @@ export function AnnexAChartSvg({
               y1={padT}
               x2={px}
               y2={padT + plotH}
-              stroke="var(--border)"
+              stroke="var(--panel-border)"
               strokeWidth={0.6}
               opacity={0.4}
             />
