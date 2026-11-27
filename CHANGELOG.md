@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.0.8] - 2026-11-27
+
+### Added
+- **ISO 17636 Şekil 14 / 14a / 14b Fiziksel Mesafe (`SDD_min > OD + bgap`) Doğrulaması ve Satır İçi Uyarı**: DWSI Odak Yüzeyde tekniğinde yalnızca $f_{\min} > OD$ değil, kapsama veya mesafe gereği $SDD_{\min} / SFD_{\min} > OD + b_{\text{gap}}$ olduğunda da fiziksel imkansızlık uyarısı (`figure_conflict`) üretilir; **Standart ISO Şekli** seçiminin altında tek tıkla uyumlu şekle (`Şekil 13 / 13a / 13b`) geçiş butonu sunulur.
+- **Güvenlik ve Veri Koruma Akışları**:
+  - `Lvl3Dialog` yerel taslak (`draft`) state'ine geçirildi; `İptal / Cancel` artık standart sapma değişikliklerini gerçekten iptal eder.
+  - `Sıfırla (Reset)` ve `Geçmişi Temizle (Clear History)` işlemlerine 8 sn süreli **Geri Al (Undo)** toast kurtarması eklendi.
+  - Radyasyon kontrollü alan mesafesi (`barrier_distance`) `HeroSummaryPanel` altında yüksek kontrastlı emniyet çağrısı (`hero-safety-callout`) olarak öne çıkarıldı; aktif Level 3 sapması `CompliancePanel` içinde denetim bandıyla gösterilir hale getirildi; `WarningsPanel` 3. kolonun en üstüne taşındı.
+- **Mobil Saha Özet Şeridi & 3D Yakınlaştırma**: `<860px` ekranlar için sabit `.mobile-summary-strip` (süre, $SFD_{\min}/SDD_{\min}$, uygunluk rozeti) ve 3D sahneye dokunmatik/klavye uyumlu `+` / `−` yakınlaştırma butonları eklendi.
+
+### Fixed
+- **Erişilebilirlik (WCAG 2.1 AA), Kontrast & Tema Bütünlüğü**:
+  - Karanlık/Aydınlık/Saha temalarında kontrastı yetersiz buton, rozet, güncelleme durumu ve tam ekran 3D stilleri `--on-accent`, `--on-danger` ve anlamsal renk tokenlarıyla düzeltildi; `WeldSetup3D` için yüksek kontrastlı `outdoor` palet renkleri eklendi.
+  - Tüm modallara focus-trap (`useModalFocusTrap`) ve `aria-labelledby`, `HeroSummaryPanel` kopyalama alanlarına klavye erişimli `<button>`, slider/sayı alanlarına `aria-label`, `aria-invalid` ve satır içi hata mesajları, `prefers-reduced-motion` desteği eklendi; `document.documentElement.lang` dil seçimiyle senkronize edildi.
+  - `OutputsPanel` 3 mantıksal alt grupta düzenlendi, `#section-applied` mükerrer panel boyut alanları kaldırıldı, `4 inç` hızlı şablonu ISO 17636 uyumlu `DWSI` olarak düzeltildi, `DecayDialog` yükleme/hata geri bildirimleri ve `UpdateModal` İngilizce çevirileri tamamlandı.
+  - `WeldSetup3D` `React.lazy` ile ayrıldı, `rAF` sürükleme throttling ve `onPointerCancel` / `onLostPointerCapture` koruması eklendi.
+
 ## [2.0.7] - 2026-10-31
 
 ### Added
